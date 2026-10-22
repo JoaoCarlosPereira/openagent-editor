@@ -10,13 +10,13 @@ Paridade significa reproduzir os fluxos e resultados observáveis, não copiar c
 
 ## Base entregue
 
-O Code OSS fornece edição, terminal, Git, depuração, extensões e interface multiplataforma. A extensão OpenAgent fornece chat, contexto explícito, chave em armazenamento seguro, edição com prévia e autocomplete inline opcional.
+O Code OSS fornece edição, terminal, Git, depuração, extensões e interface multiplataforma. A extensão OpenAgent fornece chat, contexto explícito, chave em armazenamento seguro, edição com prévia, autocomplete inline opcional e um agente local básico com ferramentas de leitura, busca, edição e terminal.
 
 ## Próximas entregas
 
 | Prioridade | Capacidade | Critério verificável |
 | --- | --- | --- |
-| P1 | Agente com ferramentas | Lê arquivos autorizados, pesquisa no workspace e propõe alterações em lote com diff. Comandos de terminal exigem confirmação. |
+| P1 | Agente com ferramentas | Ampliar o agente básico para alterações em lote, cancelamento, permissões configuráveis e validação de resultados. |
 | P1 | Indexação local | Busca semântica incremental por workspace com exclusões e inspeção dos dados indexados. |
 | P1 | Contexto de múltiplos arquivos | Usuário escolhe arquivos e diretórios a anexar, com orçamento de contexto visível. |
 | P2 | MCP | Cliente para servidores MCP configurados pelo usuário, com lista de ferramentas e consentimento por execução. |

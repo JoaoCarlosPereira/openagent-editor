@@ -6,6 +6,7 @@ const { complete, extractCodeBlock } = require('./client');
 const { editorContext, contextMessage } = require('./context');
 const { html } = require('./html');
 const { registerInline } = require('./inline');
+const { runAgent } = require('./agent');
 
 const KEY_NAME = 'openagent.apiKey';
 const SYSTEM = 'Você é um assistente de programação. Responda com precisão. Não alegue ter executado código ou testes. Quando fornecer uma edição, inclua o código completo da substituição em um único bloco Markdown.';
@@ -24,7 +25,7 @@ class ChatView {
     view.webview.html = html(crypto.randomBytes(16).toString('hex'));
     view.webview.onDidReceiveMessage(async message => {
       try {
-        if (message?.type === 'ask') await this.ask(message.text);
+        if (message?.type === 'ask') await this.ask(message.text, false, message.mode);
         if (message?.type === 'preview') await this.preview(message.id);
       } catch (error) {
         vscode.window.showErrorMessage(`OpenAgent: ${error.message || error}`);
@@ -34,21 +35,41 @@ class ChatView {
 
   post(message) { this.view?.webview.postMessage(message); }
 
-  async openWithPrompt(prompt, submit = false) {
+  async openWithPrompt(prompt, submit = false, mode = 'ask') {
     await vscode.commands.executeCommand('workbench.view.extension.openagent');
+    this.post({ type: 'mode', value: mode });
     if (submit) {
       this.post({ type: 'submitted', text: prompt });
-      await this.ask(prompt, true);
+      await this.ask(prompt, true, mode);
     }
     else this.post({ type: 'prompt', text: prompt });
   }
 
-  async ask(rawPrompt, editing = false) {
+  async ask(rawPrompt, editing = false, mode = 'ask') {
     const prompt = String(rawPrompt || '').trim();
     if (!prompt) return;
     const config = vscode.workspace.getConfiguration('openagent');
     const context = editorContext(vscode.window.activeTextEditor, config.get('maxContextCharacters', 12000));
     const user = prompt + contextMessage(context);
+    if (mode === 'agent') {
+      try {
+        const folder = (context && vscode.workspace.getWorkspaceFolder(vscode.Uri.parse(context.uri))) || vscode.workspace.workspaceFolders?.[0];
+        if (!folder) throw new Error('Abra uma pasta de trabalho para usar o agente.');
+        const answer = await runAgent({
+          folder,
+          baseUrl: config.get('baseUrl'),
+          model: config.get('model'),
+          apiKey: await this.context.secrets.get(KEY_NAME),
+          prompt,
+          context: contextMessage(context),
+          onProgress: text => this.post({ type: 'progress', text })
+        });
+        this.post({ type: 'answer', text: answer });
+      } catch (error) {
+        this.post({ type: 'error', text: error.message || String(error) });
+      }
+      return;
+    }
     const messages = [
       { role: 'system', content: SYSTEM },
       ...this.history.slice(-8),
@@ -118,6 +139,7 @@ function activate(context) {
     vscode.window.showInformationMessage(key ? 'Chave de API armazenada no SecretStorage.' : 'Chave de API removida.');
   }));
   context.subscriptions.push(vscode.commands.registerCommand('openagent.ask', () => chat.openWithPrompt('Explique este código.')));
+  context.subscriptions.push(vscode.commands.registerCommand('openagent.agent', () => chat.openWithPrompt('', false, 'agent')));
   context.subscriptions.push(vscode.commands.registerCommand('openagent.editSelection', async () => {
     const instruction = await vscode.window.showInputBox({ prompt: 'Como deseja editar a seleção?', ignoreFocusOut: true });
     if (!instruction) return;

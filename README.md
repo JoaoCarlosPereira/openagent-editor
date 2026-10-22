@@ -7,6 +7,7 @@ A meta desta MVP é paridade das funções locais do Cursor com modelos configur
 ## Estado atual
 
 - Chat em painel lateral com API de `chat/completions` compatível com OpenAI; endpoint e modelo configuráveis.
+- Modo Agent local com ferramentas para listar, ler e buscar arquivos; editar com diff e aprovação; executar comandos com aprovação e captura de saída.
 - Contexto do arquivo ativo ou da seleção enviado quando o usuário faz uma pergunta, com limite configurável.
 - Chave de API guardada no `SecretStorage` do editor.
 - Autocomplete inline opcional com debounce, cancelamento e limite de resposta.
@@ -19,7 +20,9 @@ A meta desta MVP é paridade das funções locais do Cursor com modelos configur
 2. Pressione `F5` e selecione **OpenAgent Extension** para abrir a janela de desenvolvimento de extensões. A extensão não precisa de `npm install` nem de compilação.
 3. Configure `openagent.baseUrl` e `openagent.model`. O padrão aponta para uma API local no formato do Ollama (`http://localhost:11434/v1`). O modelo padrão precisa existir no provedor.
 4. Se necessário, execute **OpenAgent: Set API Key** na paleta de comandos.
-5. Abra o ícone OpenAgent na barra lateral ou use o menu de contexto de uma seleção.
+5. Abra o ícone OpenAgent na barra lateral, escolha **Ask** ou **Agent**, ou use o menu de contexto de uma seleção.
+
+O modo Agent requer um modelo/provedor que implemente `tool_calls` no formato OpenAI. O modo Ask e o autocomplete usam apenas `chat/completions` com resposta textual.
 
 `npm test` executa os testes sem depender do editor. `npm run check` valida a sintaxe.
 

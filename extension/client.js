@@ -10,13 +10,13 @@ function completionsUrl(baseUrl) {
   return url;
 }
 
-async function complete({ baseUrl, model, apiKey, messages, signal }) {
+async function requestChat({ baseUrl, model, apiKey, messages, tools, signal }) {
   const headers = { 'content-type': 'application/json' };
   if (apiKey) headers.authorization = `Bearer ${apiKey}`;
   const response = await fetch(completionsUrl(baseUrl), {
     method: 'POST',
     headers,
-    body: JSON.stringify({ model, messages, stream: false }),
+    body: JSON.stringify({ model, messages, stream: false, ...(tools ? { tools, tool_choice: 'auto' } : {}) }),
     signal
   });
   if (!response.ok) {
@@ -24,7 +24,14 @@ async function complete({ baseUrl, model, apiKey, messages, signal }) {
     throw new Error(`Provedor respondeu HTTP ${response.status}: ${detail}`);
   }
   const data = await response.json();
-  const content = data?.choices?.[0]?.message?.content;
+  const message = data?.choices?.[0]?.message;
+  if (!message || typeof message !== 'object') throw new Error('O provedor não retornou uma mensagem em choices[0].message.');
+  return message;
+}
+
+async function complete(options) {
+  const message = await requestChat(options);
+  const content = message.content;
   if (typeof content !== 'string') throw new Error('O provedor não retornou texto em choices[0].message.content.');
   return content;
 }
@@ -34,4 +41,4 @@ function extractCodeBlock(text) {
   return match ? match[1].replace(/\n$/, '') : null;
 }
 
-module.exports = { completionsUrl, complete, extractCodeBlock };
+module.exports = { completionsUrl, requestChat, complete, extractCodeBlock };

@@ -2,7 +2,7 @@
   "name": "openagent-editor",
   "displayName": "OpenAgent Editor",
   "description": "Open source AI assistance for Code OSS and VS Code compatible editors",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "license": "MIT",
   "private": true,
   "engines": { "vscode": "^1.96.0" },
@@ -11,12 +11,14 @@
     "onView:openagent.chat",
     "onCommand:openagent.ask",
     "onCommand:openagent.editSelection",
+    "onCommand:openagent.agent",
     "onCommand:openagent.setApiKey"
   ],
   "contributes": {
     "commands": [
       { "command": "openagent.ask", "title": "OpenAgent: Ask about Selection" },
       { "command": "openagent.editSelection", "title": "OpenAgent: Edit Selection" },
+      { "command": "openagent.agent", "title": "OpenAgent: Open Agent" },
       { "command": "openagent.setApiKey", "title": "OpenAgent: Set API Key" }
     ],
     "viewsContainers": {
@@ -65,6 +67,6 @@
   },
   "scripts": {
     "test": "node --test tests/*.test.js",
-    "check": "node --check extension/index.js && node --check extension/client.js && node --check extension/html.js && node --check extension/context.js && node --check extension/inline.js"
+    "check": "node --check extension/index.js && node --check extension/client.js && node --check extension/html.js && node --check extension/context.js && node --check extension/inline.js && node --check extension/agent.js && node --check extension/paths.js"
   }
 }

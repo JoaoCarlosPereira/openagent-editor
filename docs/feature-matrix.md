@@ -2,11 +2,11 @@
 
 Levantamento em 2026-10-22. **Pacote** = módulo encontrado na instalação Linux 3.16.17, salvo indicação de Windows 3.24.18. **Docs** = função descrita na documentação oficial consultada nesta data. Uma linha com ambos não prova que o fluxo documentado exista exatamente nessas versões instaladas.
 
-| Capacidade | Evidência do pacote instalado | Documentação oficial | OpenAgent 0.1 |
+| Capacidade | Evidência do pacote instalado | Documentação oficial | OpenAgent 0.2 |
 | --- | --- | --- | --- |
 | Editor, terminal, Git, debug e extensões | `package.json` aponta para `microsoft/vscode`; diretórios `out/vs` e `extensions` | [Instalação e extensões](https://docs.cursor.com/get-started/installation) | Base Code OSS, sem distribuição própria |
-| Chat e modos Agent/Ask/Plan/Debug | `cursor-agent-host`, `cursor-agent-exec`, `cursor-local-agent-runtime`; `out/vs/workbench/contrib/composer` | [Agent e modos](https://prod.cursor.com/help/ai-features/agent) | Chat com modelo configurável; sem agente autônomo |
-| Ferramentas do agente: busca, leitura, edição e terminal | `cursor-agent-exec`, `cursor-retrieval` | [Ferramentas](https://docs.cursor.com/en/agent/tools) | Edição de seleção com diff; sem ciclo de ferramentas |
+| Chat e modos Agent/Ask/Plan/Debug | `cursor-agent-host`, `cursor-agent-exec`, `cursor-local-agent-runtime`; `out/vs/workbench/contrib/composer` | [Agent e modos](https://prod.cursor.com/help/ai-features/agent) | Ask e Agent básicos; Plan e Debug pendentes |
+| Ferramentas do agente: busca, leitura, edição e terminal | `cursor-agent-exec`, `cursor-retrieval` | [Ferramentas](https://docs.cursor.com/en/agent/tools) | Ciclo local de ferramentas, diff/aprovação para edição e comando; ainda sem alterações em lote |
 | Subagentes e fila de mensagens | Módulos de agente; detalhes não confirmados no pacote | [Agent](https://prod.cursor.com/help/ai-features/agent) | Pendente |
 | Autocomplete Tab, múltiplas linhas e saltos | Implementação específica não isolada | [Tab](https://cursor.com/help/ai-features/tab) | Continuação inline básica, opcional; sem saltos/edições cruzadas |
 | Inline Edit e edição de arquivo inteiro | `out/vs/workbench/contrib/composer`; detalhes não confirmados | [Inline Edit](https://docs.cursor.com/en/inline-edit/overview) | Seleção com prompt e prévia; sem UI inline ou edição integral |
