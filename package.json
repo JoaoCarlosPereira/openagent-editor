@@ -1,6 +1,7 @@
 {
   "name": "openagent-editor",
   "displayName": "OpenAgent Editor",
+  "publisher": "openagent",
   "description": "Open source AI assistance for Code OSS and VS Code compatible editors",
   "version": "0.2.0",
   "license": "MIT",
