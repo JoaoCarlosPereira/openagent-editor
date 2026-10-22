@@ -1,0 +1,70 @@
+{
+  "name": "openagent-editor",
+  "displayName": "OpenAgent Editor",
+  "description": "Open source AI assistance for Code OSS and VS Code compatible editors",
+  "version": "0.1.0",
+  "license": "MIT",
+  "private": true,
+  "engines": { "vscode": "^1.96.0" },
+  "main": "./extension/index.js",
+  "activationEvents": [
+    "onView:openagent.chat",
+    "onCommand:openagent.ask",
+    "onCommand:openagent.editSelection",
+    "onCommand:openagent.setApiKey"
+  ],
+  "contributes": {
+    "commands": [
+      { "command": "openagent.ask", "title": "OpenAgent: Ask about Selection" },
+      { "command": "openagent.editSelection", "title": "OpenAgent: Edit Selection" },
+      { "command": "openagent.setApiKey", "title": "OpenAgent: Set API Key" }
+    ],
+    "viewsContainers": {
+      "activitybar": [
+        { "id": "openagent", "title": "OpenAgent", "icon": "media/icon.svg" }
+      ]
+    },
+    "views": {
+      "openagent": [
+        { "id": "openagent.chat", "name": "Chat", "type": "webview" }
+      ]
+    },
+    "configuration": {
+      "title": "OpenAgent",
+      "properties": {
+        "openagent.baseUrl": {
+          "type": "string",
+          "default": "http://localhost:11434/v1",
+          "description": "Base URL of an OpenAI compatible chat completions API."
+        },
+        "openagent.model": {
+          "type": "string",
+          "default": "qwen2.5-coder:7b",
+          "description": "Model identifier accepted by the configured API."
+        },
+        "openagent.maxContextCharacters": {
+          "type": "integer",
+          "default": 12000,
+          "minimum": 1000,
+          "maximum": 100000,
+          "description": "Maximum characters sent from the selected editor context."
+        },
+        "openagent.inlineCompletion.enabled": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable inline code suggestions. Sends nearby code to the configured provider as you type."
+        }
+      }
+    },
+    "menus": {
+      "editor/context": [
+        { "command": "openagent.ask", "when": "editorHasSelection", "group": "navigation@10" },
+        { "command": "openagent.editSelection", "when": "editorHasSelection", "group": "navigation@11" }
+      ]
+    }
+  },
+  "scripts": {
+    "test": "node --test tests/*.test.js",
+    "check": "node --check extension/index.js && node --check extension/client.js && node --check extension/html.js && node --check extension/context.js && node --check extension/inline.js"
+  }
+}
