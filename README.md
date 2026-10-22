@@ -2,12 +2,13 @@
 
 Projeto aberto para construir uma experiência de editor com assistência de IA sobre o **Code OSS**. A primeira entrega é uma extensão funcional, com código próprio e licença MIT. Ela roda em editores compatíveis com a API de extensões do VS Code.
 
-A meta desta MVP é paridade das funções locais do Cursor com modelos configuráveis por API. Agentes e automações em nuvem ficam para a MVP seguinte.
+A meta desta MVP é paridade das funções locais e da interface do Cursor com modelos configuráveis por API. Agentes e automações em nuvem ficam para a MVP seguinte. A [situação atual da interface](docs/interface-parity.md) está documentada separadamente.
 
 ## Estado atual
 
 - Chat em painel lateral com API de `chat/completions` compatível com OpenAI; endpoint e modelo configuráveis.
 - Modo Agent local com ferramentas para listar, ler e buscar arquivos; editar com diff e aprovação; executar comandos com aprovação e captura de saída.
+- Painel de conversa com modos, modelo, contexto visível e nova conversa.
 - Contexto do arquivo ativo ou da seleção enviado quando o usuário faz uma pergunta, com limite configurável.
 - Chave de API guardada no `SecretStorage` do editor.
 - Autocomplete inline opcional com debounce, cancelamento e limite de resposta.

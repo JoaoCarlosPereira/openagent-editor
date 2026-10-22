@@ -2,6 +2,7 @@
 
 const vscode = require('vscode');
 const crypto = require('node:crypto');
+const path = require('node:path');
 const { complete, extractCodeBlock } = require('./client');
 const { editorContext, contextMessage } = require('./context');
 const { html } = require('./html');
@@ -17,15 +18,25 @@ class ChatView {
     this.history = [];
     this.pending = new Map();
     this.view = null;
+    this.ready = false;
+    this.outbox = [];
   }
 
   resolveWebviewView(view) {
     this.view = view;
+    this.ready = false;
     view.webview.options = { enableScripts: true };
     view.webview.html = html(crypto.randomBytes(16).toString('hex'));
     view.webview.onDidReceiveMessage(async message => {
       try {
-        if (message?.type === 'ask') await this.ask(message.text, false, message.mode);
+        if (message?.type === 'ready') {
+          this.ready = true;
+          for (const queued of this.outbox.splice(0)) this.view.webview.postMessage(queued);
+          this.post({ type: 'model', value: vscode.workspace.getConfiguration('openagent').get('model') });
+          this.updateContext();
+        }
+        if (message?.type === 'newChat') { this.history = []; this.pending.clear(); }
+        if (message?.type === 'ask') await this.ask(message.text, false, message.mode, message.includeContext !== false);
         if (message?.type === 'preview') await this.preview(message.id);
       } catch (error) {
         vscode.window.showErrorMessage(`OpenAgent: ${error.message || error}`);
@@ -33,7 +44,16 @@ class ChatView {
     });
   }
 
-  post(message) { this.view?.webview.postMessage(message); }
+  post(message) {
+    if (this.ready && this.view) this.view.webview.postMessage(message);
+    else if (this.view || !['context', 'model'].includes(message.type)) this.outbox.push(message);
+  }
+
+  updateContext() {
+    const editor = vscode.window.activeTextEditor;
+    const label = editor ? `${path.basename(editor.document.fileName)} · ${editor.selection.isEmpty ? 'arquivo' : 'seleção'}` : '';
+    this.post({ type: 'context', label });
+  }
 
   async openWithPrompt(prompt, submit = false, mode = 'ask') {
     await vscode.commands.executeCommand('workbench.view.extension.openagent');
@@ -45,15 +65,16 @@ class ChatView {
     else this.post({ type: 'prompt', text: prompt });
   }
 
-  async ask(rawPrompt, editing = false, mode = 'ask') {
+  async ask(rawPrompt, editing = false, mode = 'ask', includeContext = true) {
     const prompt = String(rawPrompt || '').trim();
     if (!prompt) return;
     const config = vscode.workspace.getConfiguration('openagent');
-    const context = editorContext(vscode.window.activeTextEditor, config.get('maxContextCharacters', 12000));
+    const editor = vscode.window.activeTextEditor;
+    const context = includeContext ? editorContext(editor, config.get('maxContextCharacters', 12000)) : null;
     const user = prompt + contextMessage(context);
     if (mode === 'agent') {
       try {
-        const folder = (context && vscode.workspace.getWorkspaceFolder(vscode.Uri.parse(context.uri))) || vscode.workspace.workspaceFolders?.[0];
+        const folder = (editor && vscode.workspace.getWorkspaceFolder(editor.document.uri)) || vscode.workspace.workspaceFolders?.[0];
         if (!folder) throw new Error('Abra uma pasta de trabalho para usar o agente.');
         const answer = await runAgent({
           folder,
@@ -131,6 +152,11 @@ function activate(context) {
   const chat = new ChatView(context);
   context.subscriptions.push(registerInline(context));
   context.subscriptions.push(vscode.window.registerWebviewViewProvider('openagent.chat', chat));
+  context.subscriptions.push(vscode.window.onDidChangeActiveTextEditor(() => chat.updateContext()));
+  context.subscriptions.push(vscode.window.onDidChangeTextEditorSelection(() => chat.updateContext()));
+  context.subscriptions.push(vscode.workspace.onDidChangeConfiguration(event => {
+    if (event.affectsConfiguration('openagent.model')) chat.post({ type: 'model', value: vscode.workspace.getConfiguration('openagent').get('model') });
+  }));
   context.subscriptions.push(vscode.commands.registerCommand('openagent.setApiKey', async () => {
     const key = await vscode.window.showInputBox({ prompt: 'Chave de API do provedor (deixe vazio para remover)', password: true, ignoreFocusOut: true });
     if (key === undefined) return;
