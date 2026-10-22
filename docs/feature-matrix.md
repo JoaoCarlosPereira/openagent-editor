@@ -1,6 +1,6 @@
 # Matriz de funcionalidades do Cursor
 
-Levantamento em 2026-10-22. **Pacote** = módulo encontrado na instalação Linux 3.16.17. **Docs** = função descrita na documentação oficial consultada nesta data. Uma linha com ambos não prova que o fluxo documentado exista exatamente nessa versão instalada. O instalador Windows 3.24.18 ainda não teve seu payload extraído.
+Levantamento em 2026-10-22. **Pacote** = módulo encontrado na instalação Linux 3.16.17, salvo indicação de Windows 3.24.18. **Docs** = função descrita na documentação oficial consultada nesta data. Uma linha com ambos não prova que o fluxo documentado exista exatamente nessas versões instaladas.
 
 | Capacidade | Evidência do pacote instalado | Documentação oficial | OpenAgent 0.1 |
 | --- | --- | --- | --- |
@@ -15,12 +15,13 @@ Levantamento em 2026-10-22. **Pacote** = módulo encontrado na instalação Linu
 | Exclusões de arquivos | Não traçado no pacote | [Ignore file](https://cursor.com/docs/reference/ignore-file) | Pendente |
 | MCP e ferramentas externas | `cursor-mcp` | [MCP](https://prod.cursor.com/help/customization/mcp) | Pendente |
 | Navegador controlado por agente | `cursor-browser-automation` | [Browser](https://cursor.com/docs/agent/tools/browser) | Pendente |
+| Uso do computador | `cursor-computer-use` existe no Windows 3.24.18; bundle contém nomes de ferramentas de screenshot, clique, scroll, digitação e permissões | [Automations e computer use](https://cursor.com/docs/cloud-agent/automations) | Pendente; execução e aprovação ainda não observadas |
 | Regras, skills, comandos, hooks e plugins | Não inventariados em detalhe no pacote | [Rules](https://prod.cursor.com/docs/rules), [Plugins](https://prod.cursor.com/docs/plugins) | Pendente |
 | Checkpoints e restauração | Não traçado no pacote | [Checkpoints](https://docs.cursor.com/en/agent/chat/checkpoints) | Pendente |
 | Worktrees e checkout | `cursor-shadow-workspace`, `cursor-checkout`, `cursor-worktree-textmate` | [Agent](https://prod.cursor.com/help/ai-features/agent) | Pendente |
-| Cloud Agents | `cursor-agent-worker` e `cursor-resolver` sugerem integração, sem comprovar execução remota | [Cloud Agents](https://prod.cursor.com/help/ai-features/background-agents) | Pendente |
+| Cloud Agents | `cursor-agent-worker` e `cursor-resolver` sugerem integração, sem comprovar execução remota | [Cloud Agents](https://prod.cursor.com/help/ai-features/background-agents) | MVP seguinte |
 | CLI para agente | `cursor-agent --help` local declara modos, sessões, worktrees, sandbox, MCP e plugins | [Cursor CLI](https://cursor.com/docs/cli/overview) | Pendente |
-| Automações remotas | Não identificadas na instalação local | [Automations](https://cursor.com/docs/cloud-agent/automations) | Pendente |
+| Automações remotas | Não identificadas na instalação local | [Automations](https://cursor.com/docs/cloud-agent/automations) | MVP seguinte |
 | Debug Mode com instrumentação | Módulos de agente; fluxo não isolado | [Debug Mode](https://prod.cursor.com/for/debugging) | Pendente |
 
 ## Prioridades de reprodução
@@ -29,6 +30,6 @@ Levantamento em 2026-10-22. **Pacote** = módulo encontrado na instalação Linu
 2. Acrescentar indexação local e exclusões; medir a qualidade da recuperação em projetos reais.
 3. Evoluir Tab e Inline Edit para edições de múltiplas linhas/arquivos e saltos.
 4. Integrar MCP, regras, sessões, checkpoints e navegador.
-5. Empacotar o Code OSS e criar distribuição própria. Cloud Agents e automações exigem infraestrutura adicional.
+5. Empacotar o Code OSS e criar distribuição própria. Cloud Agents e automações pertencem à MVP seguinte.
 
-As funções do Cursor documentadas online podem ter sido lançadas depois da versão Linux 3.16.17 instalada. A matriz indica o método de cada afirmação para evitar equivalência indevida entre versões.
+As funções do Cursor documentadas online podem ter sido lançadas depois das versões examinadas. A matriz indica o método de cada afirmação para evitar equivalência indevida entre versões.

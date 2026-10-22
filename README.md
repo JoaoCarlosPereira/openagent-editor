@@ -2,6 +2,8 @@
 
 Projeto aberto para construir uma experiência de editor com assistência de IA sobre o **Code OSS**. A primeira entrega é uma extensão funcional, com código próprio e licença MIT. Ela roda em editores compatíveis com a API de extensões do VS Code.
 
+A meta desta MVP é paridade das funções locais do Cursor com modelos configuráveis por API. Agentes e automações em nuvem ficam para a MVP seguinte.
+
 ## Estado atual
 
 - Chat em painel lateral com API de `chat/completions` compatível com OpenAI; endpoint e modelo configuráveis.
@@ -23,6 +25,6 @@ Projeto aberto para construir uma experiência de editor com assistência de IA 
 
 ## Direção técnica
 
-O produto completo deve empacotar Code OSS e esta camada de IA com identidade, atualizações e instaladores próprios. A extensão é o primeiro módulo desse produto. O [plano de paridade](docs/roadmap.md), a [matriz de funcionalidades](docs/feature-matrix.md) e o [caderno de evidências](docs/evidence.md) orientam as próximas etapas.
+O produto completo deve empacotar Code OSS e esta camada de IA com identidade, atualizações e instaladores próprios. A extensão é o primeiro módulo desse produto. O [plano de paridade](docs/roadmap.md), a [matriz de funcionalidades](docs/feature-matrix.md), os [critérios de aceitação](docs/parity-acceptance.md) e o [caderno de evidências](docs/evidence.md) orientam as próximas etapas.
 
 Não inclua binários, código, recursos de marca ou credenciais do Cursor neste repositório. As observações de engenharia reversa são registradas como fatos e hipóteses, sem copiar implementação proprietária.

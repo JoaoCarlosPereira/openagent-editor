@@ -1,0 +1,29 @@
+# Critérios de paridade local
+
+Cada cenário deve ser executado no Cursor de referência e no OpenAgent com o mesmo repositório de teste. Registrar versão, sistema, modelo/provedor, resultado, captura ou log e divergências. Uma capacidade só fica **concluída** quando o fluxo principal e os casos de erro passam no OpenAgent.
+
+| ID | Capacidade | Cenário de aceitação |
+| --- | --- | --- |
+| E01 | Editor base | Abrir pasta, editar arquivos, usar terminal, Git, debug e instalar uma extensão compatível. |
+| A01 | Chat Ask | Perguntar sobre uma função selecionada; resposta usa o contexto correto e não altera arquivos. |
+| A02 | Agent | Solicitar mudança em três arquivos; agente localiza arquivos, edita, executa teste autorizado e mostra resultado. |
+| A03 | Aprovações | Solicitar comando ou ferramenta sensível; usuário vê argumentos e pode aprovar ou recusar antes da execução. |
+| A04 | Modos | Alternar Ask, Plan e Agent; ferramentas e permissões seguem o modo escolhido. |
+| A05 | Subagentes locais | Delegar duas investigações independentes; reunir os resultados no contexto do agente principal. |
+| T01 | Tab | Completar linha e bloco; aceitar, recusar, cancelar durante geração e desativar por linguagem. |
+| T02 | Próximo local | Após aceitar sugestão, saltar para o próximo ponto de edição sugerido. |
+| T03 | Multiarquivo | Sugerir mudança relacionada em outro arquivo e permitir revisão antes de aplicar. |
+| I01 | Inline Edit | Editar seleção, inserir no cursor e revisar diff sem perder o texto original. |
+| I02 | Arquivo inteiro | Aplicar refatoração de arquivo completo com prévia, rejeição e instrução de refinamento. |
+| C01 | Contexto | Anexar seleção, arquivo e pasta; mostrar o que será enviado e avisar quando houver truncamento. |
+| C02 | Busca | Indexar workspace, recuperar símbolos/trechos relevantes e atualizar resultados após editar arquivo. |
+| C03 | Exclusões | Impedir que arquivos excluídos entrem em índice, contexto automático ou busca do agente. |
+| M01 | MCP | Conectar servidor stdio e HTTP, listar ferramentas, solicitar aprovação e mostrar resultado. |
+| R01 | Regras | Aplicar instruções de usuário e projeto nos modos certos; mostrar regras carregadas. |
+| S01 | Sessões | Salvar, retomar, exportar e apagar conversa de um workspace. |
+| S02 | Checkpoints | Restaurar alterações feitas pelo agente sem reverter edições manuais posteriores. |
+| B01 | Navegador | Navegar, clicar, capturar screenshot e ler console em ambiente de teste com autorização. |
+| U01 | Computador | Selecionar app, capturar tela e executar ação aprovada; registrar resultado e recusa. |
+| D01 | Distribuição | Instalar pacote próprio em Linux e Windows, atualizar e preservar configurações. |
+
+Serviços em nuvem e automações remotas serão avaliados na MVP seguinte. O provedor de modelo pode diferir do Cursor; a avaliação deve medir o comportamento da ferramenta e a qualidade mínima definida para o cenário, sem exigir respostas textualmente idênticas.
