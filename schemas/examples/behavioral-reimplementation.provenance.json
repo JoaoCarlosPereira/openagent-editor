@@ -1,5 +1,5 @@
 {
-  "$schema": "../provenance.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
   "schemaVersion": 1,
   "module": "services/harness-daemon/src/queue",
   "strategy": "behavioral-reimplementation",

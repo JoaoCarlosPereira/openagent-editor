@@ -14,8 +14,8 @@
   ],
   "properties": {
     "$schema": {
-      "type": "string",
-      "description": "Caminho ou URI do schema, opcional, para editores."
+      "const": "https://json-schema.org/draft/2020-12/schema",
+      "description": "URI exata do JSON Schema draft 2020-12."
     },
     "schemaVersion": {
       "const": 1,
@@ -24,7 +24,7 @@
     "module": {
       "type": "string",
       "minLength": 1,
-      "pattern": "^[A-Za-z0-9._-]+(/[A-Za-z0-9._-]+)*$",
+      "pattern": "^(?!/)(?!.*(?:^|/)\\.?(?:/|$))(?!.*(?:^|/)\\.\\.(?:/|$))[A-Za-z0-9_-]+(?:/[A-Za-z0-9_-]+)*$",
       "description": "Caminho do modulo no repositorio, relativo a raiz, com separador '/'."
     },
     "strategy": {
@@ -179,7 +179,7 @@
         "documentRef": {
           "type": "string",
           "minLength": 1,
-          "pattern": "^(?!/)(?!.*\\.\\./).+$",
+          "pattern": "^[A-Za-z0-9_-]+(?:\\.[A-Za-z0-9_-]+)*(?:/[A-Za-z0-9_-]+(?:\\.[A-Za-z0-9_-]+)*)*$",
           "description": "Caminho relativo a raiz do repositorio para o documento de autorizacao/licenca."
         },
         "documentSha256": {

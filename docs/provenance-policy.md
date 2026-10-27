@@ -26,13 +26,15 @@ Permite incorporar implementação extraída do Cursor 3.24.18 ao módulo. Aplic
 
 Regras:
 
-- O campo `authorization` é obrigatório. Sem ele, o `provenance.json` é inválido e o build rejeita o módulo.
-- `authorization.documentRef` aponta, por caminho relativo à raiz do repositório, para o documento de autorização. O documento precisa existir no repositório.
-- `authorization.documentSha256` é o SHA-256 do documento. Hash divergente invalida o registro.
+- O campo `authorization` é obrigatório. Sem ele, o registro não atende ao contrato e a validação automatizada futura deve rejeitar o módulo.
+- `authorization.documentRef` aponta, por caminho relativo à raiz do repositório, para o documento de autorização.
+- `authorization.documentSha256` é o SHA-256 esperado do documento.
 - `authorization.scope` descreve o que o documento autoriza, nos termos dele. O uso no módulo não pode ir além desse escopo.
 - `license.spdx` identifica a licença ou os termos aplicáveis ao código incorporado (por exemplo, `LicenseRef-*`). A licença MIT do repositório não comprova, por si só, a autorização.
 
 A declaração verbal de que existe autorização não basta. Enquanto o documento não estiver registrado, todo módulo usa `behavioral-reimplementation`.
+
+A validação da referência, da existência do documento e da correspondência do hash será ativada pelos cards task_04/task_05. Até que esses cards implementem o validador e o gate, esta política descreve o contrato pretendido, não uma garantia aplicada pelo build atual.
 
 ## Campos obrigatórios
 
@@ -57,8 +59,8 @@ A declaração verbal de que existe autorização não basta. Enquanto o documen
 
 Marca, logotipos, ícones, nomes comerciais e textos de interface do Cursor ficam proibidos no produto, em qualquer estratégia, inclusive em `direct-authorized`. O produto usa nome, ícones e textos próprios do OpenAgent. O campo `containsCursorBrandAssets` só aceita `false`, e qualquer conteúdo desse tipo é removido antes do commit.
 
-## Aplicação
+## Aplicação planejada
 
-- A estrutura do `provenance.json` é validada contra o schema (validador em `packages/provenance`).
-- O build rejeita `direct-authorized` sem documento de autorização referenciado, existente e com hash conferido.
+- O card task_04 implementará a validação estrutural do `provenance.json` contra o schema.
+- O card task_05 integrará ao build a checagem de documento de autorização referenciado, existente e com hash conferido.
 - Código, marca, ícones e textos não cobertos por esta política não entram no pacote MIT.
