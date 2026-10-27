@@ -3,7 +3,7 @@ import { spawnSync } from "node:child_process";
 
 const patterns = [
   "packages/*/test/**/*.test.ts",
-  "services/*/test/unit/**/*.test.ts",
+  "services/*/test/unit/**/*.ts",
 ];
 const files = [];
 
@@ -17,10 +17,12 @@ if (files.length === 0) {
   console.error("Nenhum teste unitário encontrado.");
   process.exitCode = 1;
 } else {
+  const childEnv = { ...process.env };
+  delete childEnv.NODE_TEST_CONTEXT;
   const result = spawnSync(
     process.execPath,
     ["--import", "tsx", "--test", ...files],
-    { stdio: "inherit" },
+    { stdio: "inherit", env: childEnv },
   );
   process.exitCode = result.status ?? 1;
 }
