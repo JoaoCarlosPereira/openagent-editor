@@ -6,6 +6,11 @@ import os from "node:os";
 import path from "node:path";
 import type net from "node:net";
 import {
+  createToolPermissionRequest,
+  openPermissionExecutionGate,
+  resolvePermissionExecutionGate,
+} from "@openagent/policy";
+import {
   OPENAGENT_DAEMON_PROTOCOL_VERSION,
   PROTOCOL_ERROR_CODES,
   ProtocolError,
@@ -15,7 +20,6 @@ import {
   getRpcMethodSpec,
   readProtocolFrame,
   validateRpcRequest,
-  validateWorkspaceTransportAck,
   validateWorkspaceTransportHello,
   writeProtocolFrame,
   type ProtocolErrorCode,
@@ -25,6 +29,12 @@ import {
   type WorkspaceTransportHello,
 } from "@openagent/protocol";
 import { openWorkspaceDatabase } from "@openagent/storage";
+import {
+  prepareSubagentRunToolPermission,
+  recordParentRunToolGrant,
+} from "../../src/agents/agent-subagent-grants.js";
+import { createWorkspaceCustomizationRules } from "../../src/customization/session-rules-loader.js";
+import type { DaemonRpcContext } from "../../src/runs/run-rpc-handler.js";
 import { startHarnessDaemon } from "../../src/index.js";
 
 const WORKSPACE_HELLO: WorkspaceTransportHello = {
@@ -37,6 +47,24 @@ const WORKSPACE_HELLO: WorkspaceTransportHello = {
   mcpServerIds: [],
   sessionIds: [],
 };
+
+function buildGrantTestContext(workspaceId: string): DaemonRpcContext {
+  return {
+    dataRoot: "/tmp/openagent-subagent-grant-unused",
+    binding: {
+      workspaceId,
+      workspaceRoot: "/tmp/openagent-subagent-grant",
+      providerProfileId: "provider-local",
+      mode: "agent",
+      rulesRef: "rules:default",
+      mcpServerIds: [],
+      sessionIds: [],
+    },
+    customizationRules: createWorkspaceCustomizationRules(),
+    runMachines: new Map(),
+    runQueues: new Map(),
+  };
+}
 
 async function readJsonFrame(socket: net.Socket): Promise<Record<string, unknown>> {
   const frame = await readProtocolFrame(socket);
@@ -127,75 +155,54 @@ async function waitForAgentNodeState(
 }
 
 test.describe("Subagente herda grants sem ampliar (AGT-05 / PER-01)", { concurrency: 1 }, () => {
-  test("[AGT-05][PER-01] grant-check herda grant do run pai e capabilities declaradas não ampliam", async () => {
-    const dataRoot = await mkdtemp(path.join(os.tmpdir(), "openagent-subagent-grant-"));
-    const runtimeDirectory = path.join(dataRoot, "runtime");
+  test("[AGT-05][PER-01] herança via recordParentRunToolGrant após aceite explícito (once)", () => {
     const runId = `run-${randomUUID()}`;
-    const objective =
-      "[run-grant-seed:session:file.write:src/inherit.ts][declared-caps:shell.exec,file.write][grant-check:file.write:src/inherit.ts] Validar herança";
+    const sessionId = `ses-${randomUUID()}`;
+    const context = buildGrantTestContext("ws-subagent-grant-inherit");
 
-    const runtime = await startHarnessDaemon({ dataRoot, runtimeDirectory });
-    const socket = await connectLocalTransport(runtime.address);
-    let sessionId: string | undefined;
-    let agentId: string | undefined;
-    try {
-      await performClientHandshake(socket, WORKSPACE_HELLO);
-      const created = await callDaemonRpc(socket, RPC_METHOD.SESSION_CREATE, { mode: "agent" }, {
-        workspaceId: WORKSPACE_HELLO.workspaceId,
-        sessionId: `ses-${randomUUID()}`,
-        runId: `run-ph-${randomUUID()}`,
-      });
-      sessionId = created.sessionId;
-
-      await callDaemonRpc(
-        socket,
-        RPC_METHOD.RUN_START,
-        { input: { text: "run pai" } },
-        { workspaceId: WORKSPACE_HELLO.workspaceId, sessionId, runId },
-      );
-
-      const spawned = await callDaemonRpc(
-        socket,
-        RPC_METHOD.AGENT_SPAWN,
-        { objective },
-        { workspaceId: WORKSPACE_HELLO.workspaceId, sessionId, runId },
-      );
-      agentId = spawned.agentId;
-    } finally {
-      socket.destroy();
-      await runtime.stop();
-    }
-
-    assert.ok(agentId);
-    await waitForAgentNodeState(
-      dataRoot,
-      WORKSPACE_HELLO.workspaceId,
-      runId,
-      agentId,
-      "complete",
-    );
-
-    const db = openWorkspaceDatabase({
-      dataRoot,
-      workspaceId: WORKSPACE_HELLO.workspaceId,
+    const parentRequest = createToolPermissionRequest({
+      requestId: "parent-allow-write",
+      capability: "file.write",
+      target: { kind: "path", path: "src/inherit.ts" },
+      offeredScopes: ["once", "session", "workspace"],
     });
-    try {
-      const node = db.listAgentNodes(runId).find((entry) => entry.id === agentId);
-      assert.ok(node?.resultRef);
-      const payload = JSON.parse(
-        Buffer.from(db.readCasBlob(node.resultRef)).toString("utf8"),
-      ) as {
-        inheritedGrantPhase: string | null;
-        declaredCapabilities: string[];
-        objective: string;
-      };
-      assert.equal(payload.inheritedGrantPhase, "granted");
-      assert.deepEqual(payload.declaredCapabilities, ["shell.exec", "file.write"]);
-      assert.equal(payload.objective, "Validar herança");
-    } finally {
-      db.close();
-      await rm(dataRoot, { recursive: true, force: true });
-    }
+    const resolvedGate = resolvePermissionExecutionGate(
+      openPermissionExecutionGate(parentRequest, "once"),
+      "allow",
+      "once",
+    );
+    assert.equal(resolvedGate.phase, "resolved");
+    recordParentRunToolGrant(context, runId, sessionId, resolvedGate);
+
+    const prepared = prepareSubagentRunToolPermission(
+      context,
+      {
+        runId,
+        sessionId,
+        request: {
+          requestId: "subagent-grant-check",
+          capability: "file.write",
+          target: { kind: "path", path: "src/inherit.ts" },
+        },
+      },
+      ["shell.exec", "file.write"],
+    );
+    assert.equal(prepared.phase, "granted");
+
+    const amplified = prepareSubagentRunToolPermission(
+      context,
+      {
+        runId,
+        sessionId,
+        request: {
+          requestId: "subagent-shell-check",
+          capability: "shell.exec",
+          target: { kind: "command", command: "npm test" },
+        },
+      },
+      ["shell.exec", "file.write"],
+    );
+    assert.equal(amplified.phase, "pending");
   });
 
   test("[PER-01] sem grant do pai, ferramenta fica pendente até aceite explícito", async () => {
@@ -235,11 +242,13 @@ test.describe("Subagente herda grants sem ampliar (AGT-05 / PER-01)", { concurre
       await runtime.stop();
     }
 
+    assert.ok(agentId);
+    const completedAgentId = agentId;
     await waitForAgentNodeState(
       dataRoot,
       WORKSPACE_HELLO.workspaceId,
       runId,
-      agentId!,
+      completedAgentId,
       "complete",
     );
 
@@ -248,11 +257,14 @@ test.describe("Subagente herda grants sem ampliar (AGT-05 / PER-01)", { concurre
       workspaceId: WORKSPACE_HELLO.workspaceId,
     });
     try {
-      const node = db.listAgentNodes(runId).find((entry) => entry.id === agentId);
+      const node = db.listAgentNodes(runId).find((entry) => entry.id === completedAgentId);
+      assert.ok(node);
+      assert.ok(node.resultRef);
       const payload = JSON.parse(
-        Buffer.from(db.readCasBlob(node!.resultRef!)).toString("utf8"),
-      ) as { inheritedGrantPhase: string | null };
+        Buffer.from(db.readCasBlob(node.resultRef)).toString("utf8"),
+      ) as { inheritedGrantPhase: string | null; objective: string };
       assert.equal(payload.inheritedGrantPhase, "pending");
+      assert.equal(payload.objective, "Sem grant herdado");
     } finally {
       db.close();
       await rm(dataRoot, { recursive: true, force: true });

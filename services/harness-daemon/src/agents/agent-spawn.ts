@@ -10,7 +10,6 @@ import {
   parseSubagentDeclaredCapabilities,
   parseSubagentGrantCheck,
   persistHarnessEventWithPayload,
-  seedRunGrantsFromSubagentObjective,
   stripSubagentObjectiveMarkers,
 } from "@openagent/policy";
 import { openWorkspaceDatabase } from "@openagent/storage";
@@ -20,11 +19,7 @@ import {
   loadRunSessionId,
   updateAgentNodeState,
 } from "./agent-node-db.js";
-import {
-  buildRunGrantContext,
-  prepareSubagentRunToolPermission,
-  runGrantRegistryForContext,
-} from "./agent-subagent-grants.js";
+import { prepareSubagentRunToolPermission } from "./agent-subagent-grants.js";
 import {
   parseSubagentObjectiveDelay,
   registerSubagentRun,
@@ -167,13 +162,9 @@ export function spawnSubagentFromObjective(
     assertSpawnPreconditions(context, runId, db);
     parseSubagentGrantCheck(objective);
 
+    // PER-01: grants do run pai só via aceite explícito (recordParentRunToolGrant).
+    // Não mintar grants a partir de marcadores no objective.
     const sessionId = loadRunSessionId(db, runId);
-    const grantContext = buildRunGrantContext(context, sessionId);
-    seedRunGrantsFromSubagentObjective(
-      objective,
-      runGrantRegistryForContext(context, runId),
-      grantContext,
-    );
 
     const agentId = randomUUID();
     const { objectiveText } = parseSubagentObjectiveDelay(objective);

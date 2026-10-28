@@ -57,7 +57,8 @@ export function computeGrantExpiresAtMs(
 ): number | null {
   switch (scope) {
     case "once":
-      return createdAtMs;
+      // once: sem TTL temporal — só consumo/revogação (PER-01).
+      return null;
     case "session":
       return context.sessionExpiresAtMs ?? createdAtMs + DEFAULT_SESSION_TTL_MS;
     case "workspace":
@@ -87,6 +88,10 @@ export function validatePermissionGrantContext(
 }
 
 export function issuePermissionGrant(input: IssuePermissionGrantInput): PermissionGrant {
+  const grantId = input.grantId.trim();
+  if (grantId.length === 0) {
+    throw new ProtocolError("INVALID_STATE", "grantId não pode ser vazio.", []);
+  }
   if (input.request.offeredScopes.includes(input.scope) === false) {
     throw new ProtocolError(
       "INVALID_STATE",
@@ -97,7 +102,7 @@ export function issuePermissionGrant(input: IssuePermissionGrantInput): Permissi
 
   const createdAtMs = input.context.nowMs;
   return {
-    grantId: input.grantId.trim(),
+    grantId,
     scope: input.scope,
     capability: input.request.capability,
     targetPattern: buildTargetPattern(input.request.target),
