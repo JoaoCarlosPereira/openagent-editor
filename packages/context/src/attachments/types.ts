@@ -60,3 +60,22 @@ export type ContextAttachmentInvalidResult = {
 export type ContextAttachmentValidationResult =
   | { valid: true; value: ContextAttachmentDraft }
   | ContextAttachmentInvalidResult;
+
+/** Entrada para montar o payload enviado a uma API externa (PRV-01). */
+export interface ContextExternalSendParams {
+  attachments: unknown[];
+  messageText?: string;
+  /** Deve ser true após ação explícita de envio na UI/CLI. */
+  explicitSendAcknowledged: boolean;
+}
+
+/** Conteúdo pronto para o gateway após confirmação explícita (PRV-01). */
+export interface ContextExternalSendResult {
+  /** Texto do usuário + blocos de contexto incluídos (sem caminhos excluídos). */
+  content: string;
+  includedPaths: string[];
+  messageTokenCount: number;
+  totalTokenCount: number;
+  contextLimitTokens: number;
+  withinLimit: boolean;
+}

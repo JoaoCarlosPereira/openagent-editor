@@ -2,6 +2,7 @@ export {
   buildContextSendPreview,
   type BuildContextSendPreviewInput,
 } from "./attachments/preview.js";
+export { buildExternalContextUserContent } from "./attachments/external-payload.js";
 export {
   DEFAULT_CONTEXT_TOKEN_LIMIT,
   estimateContextTokens,
@@ -15,6 +16,8 @@ export {
   type ContextAttachmentKind,
   type ContextAttachmentSource,
   type ContextAttachmentValidationResult,
+  type ContextExternalSendParams,
+  type ContextExternalSendResult,
   type ContextSendPreview,
   type ContextTokenLimitValidationResult,
 } from "./attachments/types.js";
@@ -27,6 +30,10 @@ export {
   executeContextAttachRpc,
   type ExecuteContextAttachRpcOptions,
 } from "./rpc/context-attach.js";
+export {
+  executeContextSendRpc,
+  type ExecuteContextSendRpcOptions,
+} from "./rpc/context-send.js";
 export {
   executeContextIndexRpc,
   type ExecuteContextIndexRpcOptions,
