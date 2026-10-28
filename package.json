@@ -77,7 +77,8 @@
     "check:provenance": "node --import tsx scripts/check-provenance-gate.mjs",
     "test:unit": "node scripts/run-unit-tests.mjs",
     "typecheck": "tsc -p tsconfig.json",
-    "lint": "eslint --max-warnings 0 ."
+    "lint": "eslint --max-warnings 0 .",
+    "parity:report": "node scripts/parity-report.mjs"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",
