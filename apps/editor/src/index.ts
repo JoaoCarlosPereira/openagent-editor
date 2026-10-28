@@ -40,6 +40,15 @@ export {
   type ConversationSearchViewSnapshot,
 } from "./agent/conversation-search.js";
 export {
+  SideConversationController,
+  buildSideConversationView,
+  type SideConversationForkPort,
+  type SideConversationForkResult,
+  type SideConversationRequestResult,
+  type SideConversationUiPhase,
+  type SideConversationViewSnapshot,
+} from "./agent/side-conversation.js";
+export {
   PermissionDialogController,
   buildPermissionDialogView,
   type PermissionDialogViewSnapshot,

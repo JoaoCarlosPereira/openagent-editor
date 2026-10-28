@@ -56,3 +56,12 @@ export {
   type ConversationSearchUiPhase,
   type ConversationSearchViewSnapshot,
 } from "./conversation-search.js";
+export {
+  SideConversationController,
+  buildSideConversationView,
+  type SideConversationForkPort,
+  type SideConversationForkResult,
+  type SideConversationRequestResult,
+  type SideConversationUiPhase,
+  type SideConversationViewSnapshot,
+} from "./side-conversation.js";
