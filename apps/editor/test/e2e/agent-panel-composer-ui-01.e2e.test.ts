@@ -68,6 +68,11 @@ describe("UI-01 e2e — painel com composer e histórico", () => {
         error.message === USER_INPUT_EMPTY_MESSAGE,
     );
     assert.equal(panel.snapshot.accessible.historyCount, 1);
+    assert.equal(
+      panel.snapshot.accessible.composerValidationMessage,
+      USER_INPUT_EMPTY_MESSAGE,
+    );
+    assert.match(panel.snapshot.html, /data-testid="agent-composer-validation"/);
     assert.equal(PANEL_EMPTY_MESSAGE, USER_INPUT_EMPTY_MESSAGE);
   });
 });

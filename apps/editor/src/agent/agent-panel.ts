@@ -6,7 +6,11 @@ import {
   type UserInput,
 } from "@openagent/protocol";
 
-import { summarizeContextAttachments } from "../context/panel-context-slot.js";
+import {
+  summarizeContextAttachments,
+  toUserInputAttachments,
+  type AgentPanelContextAttachment,
+} from "../context/panel-context-slot.js";
 import {
   buildAgentPanelView,
   type AgentPanelViewSnapshot,
@@ -29,6 +33,7 @@ export {
   DEFAULT_AGENT_PANEL_MODELS,
   type AgentPanelModelOption,
 } from "./agent-panel-selectors.js";
+export type { AgentPanelContextAttachment } from "../context/panel-context-slot.js";
 
 export interface AgentPanelOpenInput {
   sessionId: string;
@@ -36,6 +41,7 @@ export interface AgentPanelOpenInput {
   mode?: AgentMode;
   modelId?: string;
   availableModels?: readonly AgentPanelModelOption[];
+  initialAttachments?: readonly AgentPanelContextAttachment[];
 }
 
 export interface AgentPanelSubmitResult {
@@ -57,13 +63,15 @@ function firstAvailableModelId(
 }
 
 /**
- * UI-01 (127/128): painel com seletores de modo/modelo, composer e histórico; envio validado (VAL-01).
+ * UI-01 / VAL-01: painel com seletores, composer, histórico e recusa de envio vazio com texto exato.
  */
 export class AgentPanelController {
   private sessionId = "";
   private history: AgentHistoryMessage[] = [];
   private composerText = "";
   private composerDisabled = false;
+  private composerValidationMessage: string | undefined;
+  private contextAttachments: AgentPanelContextAttachment[] = [];
   private mode: AgentMode = "agent";
   private modelId = firstAvailableModelId(DEFAULT_AGENT_PANEL_MODELS);
   private availableModels: readonly AgentPanelModelOption[] = DEFAULT_AGENT_PANEL_MODELS;
@@ -86,6 +94,8 @@ export class AgentPanelController {
     this.history = [...(input.initialHistory ?? [])];
     this.composerText = "";
     this.composerDisabled = false;
+    this.composerValidationMessage = undefined;
+    this.contextAttachments = [...(input.initialAttachments ?? [])];
     this.availableModels =
       input.availableModels && input.availableModels.length > 0
         ? [...input.availableModels]
@@ -113,6 +123,16 @@ export class AgentPanelController {
 
   setComposerText(text: string): AgentPanelViewSnapshot {
     this.composerText = text;
+    this.composerValidationMessage = undefined;
+    this.refreshView();
+    return this.view;
+  }
+
+  setContextAttachments(
+    attachments: readonly AgentPanelContextAttachment[],
+  ): AgentPanelViewSnapshot {
+    this.contextAttachments = [...attachments];
+    this.composerValidationMessage = undefined;
     this.refreshView();
     return this.view;
   }
@@ -124,18 +144,29 @@ export class AgentPanelController {
   }
 
   submitComposer(): AgentPanelSubmitResult {
-    const validation = validateUserInput({ text: this.composerText });
+    const validation = validateUserInput({
+      text: this.composerText,
+      attachments: toUserInputAttachments(this.contextAttachments),
+    });
     if (!validation.valid) {
       const message =
         validation.userMessage ??
         `UserInput inválido: ${validation.errors.join("; ")}`;
+      // VAL-01: exibir o texto exato na UI antes de recusar com INVALID_STATE.
+      this.composerValidationMessage = validation.userMessage ?? message;
+      this.refreshView();
       throw new ProtocolError(validation.code, message, validation.errors);
     }
 
     const trimmed = validation.value.text?.trim() ?? "";
-    const userMessage = createAgentHistoryMessage("user", trimmed);
+    const historyContent =
+      trimmed.length > 0
+        ? trimmed
+        : summarizeContextAttachments(this.contextAttachments).labels.join(", ");
+    const userMessage = createAgentHistoryMessage("user", historyContent);
     this.history.push(userMessage);
     this.composerText = "";
+    this.composerValidationMessage = undefined;
     this.refreshView();
 
     return {
@@ -148,7 +179,7 @@ export class AgentPanelController {
   }
 
   private refreshView(): void {
-    summarizeContextAttachments([]);
+    summarizeContextAttachments(this.contextAttachments);
     this.view = buildAgentPanelView({
       sessionId: this.sessionId,
       history: this.history,
@@ -157,6 +188,9 @@ export class AgentPanelController {
       mode: this.mode,
       modelId: this.modelId,
       availableModels: this.availableModels,
+      ...(this.composerValidationMessage !== undefined
+        ? { composerValidationMessage: this.composerValidationMessage }
+        : {}),
     });
   }
 }

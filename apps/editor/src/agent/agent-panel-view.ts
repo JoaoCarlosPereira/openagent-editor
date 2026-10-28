@@ -15,6 +15,8 @@ export interface AgentPanelViewInput {
   mode: AgentMode;
   modelId: string;
   availableModels: readonly AgentPanelModelOption[];
+  /** VAL-01: mensagem de recusa do composer (texto exato do PRD quando vazio). */
+  composerValidationMessage?: string;
 }
 
 export interface AgentPanelViewSnapshot {
@@ -26,6 +28,7 @@ export interface AgentPanelViewSnapshot {
     mode: AgentMode;
     modelId: string;
     focusOrder: readonly string[];
+    composerValidationMessage: string | null;
   };
 }
 
@@ -78,7 +81,18 @@ function renderModelSelect(
   ].join("");
 }
 
-/** UI-01 (127/128): painel do agente com seletores, composer e histórico acessível por teclado. */
+function renderComposerValidation(message: string | undefined): string {
+  if (message === undefined || message.length === 0) {
+    return "";
+  }
+  return [
+    `<p role="alert" aria-live="assertive" data-testid="agent-composer-validation">`,
+    escapeHtml(message),
+    `</p>`,
+  ].join("");
+}
+
+/** UI-01 (127–129): painel do agente com seletores, composer, VAL-01 e histórico acessível. */
 export function buildAgentPanelView(input: AgentPanelViewInput): AgentPanelViewSnapshot {
   const historyItems =
     input.history.length > 0
@@ -86,6 +100,10 @@ export function buildAgentPanelView(input: AgentPanelViewInput): AgentPanelViewS
       : `<li data-testid="agent-history-empty">Nenhuma mensagem ainda.</li>`;
 
   const composerDisabledAttr = input.composerDisabled ? " disabled" : "";
+  const validationMessage = input.composerValidationMessage;
+  const hasValidation =
+    validationMessage !== undefined && validationMessage.length > 0;
+  const invalidAttr = hasValidation ? ` aria-invalid="true"` : "";
   const focusOrder = [
     "agent-mode-selector",
     "agent-model-selector",
@@ -106,8 +124,9 @@ export function buildAgentPanelView(input: AgentPanelViewInput): AgentPanelViewS
     `<form data-testid="agent-composer">`,
     `<label for="agent-composer-input">Mensagem</label>`,
     `<textarea id="agent-composer-input" data-testid="agent-composer-input" name="composer"`,
-    ` aria-label="Composer do agente" tabindex="0"${composerDisabledAttr}>`,
+    ` aria-label="Composer do agente" tabindex="0"${composerDisabledAttr}${invalidAttr}>`,
     `${escapeHtml(input.composerText)}</textarea>`,
+    renderComposerValidation(validationMessage),
     `<button type="button" data-testid="agent-composer-send" tabindex="0"${composerDisabledAttr}>Enviar</button>`,
     `</form>`,
     `<div data-testid="agent-review-slot" role="group" aria-label="Revisão de alterações" tabindex="0"></div>`,
@@ -123,6 +142,10 @@ export function buildAgentPanelView(input: AgentPanelViewInput): AgentPanelViewS
       mode: input.mode,
       modelId: input.modelId,
       focusOrder,
+      composerValidationMessage:
+        validationMessage !== undefined && validationMessage.length > 0
+          ? validationMessage
+          : null,
     },
   };
 }
