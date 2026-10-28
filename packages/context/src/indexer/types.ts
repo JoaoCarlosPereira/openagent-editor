@@ -30,6 +30,8 @@ export type IndexContextFileResult = {
 export type SearchContextIndexInput = {
   query: string;
   exclusionRuleset?: ContextExclusionRuleset;
+  embeddingModel?: RegisteredLocalEmbeddingModel;
+  limit?: number;
 };
 
 export type ContextIndexSearchHit = {

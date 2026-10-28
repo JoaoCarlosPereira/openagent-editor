@@ -13,6 +13,10 @@ export {
   upsertContextChunkVectorRef,
 } from "./chunk-vector-store.js";
 export {
+  searchHybridContextIndex,
+  type SearchHybridContextIndexInput,
+} from "./hybrid-context-retrieval.js";
+export {
   createIncrementalChunkEmbeddingIndex,
   reindexPathEmbeddingsOnSave,
   searchIncrementalChunkEmbeddings,

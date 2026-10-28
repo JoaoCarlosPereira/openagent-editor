@@ -5,6 +5,8 @@ import { PROTOCOL_ERROR_CODES, ProtocolError } from "@openagent/protocol";
 
 import { chunkContextFileText, DEFAULT_CONTEXT_INDEX_CHUNK_SIZE } from "../indexer/chunk-text.js";
 import { hashContextFileContent } from "../indexer/content-hash.js";
+import { evaluateContextPathExclusion } from "../exclusions/rules.js";
+import type { ContextExclusionRuleset } from "../exclusions/types.js";
 import { cosineSimilarity, embedTextWithLocalModel } from "./deterministic-local-embedder.js";
 import type {
   EmbeddingSearchHit,
@@ -213,6 +215,7 @@ export function searchPersistedChunkEmbeddings(
   model: RegisteredLocalEmbeddingModel,
   query: string,
   limit = 8,
+  exclusionRuleset?: ContextExclusionRuleset,
 ): EmbeddingSearchHit[] {
   ensureContextChunkVectorSchema(database);
 
@@ -242,6 +245,15 @@ export function searchPersistedChunkEmbeddings(
 
   const hits: EmbeddingSearchHit[] = [];
   for (const row of rows) {
+    if (exclusionRuleset) {
+      const exclusion = evaluateContextPathExclusion({
+        ruleset: exclusionRuleset,
+        requestedPath: row.path,
+      });
+      if ("error" in exclusion || !exclusion.included) {
+        continue;
+      }
+    }
     const vector = float32FromVectorBytes(row.vectorBlob, model.manifest.dimensions);
     const score = cosineSimilarity(queryVector, vector);
     if (score <= 0) {

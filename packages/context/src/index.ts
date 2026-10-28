@@ -91,6 +91,7 @@ export {
   formatEmbeddingVectorRef,
   loadRedistributableLocalEmbeddingModel,
   reindexPersistedPathEmbeddingsOnSave,
+  searchHybridContextIndex,
   searchPersistedChunkEmbeddings,
 } from "./embeddings/index.js";
 export { reindexContextFileOnSave } from "./indexer/reindex-context-file-on-save.js";

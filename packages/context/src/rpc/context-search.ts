@@ -8,6 +8,7 @@ import {
   type RpcResultMap,
 } from "@openagent/protocol";
 
+import type { RegisteredLocalEmbeddingModel } from "../embeddings/types.js";
 import type { ContextExclusionRuleset } from "../exclusions/types.js";
 import { resolveContextExclusionRuleset } from "../exclusions/rules.js";
 import { searchContextIndex } from "../indexer/search-context-index.js";
@@ -16,6 +17,7 @@ export interface ExecuteContextSearchRpcOptions {
   workspaceRoot: string;
   exclusionRuleset?: ContextExclusionRuleset;
   workspaceExclusionPatterns?: unknown;
+  embeddingModel?: RegisteredLocalEmbeddingModel;
 }
 
 function searchRpcInvalid(message: string, details?: string[]): never {
@@ -35,7 +37,8 @@ function resolveSearchExclusionRuleset(
 }
 
 /**
- * Implementação de context.search: busca lexical omitindo caminhos excluídos (CTX-03).
+ * Implementação de context.search: busca híbrida FTS5+vetor (quando há modelo) omitindo
+ * caminhos excluídos (CTX-03).
  */
 export function executeContextSearchRpc(
   database: DatabaseSync,
@@ -52,15 +55,19 @@ export function executeContextSearchRpc(
   }
 
   const exclusionRuleset = resolveSearchExclusionRuleset(options);
+  const rpcLimit =
+    params.limit !== undefined && Number.isFinite(params.limit) && params.limit > 0
+      ? Math.floor(params.limit)
+      : undefined;
+
   const searchResult = searchContextIndex(database, {
     query,
     exclusionRuleset,
+    embeddingModel: options.embeddingModel,
+    limit: rpcLimit,
   });
 
-  const limit =
-    params.limit !== undefined && Number.isFinite(params.limit) && params.limit > 0
-      ? Math.floor(params.limit)
-      : searchResult.hits.length;
+  const limit = rpcLimit ?? searchResult.hits.length;
 
   const hits = searchResult.hits.slice(0, limit).map((hit, index) => ({
     ref: `${hit.path}#${hit.chunkIndex}`,

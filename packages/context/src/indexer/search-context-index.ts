@@ -6,6 +6,7 @@ import {
   buildContextFtsMatchExpression,
   snippetFromLexicalText,
 } from "./fts-query.js";
+import { searchHybridContextIndex } from "../embeddings/hybrid-context-retrieval.js";
 import { purgeExcludedContextIndexPaths } from "./purge-excluded-context-index.js";
 import { ensureContextIndexSchema } from "./schema.js";
 import type {
@@ -42,6 +43,15 @@ export function searchContextIndex(
 ): SearchContextIndexResult {
   ensureContextIndexSchema(database);
   requireNonEmptyQuery(input.query);
+
+  if (input.embeddingModel) {
+    return searchHybridContextIndex(database, {
+      query: input.query,
+      exclusionRuleset: input.exclusionRuleset,
+      embeddingModel: input.embeddingModel,
+      limit: input.limit,
+    });
+  }
 
   if (input.exclusionRuleset) {
     purgeExcludedContextIndexPaths(database, {
