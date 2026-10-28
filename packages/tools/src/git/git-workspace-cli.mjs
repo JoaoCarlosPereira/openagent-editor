@@ -76,3 +76,69 @@ export function gitDiffInWorkspace(input) {
     ...result,
   };
 }
+
+/**
+ * @param {{ workspaceRoot: string; worktreePath: string; branchName: string }} input
+ */
+export function createIsolatedWorktreeInWorkspace(input) {
+  const workspaceRoot = input?.workspaceRoot;
+  const worktreePath = input?.worktreePath;
+  const branchName = input?.branchName;
+  if (typeof workspaceRoot !== "string" || !workspaceRoot.trim()) {
+    throw new Error("Raiz do workspace inválida.");
+  }
+  if (typeof worktreePath !== "string" || !worktreePath.trim()) {
+    throw new Error("Caminho do worktree inválido.");
+  }
+  if (typeof branchName !== "string" || !branchName.trim()) {
+    throw new Error("Nome de branch inválido.");
+  }
+
+  const resolvedWorktree = path.resolve(worktreePath.trim());
+  const result = runGitInWorkspace(workspaceRoot, [
+    "worktree",
+    "add",
+    "-b",
+    branchName.trim(),
+    resolvedWorktree,
+    "HEAD",
+  ]);
+  if (result.exitCode !== 0) {
+    throw new Error(result.stderr.trim() || "Falha ao executar git worktree add.");
+  }
+  return {
+    command: `git worktree add -b ${branchName.trim()} ${resolvedWorktree} HEAD`,
+    worktreePath: resolvedWorktree,
+    branchName: branchName.trim(),
+    ...result,
+  };
+}
+
+/**
+ * @param {{ workspaceRoot: string; worktreePath: string }} input
+ */
+export function removeIsolatedWorktreeFromWorkspace(input) {
+  const workspaceRoot = input?.workspaceRoot;
+  const worktreePath = input?.worktreePath;
+  if (typeof workspaceRoot !== "string" || !workspaceRoot.trim()) {
+    throw new Error("Raiz do workspace inválida.");
+  }
+  if (typeof worktreePath !== "string" || !worktreePath.trim()) {
+    throw new Error("Caminho do worktree inválido.");
+  }
+  const resolvedWorktree = path.resolve(worktreePath.trim());
+  const result = runGitInWorkspace(workspaceRoot, [
+    "worktree",
+    "remove",
+    "--force",
+    resolvedWorktree,
+  ]);
+  if (result.exitCode !== 0) {
+    throw new Error(result.stderr.trim() || "Falha ao executar git worktree remove.");
+  }
+  return {
+    command: `git worktree remove --force ${resolvedWorktree}`,
+    worktreePath: resolvedWorktree,
+    ...result,
+  };
+}

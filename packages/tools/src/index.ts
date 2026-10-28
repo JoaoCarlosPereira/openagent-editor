@@ -107,6 +107,13 @@ export {
 } from "./git/checkpoint-restore.js";
 
 export {
+  createIsolatedGitWork,
+  removeIsolatedGitWork,
+  type CreateIsolatedGitWorkInput,
+  type CreateIsolatedGitWorkResult,
+} from "./git/isolated-worktree.js";
+
+export {
   executePolicyGitDiffInWorker,
   executePolicyGitStatusInWorker,
   formatAgentGitDiffToolResult,

@@ -153,7 +153,7 @@ test("[SES-03] migração 008 expõe schema_version 8", async () => {
       .prepare("SELECT value FROM storage_meta WHERE key = 'schema_version'")
       .get() as { value?: string };
     assert.equal(Number(row.value), STORAGE_SCHEMA_VERSION);
-    assert.equal(STORAGE_SCHEMA_VERSION, 8);
+    assert.equal(STORAGE_SCHEMA_VERSION, 9);
     sqlite.close();
     db.close();
   });

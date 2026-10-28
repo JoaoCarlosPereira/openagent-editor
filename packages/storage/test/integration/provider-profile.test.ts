@@ -195,6 +195,6 @@ test("migração 006 expõe provider_profile e schema_version atual", async () =
 
     assert.equal(table?.name, "provider_profile");
     assert.equal(schemaVersion.value, String(STORAGE_SCHEMA_VERSION));
-    assert.equal(STORAGE_SCHEMA_VERSION, 8);
+    assert.equal(STORAGE_SCHEMA_VERSION, 9);
   });
 });

@@ -6,6 +6,7 @@ import { migration005MessageToolQueueAgent } from "./005-message-tool-queue-agen
 import { migration006ProviderProfile } from "./006-provider-profile.js";
 import { migration007MessageFts5 } from "./007-message-fts5.js";
 import { migration008Checkpoint } from "./008-checkpoint.js";
+import { migration009IsolatedWork } from "./009-isolated-work.js";
 import type { StorageMigration } from "../migration-runner.js";
 
 /** Migrações ordenadas por version (crescente). */
@@ -18,4 +19,5 @@ export const STORAGE_MIGRATIONS: StorageMigration[] = [
   migration006ProviderProfile,
   migration007MessageFts5,
   migration008Checkpoint,
+  migration009IsolatedWork,
 ];

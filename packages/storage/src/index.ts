@@ -126,14 +126,18 @@ export {
 
 export {
   createStoredCheckpoint,
+  createStoredIsolatedWork,
   getStoredCheckpointById,
+  getStoredIsolatedWorkById,
   loadCheckpointRestorePayload,
   readCheckpointHashesFromRef,
   readCheckpointPatchFromRef,
   type CheckpointFileHashes,
   type CreateCheckpointInput,
+  type CreateStoredIsolatedWorkInput,
   type LoadedCheckpointRestorePayload,
   type StoredCheckpointRecord,
+  type StoredIsolatedWorkRecord,
 } from "./checkpoints/index.js";
 
 export {
