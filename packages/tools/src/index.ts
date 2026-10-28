@@ -14,6 +14,14 @@ export {
 } from "./sandbox/linux-sandbox-probe.js";
 
 export {
+  probeMacosSandbox,
+  probeSeatbeltOperational,
+  type MacosSandboxProbe,
+  type MacosSandboxProbeResult,
+  type MacNativeSandboxPrimitive,
+} from "./sandbox/macos-sandbox-probe.js";
+
+export {
   prepareSandboxToolDispatch,
   sandboxDegradationNoticeForPermission,
   type SandboxToolDispatchInput,

@@ -2,6 +2,10 @@ import {
   probeLinuxSandbox,
   type LinuxSandboxProbe,
 } from "./linux-sandbox-probe.js";
+import {
+  probeMacosSandbox,
+  type MacosSandboxProbe,
+} from "./macos-sandbox-probe.js";
 
 /**
  * Nível de isolamento disponível no SO (ADR-006). Degradação explícita antes do consentimento.
@@ -19,6 +23,9 @@ export interface SandboxCapabilitySnapshot {
 
 export interface DescribeSandboxCapabilityOptions {
   linuxProbe?: LinuxSandboxProbe;
+  macosProbe?: MacosSandboxProbe;
+  /** Somente testes: simula plataforma distinta de process.platform. */
+  platform?: NodeJS.Platform;
 }
 
 const WORKER_THREAD_DEGRADED_NOTICE =
@@ -30,7 +37,7 @@ const WORKER_THREAD_DEGRADED_NOTICE =
 export function describeSandboxCapability(
   options?: DescribeSandboxCapabilityOptions,
 ): SandboxCapabilitySnapshot {
-  const platform = process.platform;
+  const platform = options?.platform ?? process.platform;
 
   if (platform === "linux") {
     const probe = (options?.linuxProbe ?? probeLinuxSandbox)();
@@ -45,6 +52,33 @@ export function describeSandboxCapability(
     const degradationNotice = probe.unshareUserNsAvailable
       ? "Bubblewrap e unshare não encontrados; isolamento limitado a worker thread."
       : "User namespaces indisponíveis; sandbox nativa degradada para worker thread.";
+
+    return {
+      level: "degraded",
+      platform,
+      degradationNotice,
+    };
+  }
+
+  if (platform === "darwin") {
+    const probe = (
+      options?.macosProbe ??
+      (() =>
+        probeMacosSandbox({
+          platform: options?.platform,
+        }))
+    )();
+    if (probe.nativeAvailable && probe.primitive) {
+      return {
+        level: "native",
+        platform,
+        nativePrimitive: probe.primitive,
+      };
+    }
+
+    const degradationNotice = probe.sandboxExecAvailable
+      ? "sandbox-exec presente mas Seatbelt não operacional; isolamento limitado a worker thread."
+      : "Seatbelt indisponível; sandbox nativa degradada para worker thread.";
 
     return {
       level: "degraded",
