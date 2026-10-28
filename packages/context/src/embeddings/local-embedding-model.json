@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "modelId": "sentence-transformers/all-MiniLM-L6-v2",
+  "displayName": "all-MiniLM-L6-v2 (local)",
+  "dimensions": 384,
+  "license": {
+    "spdx": "Apache-2.0",
+    "redistributable": true
+  },
+  "upstream": {
+    "repository": "https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2",
+    "revision": "main"
+  },
+  "packaging": {
+    "relativeArtifactPath": "vendor/embeddings/all-MiniLM-L6-v2",
+    "format": "onnx",
+    "checksumSha256": null
+  },
+  "provenanceModule": "packages/context/src/embeddings"
+}
