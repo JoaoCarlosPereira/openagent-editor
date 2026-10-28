@@ -60,6 +60,7 @@ export {
   type PermissionRequestedPayload,
   type RunPermissionEventWriter,
   type RunToolPermissionPrepareResult,
+  type ToolExecutionIsolationContext,
 } from "./run-permission.js";
 export {
   formatGrantScopeLabel,
@@ -99,6 +100,7 @@ export type {
   PermissionDecision,
   PermissionExecutionGate,
   PermissionPrompt,
+  SandboxIsolationLevel,
   PolicyCapability,
   PolicyTarget,
   PolicyTargetKind,

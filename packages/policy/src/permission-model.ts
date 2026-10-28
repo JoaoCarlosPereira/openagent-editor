@@ -9,8 +9,41 @@ import type {
   PermissionExecutionGate,
   PermissionPrompt,
   PolicyValidationResult,
+  SandboxIsolationLevel,
   ToolPermissionRequest,
 } from "./types.js";
+
+function applyExecutionIsolationToPrompt(
+  prompt: PermissionPrompt,
+  isolation?: { level: SandboxIsolationLevel; degradationNotice?: string },
+): PermissionPrompt {
+  if (!isolation || isolation.level === "native") {
+    return prompt;
+  }
+  const notice = isolation.degradationNotice?.trim();
+  if (!notice) {
+    return { ...prompt, sandboxIsolationLevel: "degraded" };
+  }
+  return {
+    ...prompt,
+    sandboxIsolationLevel: "degraded",
+    degradationNotice: notice,
+  };
+}
+
+function preserveSandboxPromptFields(
+  next: PermissionPrompt,
+  previous: PermissionPrompt,
+): PermissionPrompt {
+  if (previous.sandboxIsolationLevel !== "degraded") {
+    return next;
+  }
+  return {
+    ...next,
+    sandboxIsolationLevel: previous.sandboxIsolationLevel,
+    ...(previous.degradationNotice ? { degradationNotice: previous.degradationNotice } : {}),
+  };
+}
 
 function isNonEmptyString(value: unknown): value is string {
   return typeof value === "string" && value.trim().length > 0;
@@ -92,6 +125,7 @@ export function createToolPermissionRequest(
 export function openPermissionExecutionGate(
   request: ToolPermissionRequest,
   preferredScope: GrantScopeKind = request.offeredScopes[0] ?? "once",
+  executionIsolation?: { level: SandboxIsolationLevel; degradationNotice?: string },
 ): PermissionExecutionGate {
   if (!request.offeredScopes.includes(preferredScope)) {
     throw new ProtocolError(
@@ -101,11 +135,14 @@ export function openPermissionExecutionGate(
     );
   }
 
-  const prompt = buildPermissionPrompt({
-    capability: request.capability,
-    targetDisplay: formatPolicyTargetDisplay(request.target),
-    scope: preferredScope,
-  });
+  const prompt = applyExecutionIsolationToPrompt(
+    buildPermissionPrompt({
+      capability: request.capability,
+      targetDisplay: formatPolicyTargetDisplay(request.target),
+      scope: preferredScope,
+    }),
+    executionIsolation,
+  );
 
   return { phase: "pending", request, prompt };
 }
@@ -131,11 +168,14 @@ export function resolvePermissionExecutionGate(
     );
   }
 
-  const prompt = buildPermissionPrompt({
-    capability: gate.request.capability,
-    targetDisplay: formatPolicyTargetDisplay(gate.request.target),
-    scope: selectedScope,
-  });
+  const prompt = preserveSandboxPromptFields(
+    buildPermissionPrompt({
+      capability: gate.request.capability,
+      targetDisplay: formatPolicyTargetDisplay(gate.request.target),
+      scope: selectedScope,
+    }),
+    gate.prompt,
+  );
 
   return {
     phase: "resolved",
@@ -155,10 +195,14 @@ export function formatPermissionPromptForDisplay(prompt: PermissionPrompt): {
   action: string;
   target: string;
   scopeLabel: string;
+  sandboxIsolationLevel?: SandboxIsolationLevel;
+  degradationNotice?: string;
 } {
   return {
     action: prompt.action,
     target: prompt.target,
     scopeLabel: formatGrantScopeLabel(prompt.scope),
+    ...(prompt.sandboxIsolationLevel ? { sandboxIsolationLevel: prompt.sandboxIsolationLevel } : {}),
+    ...(prompt.degradationNotice ? { degradationNotice: prompt.degradationNotice } : {}),
   };
 }

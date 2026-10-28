@@ -53,6 +53,11 @@ test("[PER-01] sandbox Linux nativa ou degradada expõe aviso antes do pedido de
   assert.equal(pendingPermission.prompt.action, "Ler arquivo");
   assert.equal(pendingPermission.prompt.target, "src/index.ts");
   assert.ok(pendingPermission.prompt.scopeLabel.length > 0);
+  assert.equal(pendingPermission.prompt.sandboxIsolationLevel, "degraded");
+  assert.equal(
+    pendingPermission.prompt.degradationNotice,
+    sandboxDegradationNoticeForPermission(prepared.sandbox),
+  );
   assert.equal(pendingPermission.canExecute, false);
 
   assert.throws(() => assertRunToolMayExecute(pendingPermission.gate), (error: unknown) => {

@@ -44,6 +44,13 @@ export function prepareSandboxToolDispatch(
       capability: input.capability,
       target: input.target,
     },
+    executionIsolation:
+      sandbox.level === "degraded"
+        ? {
+            level: sandbox.level,
+            degradationNotice: sandboxDegradationNoticeForPermission(sandbox),
+          }
+        : { level: "native" },
   });
   return { sandbox, permission };
 }

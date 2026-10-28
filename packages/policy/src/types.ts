@@ -14,6 +14,8 @@ export type PolicyTarget =
 /** Capability estável alinhada ao envelope RPC (ex.: file.write). */
 export type PolicyCapability = string;
 
+export type SandboxIsolationLevel = "native" | "degraded";
+
 export interface PermissionPrompt {
   /** Ação humana exibida ao usuário (PER-01). */
   action: string;
@@ -21,6 +23,10 @@ export interface PermissionPrompt {
   target: string;
   /** Escopo oferecido para aceite (once/session/workspace). */
   scope: GrantScopeKind;
+  /** Nível de isolamento da execução da ferramenta (ADR-006), quando conhecido. */
+  sandboxIsolationLevel?: SandboxIsolationLevel;
+  /** Aviso de degradação exibido antes do aceite quando o isolamento não é nativo. */
+  degradationNotice?: string;
 }
 
 export interface ToolPermissionRequest {

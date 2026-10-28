@@ -19,6 +19,7 @@ import type {
   PermissionDecision,
   PermissionExecutionGate,
   PermissionPrompt,
+  SandboxIsolationLevel,
   ToolPermissionRequest,
 } from "./types.js";
 
@@ -45,11 +46,18 @@ export interface PermissionDecidedPayload {
   canExecute: boolean;
 }
 
+export interface ToolExecutionIsolationContext {
+  level: SandboxIsolationLevel;
+  degradationNotice?: string;
+}
+
 export interface BeginRunToolPermissionInput {
   runId: unknown;
   sessionId: unknown;
   request: CreateToolPermissionRequestInput;
   preferredScope?: GrantScopeKind;
+  /** Isolamento da ferramenta (sandbox); degradação informada no pedido PER-01. */
+  executionIsolation?: ToolExecutionIsolationContext;
 }
 
 export type RunToolPermissionPrepareResult =
@@ -115,7 +123,7 @@ export function prepareRunToolPermission(
     }
   }
 
-  const gate = openPermissionExecutionGate(request, input.preferredScope);
+  const gate = openPermissionExecutionGate(request, input.preferredScope, input.executionIsolation);
   if (gate.phase !== "pending") {
     throw new ProtocolError("INVALID_STATE", "Gate de permissão inválido após abertura.");
   }
