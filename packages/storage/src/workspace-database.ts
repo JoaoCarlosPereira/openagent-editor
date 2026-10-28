@@ -12,6 +12,22 @@ import { deleteSessionStorage, type DeleteSessionStorageResult } from "./delete.
 import { runStorageMigrations } from "./migration-runner.js";
 import { STORAGE_MIGRATIONS } from "./migrations/index.js";
 import { STORAGE_SCHEMA_VERSION } from "./schema-version.js";
+import {
+  insertStoredAgentNode,
+  insertStoredMessage,
+  insertStoredQueueItem,
+  insertStoredToolInvocation,
+  listStoredAgentNodes,
+  listStoredMessages,
+  listStoredQueueItems,
+  listStoredToolInvocations,
+  removePendingQueueItem,
+  type RemovePendingQueueItemResult,
+  type StoredAgentNode,
+  type StoredMessage,
+  type StoredQueueItem,
+  type StoredToolInvocation,
+} from "./session-projections.js";
 import { assertValidWorkspaceId } from "./workspace-id.js";
 
 export { STORAGE_SCHEMA_VERSION };
@@ -40,6 +56,18 @@ export type WorkspaceDatabase = {
   listHarnessEvents(runId?: string): HarnessEvent[];
   putCasBlob(content: Uint8Array): PutCasBlobResult;
   readCasBlob(contentRef: string): Uint8Array;
+  insertMessage(message: StoredMessage): StoredMessage;
+  listMessages(sessionId: string): StoredMessage[];
+  insertToolInvocation(invocation: StoredToolInvocation): StoredToolInvocation;
+  listToolInvocations(runId: string): StoredToolInvocation[];
+  insertAgentNode(node: StoredAgentNode): StoredAgentNode;
+  listAgentNodes(runId: string): StoredAgentNode[];
+  insertQueueItem(item: StoredQueueItem): StoredQueueItem;
+  listQueueItems(runId: string): StoredQueueItem[];
+  removePendingQueueItem(
+    runId: string,
+    queueItemId: string,
+  ): RemovePendingQueueItemResult;
   deleteSession(sessionId: string): DeleteSessionStorageResult;
   close(): void;
 };
@@ -147,6 +175,33 @@ export function openWorkspaceDatabase(
     },
     readCasBlob(contentRef: string) {
       return readCasBlob(database, casRoot, contentRef);
+    },
+    insertMessage(message: StoredMessage) {
+      return insertStoredMessage(database, message);
+    },
+    listMessages(sessionId: string) {
+      return listStoredMessages(database, sessionId);
+    },
+    insertToolInvocation(invocation: StoredToolInvocation) {
+      return insertStoredToolInvocation(database, invocation);
+    },
+    listToolInvocations(runId: string) {
+      return listStoredToolInvocations(database, runId);
+    },
+    insertAgentNode(node: StoredAgentNode) {
+      return insertStoredAgentNode(database, node);
+    },
+    listAgentNodes(runId: string) {
+      return listStoredAgentNodes(database, runId);
+    },
+    insertQueueItem(item: StoredQueueItem) {
+      return insertStoredQueueItem(database, item);
+    },
+    listQueueItems(runId: string) {
+      return listStoredQueueItems(database, runId);
+    },
+    removePendingQueueItem(runId: string, queueItemId: string) {
+      return removePendingQueueItem(database, runId, queueItemId);
     },
     deleteSession(sessionId: string) {
       return deleteSessionStorage(database, casRoot, sessionId);

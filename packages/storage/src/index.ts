@@ -40,3 +40,20 @@ export {
 } from "./cas-gc.js";
 
 export { deleteSessionStorage, type DeleteSessionStorageResult } from "./delete.js";
+
+export {
+  insertStoredAgentNode,
+  insertStoredMessage,
+  insertStoredQueueItem,
+  insertStoredToolInvocation,
+  listStoredAgentNodes,
+  listStoredMessages,
+  listStoredQueueItems,
+  listStoredToolInvocations,
+  removePendingQueueItem,
+  type RemovePendingQueueItemResult,
+  type StoredAgentNode,
+  type StoredMessage,
+  type StoredQueueItem,
+  type StoredToolInvocation,
+} from "./session-projections.js";
