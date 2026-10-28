@@ -185,8 +185,31 @@ export interface ProjectRejectParams {
   nodeId: string;
 }
 
+/** Fonte listada na resposta de context.attach (CTX-01). */
+export interface ContextAttachSource {
+  id: string;
+  kind: string;
+  label: string;
+  path: string;
+  previewText?: string;
+  truncated: boolean;
+  tokenCount: number;
+}
+
+/** Prévia retornada por context.attach antes do envio (CTX-01). */
+export interface ContextAttachResult {
+  sources: ContextAttachSource[];
+  messageTokenCount: number;
+  totalTokenCount: number;
+  contextLimitTokens: number;
+  withinLimit: boolean;
+}
+
 export interface ContextAttachParams {
-  refs: string[];
+  /** Rascunhos de anexo (seleção, arquivo, pasta ou símbolo). */
+  attachments: unknown[];
+  /** Rascunho da mensagem do usuário para contagem de tokens (opcional). */
+  messageText?: string;
 }
 
 export interface ContextIndexParams {
@@ -271,7 +294,7 @@ export interface RpcResultMap {
   [RPC_METHOD.PROJECT_CREATE]: { projectId: string };
   [RPC_METHOD.PROJECT_ACCEPT]: { accepted: true };
   [RPC_METHOD.PROJECT_REJECT]: { rejected: true };
-  [RPC_METHOD.CONTEXT_ATTACH]: { attached: string[] };
+  [RPC_METHOD.CONTEXT_ATTACH]: ContextAttachResult;
   [RPC_METHOD.CONTEXT_INDEX]: { indexed: number };
   [RPC_METHOD.CONTEXT_SEARCH]: { hits: Array<{ ref: string; score: number }> };
   [RPC_METHOD.CONTEXT_CLEAR]: { cleared: true };

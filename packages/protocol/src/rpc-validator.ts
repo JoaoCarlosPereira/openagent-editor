@@ -199,10 +199,14 @@ function validateParamsForMethod(method: RpcMethod, params: unknown): string[] {
       }
       break;
     case RPC_METHOD.CONTEXT_ATTACH:
-      if (!Array.isArray(params["refs"]) || params["refs"].length === 0) {
-        errors.push("Campo obrigatório 'refs' deve ser array não-vazio de strings.");
-      } else if (!params["refs"].every((ref) => isNonEmptyString(ref))) {
-        errors.push("Cada item de 'refs' deve ser string não-vazia.");
+      if (!Array.isArray(params["attachments"]) || params["attachments"].length === 0) {
+        errors.push("Campo obrigatório 'attachments' deve ser array não-vazio.");
+      }
+      if (
+        params["messageText"] !== undefined &&
+        typeof params["messageText"] !== "string"
+      ) {
+        errors.push("Campo 'messageText' deve ser string quando presente.");
       }
       break;
     case RPC_METHOD.CONTEXT_INDEX:

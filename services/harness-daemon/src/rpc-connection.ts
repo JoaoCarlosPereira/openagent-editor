@@ -13,6 +13,7 @@ import {
   type RpcRequestEnvelope,
 } from "@openagent/protocol";
 import { dispatchCheckpointRpc } from "./checkpoints/checkpoint-rpc-handler.js";
+import { dispatchContextRpc } from "./context/context-rpc-handler.js";
 import { dispatchRunRpc, type DaemonRpcContext } from "./runs/run-rpc-handler.js";
 import { dispatchSessionRpc } from "./sessions/session-rpc-handler.js";
 
@@ -35,6 +36,8 @@ const CHECKPOINT_RPC_METHODS = new Set<string>([
   RPC_METHOD.CHECKPOINT_CREATE,
   RPC_METHOD.CHECKPOINT_RESTORE,
 ]);
+
+const CONTEXT_RPC_METHODS = new Set<string>([RPC_METHOD.CONTEXT_ATTACH]);
 
 function writeProtocolError(socket: net.Socket, code: ProtocolErrorCode, message: string): void {
   writeProtocolFrame(
@@ -86,7 +89,8 @@ export async function serveRpcOnConnection(
     const isSession = SESSION_RPC_METHODS.has(request.method);
     const isRun = RUN_RPC_METHODS.has(request.method);
     const isCheckpoint = CHECKPOINT_RPC_METHODS.has(request.method);
-    if (!isSession && !isRun && !isCheckpoint) {
+    const isContext = CONTEXT_RPC_METHODS.has(request.method);
+    if (!isSession && !isRun && !isCheckpoint && !isContext) {
       writeProtocolError(
         socket,
         PROTOCOL_ERROR_CODES.INVALID_STATE,
@@ -100,7 +104,9 @@ export async function serveRpcOnConnection(
         ? dispatchRunRpc(context, request)
         : isCheckpoint
           ? dispatchCheckpointRpc(context, request)
-          : dispatchSessionRpc(context, request);
+          : isContext
+            ? dispatchContextRpc(context, request)
+            : dispatchSessionRpc(context, request);
       writeProtocolFrame(
         socket,
         Buffer.from(

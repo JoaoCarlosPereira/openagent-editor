@@ -62,6 +62,8 @@ export {
   type CheckpointRestoreParams,
   type CheckpointRestoreRpcResult,
   type ContextAttachParams,
+  type ContextAttachResult,
+  type ContextAttachSource,
   type ContextClearParams,
   type ContextIndexParams,
   type ContextSearchParams,

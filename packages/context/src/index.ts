@@ -23,3 +23,7 @@ export {
   validateContextAttachmentDraft,
   type ContextAttachmentListValidationResult,
 } from "./attachments/validate.js";
+export {
+  executeContextAttachRpc,
+  type ExecuteContextAttachRpcOptions,
+} from "./rpc/context-attach.js";
