@@ -8,7 +8,7 @@ import {
   type SystemSecretVault,
 } from "@openagent/storage";
 
-import { loadPinnedCliProxyApiSidecar } from "./load-pinned-cliproxyapi-sidecar.js";
+import { resolveCliProxyOpenAiBaseUrl } from "./cliproxy-provider-connection-catalog.js";
 
 export type RegisterCliProxyProviderInput = {
   profileId: string;
@@ -30,8 +30,7 @@ export async function registerCliProxyProviderProfile(
     workspaceId?: string;
   },
 ): Promise<RegisterProviderProfileResult> {
-  const pin = await loadPinnedCliProxyApiSidecar();
-  const endpoint = input.endpoint?.trim() || pin.manifest.defaultOpenAiBaseUrl;
+  const { endpoint } = await resolveCliProxyOpenAiBaseUrl(input.endpoint);
 
   return registerProviderProfile(
     database,

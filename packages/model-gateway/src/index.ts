@@ -15,6 +15,12 @@ export {
   type RegisterCliProxyProviderInput,
 } from "./register-cliproxy-provider.js";
 export {
+  catalogCliProxyProviderCapabilities,
+  resolveCliProxyOpenAiBaseUrl,
+  type CliProxyProviderCapabilitiesCatalog,
+  type CliProxyProviderConnectionInput,
+} from "./cliproxy-provider-connection-catalog.js";
+export {
   registerSupervisedCliProxyProviderProfile,
   type RegisterSupervisedCliProxyProviderInput,
   type RegisterSupervisedCliProxyProviderResult,
