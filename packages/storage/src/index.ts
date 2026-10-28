@@ -48,6 +48,17 @@ export {
 } from "./export/index.js";
 
 export {
+  indexMessageFts,
+  lexicalTextFromContentRef,
+  removeMessageFtsForSession,
+  searchSessionMessages,
+  type MessageFtsIndexInput,
+  type SearchSessionMessagesInput,
+  type SearchSessionMessagesResult,
+  type SessionMessageSearchHit,
+} from "./search/index.js";
+
+export {
   applyHarnessEventToProjections,
   rebuildProjectionsFromEventLog,
   syncSessionResumeProjection,

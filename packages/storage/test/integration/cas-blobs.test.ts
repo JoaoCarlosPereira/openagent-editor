@@ -156,7 +156,7 @@ test("[SES-01] migração CAS registra schema_version atualizado", async () => {
     sqlite.close();
     db.close();
     assert.equal(meta.value, String(STORAGE_SCHEMA_VERSION));
-    assert.equal(STORAGE_SCHEMA_VERSION, 6);
+    assert.equal(STORAGE_SCHEMA_VERSION, 7);
   } finally {
     await rm(dataRoot, { recursive: true, force: true });
   }
