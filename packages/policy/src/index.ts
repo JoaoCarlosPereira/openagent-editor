@@ -17,6 +17,15 @@ export {
   validatePolicyCapability,
 } from "./capability.js";
 export {
+  assertCapabilityAllowedForExecutionMode,
+  EXECUTION_MODE_READ_ONLY_BLOCKED_MESSAGE,
+  EXECUTION_MODES,
+  isMutatingPolicyCapability,
+  readOnlyExecutionModeBlockedError,
+  validateExecutionMode,
+  type ExecutionMode,
+} from "./execution-mode.js";
+export {
   buildPermissionPrompt,
   createToolPermissionRequest,
   formatPermissionPromptForDisplay,
