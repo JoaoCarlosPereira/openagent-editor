@@ -60,3 +60,11 @@ export {
   type SubagentUiState,
   type SubagentCancelResult,
 } from "./review/subagents-panel.js";
+export {
+  ProviderRunErrorController,
+  buildProviderRunErrorView,
+  type ProviderRunErrorPhase,
+  type ProviderRunErrorViewSnapshot,
+  type ProviderRunResponseStatus,
+  type ProviderRunRetryRequest,
+} from "./review/provider-run-error.js";

@@ -85,3 +85,15 @@ export {
   type ReadOnlyBlockAttemptResult,
   type ReadOnlyBlockViewSnapshot,
 } from "../permissions/read-only-block.js";
+
+export {
+  ProviderRunErrorController,
+  PROVIDER_RUN_ERROR_IDLE_MESSAGE,
+  PROVIDER_RUN_ERROR_FAILURE_MESSAGE,
+  PROVIDER_RUN_ERROR_INCOMPLETE_MESSAGE,
+  buildProviderRunErrorView,
+  type ProviderRunErrorPhase,
+  type ProviderRunErrorViewSnapshot,
+  type ProviderRunResponseStatus,
+  type ProviderRunRetryRequest,
+} from "./provider-run-error.js";
