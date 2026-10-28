@@ -64,7 +64,9 @@ describe("VAL-01 e2e — Composer recusa mensagem vazia com o texto exato", () =
     const panel = new AgentPanelController();
     panel.open({ sessionId: "sess-val-01-attach" });
     panel.setComposerText("   ");
-    panel.setContextAttachments([{ ref: "ctx://file.ts", label: "file.ts" }]);
+    panel.setContextAttachments([
+      { id: "ctx://file.ts", kind: "file", path: "file.ts" },
+    ]);
 
     const result = panel.submitComposer();
 

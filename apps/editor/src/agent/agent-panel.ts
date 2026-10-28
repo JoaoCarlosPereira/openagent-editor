@@ -1,4 +1,8 @@
 import {
+  buildContextSendPreview,
+  parseContextAttachmentDrafts,
+} from "@openagent/context";
+import {
   ProtocolError,
   USER_INPUT_EMPTY_MESSAGE,
   validateUserInput,
@@ -6,6 +10,7 @@ import {
   type UserInput,
 } from "@openagent/protocol";
 
+import { buildContextSendPreviewView } from "../context/context-send-preview-view.js";
 import {
   summarizeContextAttachments,
   toUserInputAttachments,
@@ -34,6 +39,7 @@ export {
   type AgentPanelModelOption,
 } from "./agent-panel-selectors.js";
 export type { AgentPanelContextAttachment } from "../context/panel-context-slot.js";
+export { buildContextSendPreviewView } from "../context/context-send-preview-view.js";
 
 export interface AgentPanelOpenInput {
   sessionId: string;
@@ -42,6 +48,8 @@ export interface AgentPanelOpenInput {
   modelId?: string;
   availableModels?: readonly AgentPanelModelOption[];
   initialAttachments?: readonly AgentPanelContextAttachment[];
+  /** null/undefined = API-03 default 200000. */
+  workspaceContextLimitTokens?: number | null;
 }
 
 export interface AgentPanelSubmitResult {
@@ -62,8 +70,19 @@ function firstAvailableModelId(
   return first.id;
 }
 
+function emptyContextPreview(workspaceContextLimitTokens: number | null) {
+  return buildContextSendPreviewView(
+    buildContextSendPreview({
+      attachments: [],
+      messageText: "",
+      workspaceContextLimitTokens,
+    }),
+  );
+}
+
 /**
- * UI-01 / VAL-01: painel com seletores, composer, histórico e recusa de envio vazio com texto exato.
+ * UI-01 / VAL-01 / CTX-01 / API-03: painel com seletores, prévia de contexto,
+ * composer, histórico e recusa de envio vazio com texto exato.
  */
 export class AgentPanelController {
   private sessionId = "";
@@ -72,6 +91,7 @@ export class AgentPanelController {
   private composerDisabled = false;
   private composerValidationMessage: string | undefined;
   private contextAttachments: AgentPanelContextAttachment[] = [];
+  private workspaceContextLimitTokens: number | null = null;
   private mode: AgentMode = "agent";
   private modelId = firstAvailableModelId(DEFAULT_AGENT_PANEL_MODELS);
   private availableModels: readonly AgentPanelModelOption[] = DEFAULT_AGENT_PANEL_MODELS;
@@ -83,6 +103,7 @@ export class AgentPanelController {
     mode: "agent",
     modelId: firstAvailableModelId(DEFAULT_AGENT_PANEL_MODELS),
     availableModels: DEFAULT_AGENT_PANEL_MODELS,
+    contextPreview: emptyContextPreview(null),
   });
 
   get snapshot(): AgentPanelViewSnapshot {
@@ -95,7 +116,15 @@ export class AgentPanelController {
     this.composerText = "";
     this.composerDisabled = false;
     this.composerValidationMessage = undefined;
-    this.contextAttachments = [...(input.initialAttachments ?? [])];
+    this.workspaceContextLimitTokens =
+      input.workspaceContextLimitTokens === undefined
+        ? null
+        : input.workspaceContextLimitTokens;
+    if (input.initialAttachments !== undefined) {
+      this.replaceAttachmentsOrThrow(input.initialAttachments);
+    } else {
+      this.contextAttachments = [];
+    }
     this.availableModels =
       input.availableModels && input.availableModels.length > 0
         ? [...input.availableModels]
@@ -128,11 +157,20 @@ export class AgentPanelController {
     return this.view;
   }
 
-  setContextAttachments(
-    attachments: readonly AgentPanelContextAttachment[],
-  ): AgentPanelViewSnapshot {
-    this.contextAttachments = [...attachments];
+  /**
+   * CTX-01: anexa fontes. Entrada inválida → INVALID_STATE sem alterar anexos.
+   */
+  setContextAttachments(attachments: unknown): AgentPanelViewSnapshot {
+    this.replaceAttachmentsOrThrow(attachments);
     this.composerValidationMessage = undefined;
+    this.refreshView();
+    return this.view;
+  }
+
+  setWorkspaceContextLimitTokens(
+    limit: number | null,
+  ): AgentPanelViewSnapshot {
+    this.workspaceContextLimitTokens = limit;
     this.refreshView();
     return this.view;
   }
@@ -178,8 +216,22 @@ export class AgentPanelController {
     };
   }
 
+  private replaceAttachmentsOrThrow(attachments: unknown): void {
+    const parsed = parseContextAttachmentDrafts(attachments);
+    if (!parsed.valid) {
+      throw new ProtocolError(parsed.code, parsed.errors.join(" "), parsed.errors);
+    }
+    this.contextAttachments = parsed.value;
+  }
+
   private refreshView(): void {
-    summarizeContextAttachments(this.contextAttachments);
+    const preview = buildContextSendPreviewView(
+      buildContextSendPreview({
+        attachments: this.contextAttachments,
+        messageText: this.composerText,
+        workspaceContextLimitTokens: this.workspaceContextLimitTokens,
+      }),
+    );
     this.view = buildAgentPanelView({
       sessionId: this.sessionId,
       history: this.history,
@@ -188,6 +240,7 @@ export class AgentPanelController {
       mode: this.mode,
       modelId: this.modelId,
       availableModels: this.availableModels,
+      contextPreview: preview,
       ...(this.composerValidationMessage !== undefined
         ? { composerValidationMessage: this.composerValidationMessage }
         : {}),

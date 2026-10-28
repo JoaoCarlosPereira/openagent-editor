@@ -1,17 +1,19 @@
+import type { ContextAttachmentDraft } from "@openagent/context";
 import type { UserContextAttachment } from "@openagent/protocol";
 
-/** Região de contexto do painel (CTX-01 / VAL-01 anexos); preenchida incrementalmente. */
-export interface AgentPanelContextAttachment {
-  ref: string;
-  label: string;
-}
+/** Anexo do painel = rascunho CTX-01 (id vira ref do UserInput). */
+export type AgentPanelContextAttachment = ContextAttachmentDraft;
 
 export function summarizeContextAttachments(
   attachments: readonly AgentPanelContextAttachment[],
 ): { count: number; labels: string[] } {
   return {
     count: attachments.length,
-    labels: attachments.map((item) => item.label),
+    labels: attachments.map((item) =>
+      item.kind === "symbol" && item.symbolName
+        ? `${item.symbolName} (${item.path})`
+        : item.path,
+    ),
   };
 }
 
@@ -19,5 +21,5 @@ export function summarizeContextAttachments(
 export function toUserInputAttachments(
   attachments: readonly AgentPanelContextAttachment[],
 ): UserContextAttachment[] {
-  return attachments.map((item) => ({ ref: item.ref }));
+  return attachments.map((item) => ({ ref: item.id }));
 }

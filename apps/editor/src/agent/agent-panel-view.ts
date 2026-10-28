@@ -1,5 +1,6 @@
 import type { AgentMode } from "@openagent/protocol";
 
+import type { ContextSendPreviewViewSnapshot } from "../context/context-send-preview-view.js";
 import { formatAgentHistoryRoleLabel, type AgentHistoryMessage } from "./agent-history.js";
 import {
   AGENT_PANEL_MODE_LABELS,
@@ -17,6 +18,8 @@ export interface AgentPanelViewInput {
   availableModels: readonly AgentPanelModelOption[];
   /** VAL-01: mensagem de recusa do composer (texto exato do PRD quando vazio). */
   composerValidationMessage?: string;
+  /** CTX-01 / API-03: prévia de fontes, tokens e teto. */
+  contextPreview: ContextSendPreviewViewSnapshot;
 }
 
 export interface AgentPanelViewSnapshot {
@@ -29,6 +32,7 @@ export interface AgentPanelViewSnapshot {
     modelId: string;
     focusOrder: readonly string[];
     composerValidationMessage: string | null;
+    contextPreview: ContextSendPreviewViewSnapshot["accessible"];
   };
 }
 
@@ -92,7 +96,7 @@ function renderComposerValidation(message: string | undefined): string {
   ].join("");
 }
 
-/** UI-01 (127–129): painel do agente com seletores, composer, VAL-01 e histórico acessível. */
+/** UI-01 + CTX-01/API-03: painel com seletores, prévia de contexto, composer e histórico. */
 export function buildAgentPanelView(input: AgentPanelViewInput): AgentPanelViewSnapshot {
   const historyItems =
     input.history.length > 0
@@ -119,7 +123,9 @@ export function buildAgentPanelView(input: AgentPanelViewInput): AgentPanelViewS
     `<h2 id="agent-panel-title">Painel do agente</h2>`,
     renderModeSelect(input.mode),
     renderModelSelect(input.modelId, input.availableModels),
-    `<div data-testid="agent-context-slot" role="group" aria-label="Contexto anexado" tabindex="0"></div>`,
+    `<div data-testid="agent-context-slot" role="group" aria-label="Contexto anexado" tabindex="0">`,
+    input.contextPreview.html,
+    `</div>`,
     `<ol data-testid="agent-history" aria-live="polite" tabindex="0">${historyItems}</ol>`,
     `<form data-testid="agent-composer">`,
     `<label for="agent-composer-input">Mensagem</label>`,
@@ -146,6 +152,7 @@ export function buildAgentPanelView(input: AgentPanelViewInput): AgentPanelViewS
         validationMessage !== undefined && validationMessage.length > 0
           ? validationMessage
           : null,
+      contextPreview: input.contextPreview.accessible,
     },
   };
 }

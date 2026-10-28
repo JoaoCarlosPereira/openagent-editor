@@ -10,6 +10,7 @@
     "./permissions": "./src/permissions/permission-dialog.ts"
   },
   "dependencies": {
+    "@openagent/context": "0.1.0",
     "@openagent/policy": "0.1.0",
     "@openagent/protocol": "0.1.0"
   }
