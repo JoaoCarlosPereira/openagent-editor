@@ -50,6 +50,13 @@ import {
   buildWorkbenchShellView,
   type WorkbenchShellViewSnapshot,
 } from "./workbench-shell-view.js";
+import {
+  assertWorkbenchPanelWidthPx,
+  assertWorkbenchTheme,
+  WORKBENCH_PANEL_WIDTH_DEFAULT_PX,
+  WORKBENCH_THEME_DEFAULT,
+  type WorkbenchTheme,
+} from "./theme.js";
 
 export type { WorkbenchShellViewSnapshot, WorkbenchCapabilitySlot } from "./workbench-shell-view.js";
 export {
@@ -156,6 +163,20 @@ export {
   type DebugViewInput,
   type DebugViewSnapshot,
 } from "./debug-view.js";
+export {
+  assertWorkbenchPanelWidthPx,
+  assertWorkbenchTheme,
+  isWorkbenchTheme,
+  themeTokensCssVariables,
+  WORKBENCH_PANEL_WIDTH_DEFAULT_PX,
+  WORKBENCH_PANEL_WIDTH_MAX_PX,
+  WORKBENCH_PANEL_WIDTH_MIN_PX,
+  WORKBENCH_THEME_DEFAULT,
+  WORKBENCH_THEME_TOKENS,
+  WORKBENCH_THEMES,
+  type WorkbenchTheme,
+  type WorkbenchThemeTokens,
+} from "./theme.js";
 
 export const WORKBENCH_FOLDER_REQUIRED_MESSAGE =
   "Caminho de pasta obrigatório para abrir o workbench OpenAgent.";
@@ -176,6 +197,8 @@ export interface WorkbenchShellOpenInput {
   platform: string;
   folderPath?: unknown;
   repoRoot?: string;
+  theme?: unknown;
+  panelWidthPx?: unknown;
 }
 
 export interface WorkbenchShellOpenResult {
@@ -246,7 +269,7 @@ function assertFolderPath(folderPath: unknown): string {
 }
 
 /**
- * LOC-01: workbench Electron — slots, árvore (120), editor (121), terminal (122), Git (123) e debug DAP (124).
+ * LOC-01 / UI-02: workbench Electron — slots, árvore, editor, terminal, Git, debug e temas claro/escuro com tokens próprios.
  */
 export class WorkbenchShellController {
   private identity: ElectronProductIdentity = createOpenAgentProductIdentity();
@@ -259,6 +282,8 @@ export class WorkbenchShellController {
   private terminalSession: IntegratedTerminalSession | null = null;
   private gitPanel: IntegratedGitPanel | null = null;
   private debugSession: IntegratedDebugSession | null = null;
+  private themeState: WorkbenchTheme = WORKBENCH_THEME_DEFAULT;
+  private panelWidthState: number = WORKBENCH_PANEL_WIDTH_DEFAULT_PX;
   private readonly rendererBridge: RendererToolBridge = createRendererToolBridge();
   private view: WorkbenchShellViewSnapshot = buildWorkbenchShellView({
     identity: this.identity,
@@ -272,10 +297,20 @@ export class WorkbenchShellController {
     terminalSession: null,
     gitPanel: null,
     debugSession: null,
+    theme: this.themeState,
+    panelWidthPx: this.panelWidthState,
   });
 
   get snapshot(): WorkbenchShellViewSnapshot {
     return this.view;
+  }
+
+  get theme(): WorkbenchTheme {
+    return this.themeState;
+  }
+
+  get panelWidthPx(): number {
+    return this.panelWidthState;
   }
 
   /** Ponte do renderer: nunca permite tool.invoke (LOC-01 / ADR-003). */
@@ -304,7 +339,12 @@ export class WorkbenchShellController {
   }
 
   /** Inicializa o shell com identidade OpenAgent antes de abrir pasta. */
-  bootstrap(input: { platform: string; repoRoot?: string }): WorkbenchShellViewSnapshot {
+  bootstrap(input: {
+    platform: string;
+    repoRoot?: string;
+    theme?: unknown;
+    panelWidthPx?: unknown;
+  }): WorkbenchShellViewSnapshot {
     this.platform = input.platform;
     this.identity = createOpenAgentProductIdentity(input.repoRoot);
     this.folderPath = null;
@@ -315,6 +355,12 @@ export class WorkbenchShellController {
     this.terminalSession = null;
     this.gitPanel = null;
     this.debugSession = null;
+    if (input.theme !== undefined) {
+      this.themeState = assertWorkbenchTheme(input.theme);
+    }
+    if (input.panelWidthPx !== undefined) {
+      this.panelWidthState = assertWorkbenchPanelWidthPx(input.panelWidthPx);
+    }
     this.refreshView();
     return this.view;
   }
@@ -322,6 +368,26 @@ export class WorkbenchShellController {
   /** Reflete no shell que o processo main está ligado ao harness-daemon. */
   setDaemonConnected(connected: boolean): WorkbenchShellViewSnapshot {
     this.daemonConnected = connected;
+    this.refreshView();
+    return this.view;
+  }
+
+  /**
+   * Altera o tema ativo do workbench (UI-02).
+   * Tema inválido -> INVALID_STATE sem efeito colateral.
+   */
+  setTheme(theme: unknown): WorkbenchShellViewSnapshot {
+    this.themeState = assertWorkbenchTheme(theme);
+    this.refreshView();
+    return this.view;
+  }
+
+  /**
+   * Altera a largura do painel em pixels (UI-02).
+   * Valor fora dos limites [280, 720] -> INVALID_STATE sem efeito colateral.
+   */
+  setPanelWidth(panelWidthPx: unknown): WorkbenchShellViewSnapshot {
+    this.panelWidthState = assertWorkbenchPanelWidthPx(panelWidthPx);
     this.refreshView();
     return this.view;
   }
@@ -337,6 +403,12 @@ export class WorkbenchShellController {
     this.terminalSession = null;
     this.gitPanel = null;
     this.debugSession = null;
+    if (input.theme !== undefined) {
+      this.themeState = assertWorkbenchTheme(input.theme);
+    }
+    if (input.panelWidthPx !== undefined) {
+      this.panelWidthState = assertWorkbenchPanelWidthPx(input.panelWidthPx);
+    }
     this.refreshView();
     return {
       identity: this.identity,
@@ -598,6 +670,8 @@ export class WorkbenchShellController {
       terminalSession: this.terminalSession,
       gitPanel: this.gitPanel,
       debugSession: this.debugSession,
+      theme: this.themeState,
+      panelWidthPx: this.panelWidthState,
     });
   }
 }

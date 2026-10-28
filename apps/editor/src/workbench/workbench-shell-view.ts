@@ -28,6 +28,12 @@ import {
   buildDebugView,
   type DebugViewSnapshot,
 } from "./debug-view.js";
+import {
+  WORKBENCH_THEME_DEFAULT,
+  type WorkbenchTheme,
+  themeTokensCssVariables,
+  WORKBENCH_PANEL_WIDTH_DEFAULT_PX,
+} from "./theme.js";
 
 export type WorkbenchCapabilitySlot =
   | "editor"
@@ -62,6 +68,10 @@ export interface WorkbenchShellViewInput {
   gitPanel?: IntegratedGitPanel | null;
   /** Sessão de depuração DAP (task_124). */
   debugSession?: IntegratedDebugSession | null;
+  /** Tema claro/escuro (UI-02). */
+  theme?: WorkbenchTheme;
+  /** Largura do painel em px (UI-02). */
+  panelWidthPx?: number;
 }
 
 export interface WorkbenchShellViewSnapshot {
@@ -79,6 +89,10 @@ export interface WorkbenchShellViewSnapshot {
     terminal: TerminalViewSnapshot["accessible"];
     git: GitPanelViewSnapshot["accessible"];
     debug: DebugViewSnapshot["accessible"];
+    /** Tema ativo no workbench (UI-02). */
+    theme: WorkbenchTheme;
+    /** Largura do painel em px (UI-02). */
+    panelWidthPx: number;
   };
   fileTree: FileTreeViewSnapshot;
   textEditor: TextEditorViewSnapshot;
@@ -134,6 +148,8 @@ export function buildWorkbenchShellView(
   const terminalSession = input.terminalSession ?? null;
   const gitPanel = input.gitPanel ?? null;
   const debugSession = input.debugSession ?? null;
+  const theme = input.theme ?? WORKBENCH_THEME_DEFAULT;
+  const panelWidthPx = input.panelWidthPx ?? WORKBENCH_PANEL_WIDTH_DEFAULT_PX;
 
   const fileTree = buildFileTreeView({
     folderPath: input.folderPath,
@@ -168,13 +184,17 @@ export function buildWorkbenchShellView(
   const daemonLabel = daemonConnected
     ? "Main ligado ao harness-daemon"
     : "Main sem ligação ao daemon";
+  const themeCssVars = themeTokensCssVariables(theme);
 
   const html = [
     `<main role="application" aria-label="${escapeHtml(input.identity.displayName)}"`,
     ` data-testid="workbench-shell" data-platform="${escapeHtml(input.platform)}"`,
     ` data-daemon-connected="${daemonConnected ? "true" : "false"}"`,
     ` data-tools-allowed-in-renderer="false"`,
-    ` data-folder-open="${input.folderPath !== null ? "true" : "false"}">`,
+    ` data-folder-open="${input.folderPath !== null ? "true" : "false"}"`,
+    ` data-theme="${theme}"`,
+    ` data-panel-width="${panelWidthPx}"`,
+    ` style="background:var(--workbench-bg);color:var(--workbench-fg);border-color:var(--workbench-border);${themeCssVars};">`,
     `<header data-testid="workbench-branding">`,
     `<img data-testid="workbench-product-icon" src="${escapeHtml(input.identity.iconRelativePath)}"`,
     ` alt="${escapeHtml(OPENAGENT_PRODUCT_NAME)}" tabindex="0" />`,
@@ -208,6 +228,8 @@ export function buildWorkbenchShellView(
       terminal: terminal.accessible,
       git: git.accessible,
       debug: debug.accessible,
+      theme,
+      panelWidthPx,
     },
     fileTree,
     textEditor,

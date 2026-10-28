@@ -92,3 +92,17 @@ export {
   type DebugViewInput,
   type DebugViewSnapshot,
 } from "./workbench-shell.js";
+export {
+  assertWorkbenchPanelWidthPx,
+  assertWorkbenchTheme,
+  isWorkbenchTheme,
+  themeTokensCssVariables,
+  WORKBENCH_PANEL_WIDTH_DEFAULT_PX,
+  WORKBENCH_PANEL_WIDTH_MAX_PX,
+  WORKBENCH_PANEL_WIDTH_MIN_PX,
+  WORKBENCH_THEME_DEFAULT,
+  WORKBENCH_THEME_TOKENS,
+  WORKBENCH_THEMES,
+  type WorkbenchTheme,
+  type WorkbenchThemeTokens,
+} from "./theme.js";
