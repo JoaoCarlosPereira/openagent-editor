@@ -36,6 +36,17 @@ import {
   type IntegratedTerminalSession,
 } from "./terminal.js";
 import {
+  continueIntegratedDebug,
+  DEBUG_NO_SESSION_MESSAGE,
+  openIntegratedDebugSession,
+  removeIntegratedBreakpoint,
+  setIntegratedBreakpoint,
+  startIntegratedDebugSession,
+  stepOverIntegratedDebug,
+  stopIntegratedDebugSession,
+  type IntegratedDebugSession,
+} from "./debug-session.js";
+import {
   buildWorkbenchShellView,
   type WorkbenchShellViewSnapshot,
 } from "./workbench-shell-view.js";
@@ -119,6 +130,32 @@ export {
   type GitPanelViewInput,
   type GitPanelViewSnapshot,
 } from "./git-panel-view.js";
+export {
+  openIntegratedDebugSession,
+  startIntegratedDebugSession,
+  stopIntegratedDebugSession,
+  setIntegratedBreakpoint,
+  removeIntegratedBreakpoint,
+  continueIntegratedDebug,
+  stepOverIntegratedDebug,
+  DEBUG_FOLDER_REQUIRED_MESSAGE,
+  DEBUG_NO_SESSION_MESSAGE,
+  DEBUG_TARGET_PATH_REQUIRED_MESSAGE,
+  DEBUG_BREAKPOINT_PATH_REQUIRED_MESSAGE,
+  DEBUG_BREAKPOINT_LINE_INVALID_MESSAGE,
+  DEBUG_BREAKPOINT_NOT_FOUND_MESSAGE,
+  DEBUG_SESSION_TERMINATED_MESSAGE,
+  OUT_OF_SCOPE_PATH_LOG_MESSAGE as DEBUG_OUT_OF_SCOPE_MESSAGE,
+  type IntegratedDebugSession,
+  type DebugBreakpoint,
+  type DebugStatus,
+  type StartDebugInput,
+} from "./debug-session.js";
+export {
+  buildDebugView,
+  type DebugViewInput,
+  type DebugViewSnapshot,
+} from "./debug-view.js";
 
 export const WORKBENCH_FOLDER_REQUIRED_MESSAGE =
   "Caminho de pasta obrigatório para abrir o workbench OpenAgent.";
@@ -132,6 +169,8 @@ export const WORKBENCH_TERMINAL_FOLDER_NOT_OPEN_MESSAGE =
   "Nenhuma pasta aberta no workbench para o terminal integrado.";
 export const WORKBENCH_GIT_FOLDER_NOT_OPEN_MESSAGE =
   "Nenhuma pasta aberta no workbench para o painel Git.";
+export const WORKBENCH_DEBUG_FOLDER_NOT_OPEN_MESSAGE =
+  "Nenhuma pasta aberta no workbench para depuração.";
 
 export interface WorkbenchShellOpenInput {
   platform: string;
@@ -158,6 +197,11 @@ export interface WorkbenchTerminalResult {
 
 export interface WorkbenchGitPanelResult {
   panel: IntegratedGitPanel;
+  view: WorkbenchShellViewSnapshot;
+}
+
+export interface WorkbenchDebugResult {
+  session: IntegratedDebugSession;
   view: WorkbenchShellViewSnapshot;
 }
 
@@ -202,7 +246,7 @@ function assertFolderPath(folderPath: unknown): string {
 }
 
 /**
- * LOC-01: workbench Electron — slots, árvore (120), editor (121), terminal (122) e Git (123).
+ * LOC-01: workbench Electron — slots, árvore (120), editor (121), terminal (122), Git (123) e debug DAP (124).
  */
 export class WorkbenchShellController {
   private identity: ElectronProductIdentity = createOpenAgentProductIdentity();
@@ -214,6 +258,7 @@ export class WorkbenchShellController {
   private textEditorDocument: TextEditorDocument | null = null;
   private terminalSession: IntegratedTerminalSession | null = null;
   private gitPanel: IntegratedGitPanel | null = null;
+  private debugSession: IntegratedDebugSession | null = null;
   private readonly rendererBridge: RendererToolBridge = createRendererToolBridge();
   private view: WorkbenchShellViewSnapshot = buildWorkbenchShellView({
     identity: this.identity,
@@ -226,6 +271,7 @@ export class WorkbenchShellController {
     textEditorDocument: null,
     terminalSession: null,
     gitPanel: null,
+    debugSession: null,
   });
 
   get snapshot(): WorkbenchShellViewSnapshot {
@@ -252,6 +298,11 @@ export class WorkbenchShellController {
     return this.gitPanel;
   }
 
+  /** Sessão de depuração DAP aberta (null se fechada). */
+  get openDebugSession(): IntegratedDebugSession | null {
+    return this.debugSession;
+  }
+
   /** Inicializa o shell com identidade OpenAgent antes de abrir pasta. */
   bootstrap(input: { platform: string; repoRoot?: string }): WorkbenchShellViewSnapshot {
     this.platform = input.platform;
@@ -263,6 +314,7 @@ export class WorkbenchShellController {
     this.textEditorDocument = null;
     this.terminalSession = null;
     this.gitPanel = null;
+    this.debugSession = null;
     this.refreshView();
     return this.view;
   }
@@ -284,6 +336,7 @@ export class WorkbenchShellController {
     this.textEditorDocument = null;
     this.terminalSession = null;
     this.gitPanel = null;
+    this.debugSession = null;
     this.refreshView();
     return {
       identity: this.identity,
@@ -431,6 +484,107 @@ export class WorkbenchShellController {
     return { panel: this.gitPanel, view: this.view };
   }
 
+  /**
+   * Abre uma sessão de depuração DAP no workbench (LOC-01 / task_124).
+   * Sem pasta aberta → INVALID_STATE; alvo fora do escopo → OUT_OF_SCOPE.
+   */
+  openDebug(targetPath: unknown): WorkbenchDebugResult {
+    if (this.folderPath === null) {
+      throw new ProtocolError("INVALID_STATE", WORKBENCH_DEBUG_FOLDER_NOT_OPEN_MESSAGE, []);
+    }
+    this.debugSession = openIntegratedDebugSession(this.folderPath, {
+      targetPath: targetPath as string,
+    });
+    this.refreshView();
+    return { session: this.debugSession, view: this.view };
+  }
+
+  /** Inicia a execução da sessão DAP aberta. */
+  startDebug(): WorkbenchDebugResult {
+    if (this.folderPath === null) {
+      throw new ProtocolError("INVALID_STATE", WORKBENCH_DEBUG_FOLDER_NOT_OPEN_MESSAGE, []);
+    }
+    if (this.debugSession === null) {
+      throw new ProtocolError("INVALID_STATE", DEBUG_NO_SESSION_MESSAGE, []);
+    }
+    this.debugSession = startIntegratedDebugSession(this.debugSession);
+    this.refreshView();
+    return { session: this.debugSession, view: this.view };
+  }
+
+  /** Encerra a sessão DAP aberta. */
+  stopDebug(): WorkbenchDebugResult {
+    if (this.folderPath === null) {
+      throw new ProtocolError("INVALID_STATE", WORKBENCH_DEBUG_FOLDER_NOT_OPEN_MESSAGE, []);
+    }
+    if (this.debugSession === null) {
+      throw new ProtocolError("INVALID_STATE", DEBUG_NO_SESSION_MESSAGE, []);
+    }
+    this.debugSession = stopIntegratedDebugSession(this.debugSession);
+    this.refreshView();
+    return { session: this.debugSession, view: this.view };
+  }
+
+  /**
+   * Adiciona um breakpoint na sessão DAP.
+   * Fora do root → OUT_OF_SCOPE; path/linha inválido → INVALID_STATE.
+   */
+  setDebugBreakpoint(relativePath: unknown, line: unknown): WorkbenchDebugResult {
+    if (this.folderPath === null) {
+      throw new ProtocolError("INVALID_STATE", WORKBENCH_DEBUG_FOLDER_NOT_OPEN_MESSAGE, []);
+    }
+    if (this.debugSession === null) {
+      throw new ProtocolError("INVALID_STATE", DEBUG_NO_SESSION_MESSAGE, []);
+    }
+    this.debugSession = setIntegratedBreakpoint(
+      this.debugSession,
+      this.folderPath,
+      relativePath,
+      line,
+    );
+    this.refreshView();
+    return { session: this.debugSession, view: this.view };
+  }
+
+  /** Remove um breakpoint na sessão DAP. */
+  removeDebugBreakpoint(breakpointId: unknown): WorkbenchDebugResult {
+    if (this.folderPath === null) {
+      throw new ProtocolError("INVALID_STATE", WORKBENCH_DEBUG_FOLDER_NOT_OPEN_MESSAGE, []);
+    }
+    if (this.debugSession === null) {
+      throw new ProtocolError("INVALID_STATE", DEBUG_NO_SESSION_MESSAGE, []);
+    }
+    this.debugSession = removeIntegratedBreakpoint(this.debugSession, breakpointId);
+    this.refreshView();
+    return { session: this.debugSession, view: this.view };
+  }
+
+  /** Continua a execução até próximo breakpoint (simulação de hit). */
+  continueDebug(): WorkbenchDebugResult {
+    if (this.folderPath === null) {
+      throw new ProtocolError("INVALID_STATE", WORKBENCH_DEBUG_FOLDER_NOT_OPEN_MESSAGE, []);
+    }
+    if (this.debugSession === null) {
+      throw new ProtocolError("INVALID_STATE", DEBUG_NO_SESSION_MESSAGE, []);
+    }
+    this.debugSession = continueIntegratedDebug(this.debugSession);
+    this.refreshView();
+    return { session: this.debugSession, view: this.view };
+  }
+
+  /** Avança uma linha (step over) na sessão DAP. */
+  stepOverDebug(): WorkbenchDebugResult {
+    if (this.folderPath === null) {
+      throw new ProtocolError("INVALID_STATE", WORKBENCH_DEBUG_FOLDER_NOT_OPEN_MESSAGE, []);
+    }
+    if (this.debugSession === null) {
+      throw new ProtocolError("INVALID_STATE", DEBUG_NO_SESSION_MESSAGE, []);
+    }
+    this.debugSession = stepOverIntegratedDebug(this.debugSession);
+    this.refreshView();
+    return { session: this.debugSession, view: this.view };
+  }
+
   private refreshView(): void {
     this.view = buildWorkbenchShellView({
       identity: this.identity,
@@ -443,6 +597,7 @@ export class WorkbenchShellController {
       textEditorDocument: this.textEditorDocument,
       terminalSession: this.terminalSession,
       gitPanel: this.gitPanel,
+      debugSession: this.debugSession,
     });
   }
 }

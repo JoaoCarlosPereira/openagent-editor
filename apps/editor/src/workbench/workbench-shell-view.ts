@@ -23,6 +23,11 @@ import {
   buildTerminalView,
   type TerminalViewSnapshot,
 } from "./terminal-view.js";
+import type { IntegratedDebugSession } from "./debug-session.js";
+import {
+  buildDebugView,
+  type DebugViewSnapshot,
+} from "./debug-view.js";
 
 export type WorkbenchCapabilitySlot =
   | "editor"
@@ -55,6 +60,8 @@ export interface WorkbenchShellViewInput {
   terminalSession?: IntegratedTerminalSession | null;
   /** Painel Git status/diff (task_123). */
   gitPanel?: IntegratedGitPanel | null;
+  /** Sessão de depuração DAP (task_124). */
+  debugSession?: IntegratedDebugSession | null;
 }
 
 export interface WorkbenchShellViewSnapshot {
@@ -71,11 +78,13 @@ export interface WorkbenchShellViewSnapshot {
     textEditor: TextEditorViewSnapshot["accessible"];
     terminal: TerminalViewSnapshot["accessible"];
     git: GitPanelViewSnapshot["accessible"];
+    debug: DebugViewSnapshot["accessible"];
   };
   fileTree: FileTreeViewSnapshot;
   textEditor: TextEditorViewSnapshot;
   terminal: TerminalViewSnapshot;
   git: GitPanelViewSnapshot;
+  debug: DebugViewSnapshot;
 }
 
 function escapeHtml(text: string): string {
@@ -91,6 +100,7 @@ function renderCapabilitySlot(
   textEditor: TextEditorViewSnapshot,
   terminal: TerminalViewSnapshot,
   git: GitPanelViewSnapshot,
+  debug: DebugViewSnapshot,
 ): string {
   if (slot === "editor") {
     return textEditor.html;
@@ -101,6 +111,9 @@ function renderCapabilitySlot(
   if (slot === "git") {
     return git.html;
   }
+  if (slot === "debug") {
+    return debug.html;
+  }
   return [
     `<section data-testid="workbench-slot-${slot}" data-capability="${slot}"`,
     ` role="region" aria-label="${escapeHtml(slot)}" tabindex="0">`,
@@ -109,7 +122,7 @@ function renderCapabilitySlot(
   ].join("");
 }
 
-/** LOC-01: shell do workbench com identidade OpenAgent, slots, árvore, editor, terminal e Git. */
+/** LOC-01: shell do workbench com identidade OpenAgent, slots, árvore, editor, terminal, Git e debug DAP. */
 export function buildWorkbenchShellView(
   input: WorkbenchShellViewInput,
 ): WorkbenchShellViewSnapshot {
@@ -120,6 +133,7 @@ export function buildWorkbenchShellView(
   const textEditorDocument = input.textEditorDocument ?? null;
   const terminalSession = input.terminalSession ?? null;
   const gitPanel = input.gitPanel ?? null;
+  const debugSession = input.debugSession ?? null;
 
   const fileTree = buildFileTreeView({
     folderPath: input.folderPath,
@@ -129,6 +143,7 @@ export function buildWorkbenchShellView(
   const textEditor = buildTextEditorView({ document: textEditorDocument });
   const terminal = buildTerminalView({ session: terminalSession });
   const git = buildGitPanelView({ panel: gitPanel });
+  const debug = buildDebugView({ session: debugSession });
 
   const focusOrder = [
     "workbench-product-name",
@@ -140,14 +155,15 @@ export function buildWorkbenchShellView(
     "workbench-slot-editor",
     "workbench-slot-terminal",
     "workbench-slot-git",
+    "workbench-slot-debug",
     ...WORKBENCH_CAPABILITY_SLOTS.filter(
-      (slot) => slot !== "editor" && slot !== "terminal" && slot !== "git",
+      (slot) => slot !== "editor" && slot !== "terminal" && slot !== "git" && slot !== "debug",
     ).map((slot) => `workbench-slot-${slot}`),
   ] as const;
 
   const folderLabel = input.folderPath ?? "Nenhuma pasta aberta";
   const slotsHtml = WORKBENCH_CAPABILITY_SLOTS.map((slot) =>
-    renderCapabilitySlot(slot, textEditor, terminal, git),
+    renderCapabilitySlot(slot, textEditor, terminal, git, debug),
   ).join("");
   const daemonLabel = daemonConnected
     ? "Main ligado ao harness-daemon"
@@ -191,10 +207,12 @@ export function buildWorkbenchShellView(
       textEditor: textEditor.accessible,
       terminal: terminal.accessible,
       git: git.accessible,
+      debug: debug.accessible,
     },
     fileTree,
     textEditor,
     terminal,
     git,
+    debug,
   };
 }

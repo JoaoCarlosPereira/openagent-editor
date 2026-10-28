@@ -2,6 +2,7 @@ import { ProtocolError } from "@openagent/protocol";
 
 import {
   WorkbenchShellController,
+  type WorkbenchDebugResult,
   type WorkbenchGitPanelResult,
   type WorkbenchShellOpenResult,
   type WorkbenchTerminalResult,
@@ -263,6 +264,79 @@ export class ElectronMainController {
       ]);
     }
     return this.workbench.loadGitDiff(relativePath);
+  }
+
+  /**
+   * Abre uma sessão de depuração DAP pelo processo main (LOC-01 / task_124).
+   * Controle de sessão no main; o renderer consome o snapshot observável.
+   */
+  openDebug(targetPath: unknown): WorkbenchDebugResult {
+    if (this.snapshot === null) {
+      throw new ProtocolError("INVALID_STATE", ELECTRON_MAIN_FOLDER_REQUIRED_MESSAGE, [
+        "launch() não foi chamado",
+      ]);
+    }
+    return this.workbench.openDebug(targetPath);
+  }
+
+  /** Inicia a sessão de depuração DAP aberta (main). */
+  startDebug(): WorkbenchDebugResult {
+    if (this.snapshot === null) {
+      throw new ProtocolError("INVALID_STATE", ELECTRON_MAIN_FOLDER_REQUIRED_MESSAGE, [
+        "launch() não foi chamado",
+      ]);
+    }
+    return this.workbench.startDebug();
+  }
+
+  /** Encerra a sessão de depuração DAP aberta (main). */
+  stopDebug(): WorkbenchDebugResult {
+    if (this.snapshot === null) {
+      throw new ProtocolError("INVALID_STATE", ELECTRON_MAIN_FOLDER_REQUIRED_MESSAGE, [
+        "launch() não foi chamado",
+      ]);
+    }
+    return this.workbench.stopDebug();
+  }
+
+  /** Adiciona um breakpoint na sessão de depuração DAP aberta (main). */
+  setDebugBreakpoint(relativePath: unknown, line: unknown): WorkbenchDebugResult {
+    if (this.snapshot === null) {
+      throw new ProtocolError("INVALID_STATE", ELECTRON_MAIN_FOLDER_REQUIRED_MESSAGE, [
+        "launch() não foi chamado",
+      ]);
+    }
+    return this.workbench.setDebugBreakpoint(relativePath, line);
+  }
+
+  /** Remove um breakpoint na sessão de depuração DAP aberta (main). */
+  removeDebugBreakpoint(breakpointId: unknown): WorkbenchDebugResult {
+    if (this.snapshot === null) {
+      throw new ProtocolError("INVALID_STATE", ELECTRON_MAIN_FOLDER_REQUIRED_MESSAGE, [
+        "launch() não foi chamado",
+      ]);
+    }
+    return this.workbench.removeDebugBreakpoint(breakpointId);
+  }
+
+  /** Continua a execução da sessão de depuração DAP até breakpoint (main). */
+  continueDebug(): WorkbenchDebugResult {
+    if (this.snapshot === null) {
+      throw new ProtocolError("INVALID_STATE", ELECTRON_MAIN_FOLDER_REQUIRED_MESSAGE, [
+        "launch() não foi chamado",
+      ]);
+    }
+    return this.workbench.continueDebug();
+  }
+
+  /** Avança uma linha (step over) na sessão de depuração DAP (main). */
+  stepOverDebug(): WorkbenchDebugResult {
+    if (this.snapshot === null) {
+      throw new ProtocolError("INVALID_STATE", ELECTRON_MAIN_FOLDER_REQUIRED_MESSAGE, [
+        "launch() não foi chamado",
+      ]);
+    }
+    return this.workbench.stepOverDebug();
   }
 
   /** Liga o processo main ao harness-daemon (ADR-003). */
