@@ -75,6 +75,13 @@ function invalidState(message: string, details: readonly string[] = []): Protoco
   return new ProtocolError(PROTOCOL_ERROR_CODES.INVALID_STATE, message, [...details]);
 }
 
+function isValidIndexSize(size: unknown): size is IndexSizeSnapshot {
+  if (!size || typeof size !== "object") return false;
+  const snapshot = size as Partial<IndexSizeSnapshot>;
+  return [snapshot.indexedFileCount, snapshot.chunkCount, snapshot.lexicalBytes]
+    .every((value) => Number.isSafeInteger(value) && (value as number) >= 0);
+}
+
 function normalizeEndpoint(raw: string): string {
   const url = new URL(raw.trim().endsWith("/") ? raw.trim() : `${raw.trim()}/`);
   if (url.protocol !== "http:" && url.protocol !== "https:") {
@@ -291,7 +298,7 @@ export class SettingsController {
       throw invalidState("A descrição do índice não está disponível.", ["port"]);
     }
     const size = await this.port.describeIndexSize();
-    if (!size || ![size.indexedFileCount, size.chunkCount, size.lexicalBytes].every((value) => Number.isSafeInteger(value) && value >= 0)) {
+    if (!isValidIndexSize(size)) {
       throw invalidState("Tamanho do índice inválido.", ["indexSize"]);
     }
     this.value = { ...this.value, indexSizeSnapshot: { ...size } };
@@ -308,7 +315,7 @@ export class SettingsController {
     if (!this.port?.confirmAndClearIndex) throw invalidState("A limpeza do índice não está disponível.", ["port"]);
     if (!this.value.indexSizeSnapshot) throw invalidState("Consulte o escopo e tamanho antes da limpeza.", ["indexSize"]);
     const baseline = expectedSize ?? this.value.indexSizeSnapshot;
-    if (JSON.stringify(baseline) !== JSON.stringify(this.value.indexSizeSnapshot)) {
+    if (!isValidIndexSize(baseline) || JSON.stringify(baseline) !== JSON.stringify(this.value.indexSizeSnapshot)) {
       throw invalidState("O tamanho do índice mudou; atualize a prévia antes de confirmar.", ["indexSize"]);
     }
     this.operationInProgress = true;
@@ -316,8 +323,11 @@ export class SettingsController {
     this.notify();
     try {
       const result = await this.port.confirmAndClearIndex();
-      if (result.cleared !== true || result.scope !== "workspace" || !result.size) {
+      if (result.cleared !== true || result.scope !== "workspace" || !isValidIndexSize(result.size)) {
         throw invalidState("Resultado de limpeza inválido.", ["result"]);
+      }
+      if (result.size.indexedFileCount !== 0 || result.size.chunkCount !== 0 || result.size.lexicalBytes !== 0) {
+        throw invalidState("A limpeza foi confirmada, mas o índice não está vazio.", ["result", "size"]);
       }
       this.value = { ...this.value, isClearingIndex: false, indexSizeSnapshot: { ...result.size } };
       this.notify();

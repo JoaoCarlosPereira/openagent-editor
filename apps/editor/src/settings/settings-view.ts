@@ -12,6 +12,7 @@ export interface SettingsViewInput {
   exclusionRules?: readonly { pattern: string; source: "project-ignore" | "workspace-config"; removable: boolean }[];
   indexSizeSnapshot?: { indexedFileCount: number; chunkCount: number; lexicalBytes: number } | null;
   isClearingIndex?: boolean;
+  clearConfirmationChecked?: boolean;
 }
 
 export interface SettingsViewSnapshot {
@@ -27,6 +28,7 @@ export interface SettingsViewSnapshot {
     exclusionRules: readonly { pattern: string; source: "project-ignore" | "workspace-config"; removable: boolean }[];
     indexSizeSnapshot: { indexedFileCount: number; chunkCount: number; lexicalBytes: number } | null;
     isClearingIndex: boolean;
+    clearConfirmationChecked: boolean;
   };
 }
 
@@ -75,8 +77,8 @@ export function buildSettingsView(input: SettingsViewInput): SettingsViewSnapsho
       ? `<div data-testid="index-size-preview"><p>Arquivos: ${size.indexedFileCount}</p><p>Trechos: ${size.chunkCount}</p><p>Tamanho textual: ${size.lexicalBytes} bytes</p></div>`
       : `<p data-testid="index-size-unavailable">Consulte o tamanho antes de limpar.</p>`,
     `<button type="button" data-testid="describe-index-size">Consultar escopo e tamanho</button>`,
-    `<button type="button" data-testid="clear-index"${size && input.isClearingIndex !== true ? "" : " disabled"}>Limpar índice do workspace</button>`,
-    `<label><input type="checkbox" data-testid="confirm-clear-index"${size && input.isClearingIndex !== true ? "" : " disabled"} /> Confirmo apagar os dados locais do índice deste workspace</label>`,
+    `<button type="button" data-testid="clear-index"${size && input.isClearingIndex !== true && input.clearConfirmationChecked === true ? "" : " disabled"}>Limpar índice do workspace</button>`,
+    `<label><input type="checkbox" data-testid="confirm-clear-index"${input.clearConfirmationChecked === true ? " checked" : ""}${size && input.isClearingIndex !== true ? "" : " disabled"} /> Confirmo apagar os dados locais do índice deste workspace</label>`,
     `<p data-testid="index-clear-result" role="status">${input.isClearingIndex ? "Limpando índice…" : size && size.indexedFileCount === 0 && size.chunkCount === 0 ? "Índice do workspace vazio." : "A limpeza exige confirmação explícita."}</p>`,
     `</section>`,
   ].join("");
@@ -114,6 +116,7 @@ export function buildSettingsView(input: SettingsViewInput): SettingsViewSnapsho
       exclusionRules: rules,
       indexSizeSnapshot: size ?? null,
       isClearingIndex: input.isClearingIndex ?? false,
+      clearConfirmationChecked: input.clearConfirmationChecked === true,
     },
   };
 }
