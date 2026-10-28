@@ -28,3 +28,15 @@ export {
   type SessionDiscoveryUiPhase,
   type SessionDiscoveryViewSnapshot,
 } from "./session-discovery.js";
+
+export {
+  AgentsWindowController,
+  buildAgentsWindowView,
+  type AgentExecutionStatus,
+  type AgentParallelExecution,
+  type AgentsWindowViewMode,
+  type AgentsWindowViewSnapshot,
+  type AgentsWindowNavigationOptions,
+  type AgentsWindowPort,
+  type AgentsWindowListener,
+} from "./agents-window.js";

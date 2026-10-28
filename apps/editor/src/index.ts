@@ -91,3 +91,14 @@ export {
   type SessionDiscoveryUiPhase,
   type SessionDiscoveryViewSnapshot,
 } from "./agents/index.js";
+export {
+  AgentsWindowController,
+  buildAgentsWindowView,
+  type AgentExecutionStatus,
+  type AgentParallelExecution,
+  type AgentsWindowViewMode,
+  type AgentsWindowViewSnapshot,
+  type AgentsWindowNavigationOptions,
+  type AgentsWindowPort,
+  type AgentsWindowListener,
+} from "./agents/index.js";
