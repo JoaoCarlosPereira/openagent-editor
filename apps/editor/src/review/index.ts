@@ -21,6 +21,21 @@ export {
 } from "./apply-conflict.js";
 
 export {
+  PlanProgressController,
+  PLAN_ACCEPTED_EVENT,
+  PLAN_PRESENTED_EVENT,
+  PLAN_PROGRESS_EVENT,
+  buildPlanProgressView,
+  type PlanAcceptedPayload,
+  type PlanPresentedPayload,
+  type PlanProgressPayload,
+  type PlanProgressPhase,
+  type PlanProgressPushInput,
+  type PlanProgressStep,
+  type PlanProgressViewSnapshot,
+} from "./plan-progress.js";
+
+export {
   ReadOnlyExecutionBlockController,
   evaluateReadOnlyExecutionBlock,
   type ReadOnlyBlockAttemptResult,

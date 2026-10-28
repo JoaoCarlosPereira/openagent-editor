@@ -26,3 +26,11 @@ export {
   type ApplyConflictEntry,
   type ApplyConflictViewSnapshot,
 } from "./review/apply-conflict.js";
+export {
+  PlanProgressController,
+  buildPlanProgressView,
+  type PlanProgressPushInput,
+  type PlanProgressViewSnapshot,
+  type PlanProgressStep,
+  type PlanProgressPhase,
+} from "./review/plan-progress.js";
