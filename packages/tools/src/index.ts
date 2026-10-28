@@ -100,6 +100,17 @@ export {
 } from "./worker/tool-run-coordinator.js";
 
 export {
+  buildToolResultEventPayload,
+  persistToolInvocationResult,
+  TOOL_RESULT_EVENT,
+  type PersistToolInvocationInput,
+  type PersistToolInvocationResult,
+  type ToolInvocationRecord,
+  type ToolInvocationRecordWriter,
+  type ToolInvocationResultPayload,
+} from "./worker/tool-invocation-record.js";
+
+export {
   dispatchInIsolatedWorker,
   IsolatedWorkerThreadHost,
 } from "./worker/isolated-worker-thread.js";
