@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import fs from "node:fs";
 import { once } from "node:events";
+import os from "node:os";
+import path from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
 import { DatabaseSync } from "node:sqlite";
@@ -117,6 +119,11 @@ test("[API-01] registerSupervisedCliProxyProviderProfile testa conexão, capacid
 });
 
 test("[API-01] caminho de erro: entrada inválida retorna INVALID_STATE sem efeito colateral", async () => {
+  const tmpDir = os.tmpdir();
+  const cliproxyDirsBefore = new Set(
+    fs.readdirSync(tmpDir).filter((name) => name.startsWith("openagent-cliproxy-")),
+  );
+
   await assert.rejects(
     () => startCliProxySidecarSupervised({}),
     (error: unknown) => {
@@ -125,4 +132,20 @@ test("[API-01] caminho de erro: entrada inválida retorna INVALID_STATE sem efei
       return true;
     },
   );
+
+  const cliproxyDirsAfter = fs
+    .readdirSync(tmpDir)
+    .filter((name) => name.startsWith("openagent-cliproxy-"));
+  const newDirs = cliproxyDirsAfter.filter((name) => !cliproxyDirsBefore.has(name));
+  assert.equal(
+    newDirs.length,
+    0,
+    "startCliProxySidecarSupervised({}) não deve criar diretório efêmero com segredos",
+  );
+  for (const dirName of cliproxyDirsAfter) {
+    const configPath = path.join(tmpDir, dirName, "cliproxy-config.yaml");
+    if (fs.existsSync(configPath) && !cliproxyDirsBefore.has(dirName)) {
+      assert.fail(`config residual inesperado: ${configPath}`);
+    }
+  }
 });
