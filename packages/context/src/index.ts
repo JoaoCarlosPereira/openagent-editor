@@ -85,6 +85,14 @@ export {
   type PurgeExcludedContextIndexResult,
 } from "./indexer/purge-excluded-context-index.js";
 export { removeContextFileIndex } from "./indexer/remove-context-file-index.js";
+export {
+  clearContextChunkVectors,
+  EMBEDDING_VECTOR_REF_PREFIX,
+  formatEmbeddingVectorRef,
+  loadRedistributableLocalEmbeddingModel,
+  reindexPersistedPathEmbeddingsOnSave,
+  searchPersistedChunkEmbeddings,
+} from "./embeddings/index.js";
 export { reindexContextFileOnSave } from "./indexer/reindex-context-file-on-save.js";
 export type { ReindexContextFileOnSaveInput } from "./indexer/reindex-context-file-on-save.js";
 export { ensureContextIndexSchema } from "./indexer/schema.js";

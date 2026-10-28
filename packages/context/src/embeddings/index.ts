@@ -3,6 +3,16 @@ export {
   cosineSimilarity,
 } from "./deterministic-local-embedder.js";
 export {
+  clearContextChunkVectors,
+  ensureContextChunkVectorSchema,
+  formatEmbeddingVectorRef,
+  EMBEDDING_VECTOR_REF_PREFIX,
+  reindexPersistedPathEmbeddingsOnSave,
+  removeContextChunkVectorsForPath,
+  searchPersistedChunkEmbeddings,
+  upsertContextChunkVectorRef,
+} from "./chunk-vector-store.js";
+export {
   createIncrementalChunkEmbeddingIndex,
   reindexPathEmbeddingsOnSave,
   searchIncrementalChunkEmbeddings,

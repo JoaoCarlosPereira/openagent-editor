@@ -1,5 +1,6 @@
 import type { DatabaseSync } from "node:sqlite";
 
+import { clearContextChunkVectors } from "../embeddings/chunk-vector-store.js";
 import {
   describeContextIndexSize,
   type ContextIndexSizeSnapshot,
@@ -17,5 +18,6 @@ export function clearWorkspaceContextIndex(
   const size = describeContextIndexSize(database);
   database.exec("DELETE FROM context_file_fts");
   database.exec("DELETE FROM context_index_file");
+  clearContextChunkVectors(database);
   return { scope: "workspace", size };
 }

@@ -1,6 +1,7 @@
 import type { DatabaseSync } from "node:sqlite";
 import { PROTOCOL_ERROR_CODES, ProtocolError } from "@openagent/protocol";
 
+import { reindexPersistedPathEmbeddingsOnSave } from "../embeddings/chunk-vector-store.js";
 import { evaluateContextPathExclusion } from "../exclusions/rules.js";
 import { chunkContextFileText, DEFAULT_CONTEXT_INDEX_CHUNK_SIZE } from "./chunk-text.js";
 import { hashContextFileContent } from "./content-hash.js";
@@ -113,6 +114,14 @@ export function indexContextFile(
   } catch (error) {
     database.exec("ROLLBACK");
     throw error;
+  }
+
+  if (input.embeddingModel) {
+    reindexPersistedPathEmbeddingsOnSave(database, input.embeddingModel, {
+      path,
+      content: input.content,
+      contentHash,
+    }, chunkSize);
   }
 
   return {

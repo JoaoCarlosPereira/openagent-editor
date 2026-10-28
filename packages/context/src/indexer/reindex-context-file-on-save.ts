@@ -5,6 +5,7 @@ import type { DatabaseSync } from "node:sqlite";
 import { resolveCanonicalWorkspacePath } from "@openagent/policy";
 import { PROTOCOL_ERROR_CODES, ProtocolError } from "@openagent/protocol";
 
+import type { RegisteredLocalEmbeddingModel } from "../embeddings/types.js";
 import type { ContextExclusionRuleset } from "../exclusions/types.js";
 import { indexContextFile } from "./index-context-file.js";
 import type { IndexContextFileResult } from "./types.js";
@@ -13,6 +14,7 @@ export type ReindexContextFileOnSaveInput = {
   workspaceRoot: string;
   relativePath: string;
   exclusionRuleset?: ContextExclusionRuleset;
+  embeddingModel?: RegisteredLocalEmbeddingModel;
 };
 
 function reindexInvalid(message: string, details?: string[]): never {
@@ -76,5 +78,6 @@ export function reindexContextFileOnSave(
     path: relativePath,
     content,
     exclusionRuleset: input.exclusionRuleset,
+    embeddingModel: input.embeddingModel,
   });
 }

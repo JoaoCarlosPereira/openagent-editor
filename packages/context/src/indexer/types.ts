@@ -1,3 +1,4 @@
+import type { RegisteredLocalEmbeddingModel } from "../embeddings/types.js";
 import type { ContextExclusionRuleset } from "../exclusions/types.js";
 
 export type ContextIndexChunk = {
@@ -5,6 +6,8 @@ export type ContextIndexChunk = {
   charStart: number;
   charEnd: number;
   lexicalText: string;
+  /** Referência local ao vetor do chunk (`sha256:<hex>`), quando embeddings estão ativos. */
+  vectorRef?: string;
 };
 
 export type IndexContextFileInput = {
@@ -13,6 +16,7 @@ export type IndexContextFileInput = {
   contentHash?: string;
   chunkSize?: number;
   exclusionRuleset?: ContextExclusionRuleset;
+  embeddingModel?: RegisteredLocalEmbeddingModel;
 };
 
 export type IndexContextFileResult = {
