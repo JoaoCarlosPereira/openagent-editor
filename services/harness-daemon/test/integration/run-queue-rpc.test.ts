@@ -122,9 +122,9 @@ test.describe("run.queue.add/remove persistido", { concurrency: 1 }, () => {
     const dataRoot = await mkdtemp(path.join(os.tmpdir(), "oa-run-queue-"));
     const runtimeDirectory = path.join(dataRoot, "runtime");
     const runId = `run-${randomUUID()}`;
-    let sessionId = "";
 
     let daemon = await startHarnessDaemon({ dataRoot, runtimeDirectory });
+    let sessionId: string | undefined;
     try {
       const client = await connectRpcClient(daemon.address);
       const created = await client.call(
@@ -164,6 +164,7 @@ test.describe("run.queue.add/remove persistido", { concurrency: 1 }, () => {
 
     daemon = await startHarnessDaemon({ dataRoot, runtimeDirectory });
     try {
+      assert.ok(sessionId, "sessionId deve existir após run.start inicial");
       const client = await connectRpcClient(daemon.address);
       const third = await client.call(
         RPC_METHOD.RUN_QUEUE_ADD,
