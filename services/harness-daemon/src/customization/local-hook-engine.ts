@@ -1,5 +1,7 @@
 import {
+  DEFAULT_LOCAL_HOOK_HANDLER_TIMEOUT_MS,
   LocalHookEngine,
+  type LocalHookEngineOptions,
   type RegisteredLocalHook,
 } from "@openagent/policy";
 
@@ -7,8 +9,10 @@ import {
 export class WorkspaceCustomizationHooks {
   private readonly engine: LocalHookEngine;
 
-  constructor(initial: RegisteredLocalHook[] = []) {
-    this.engine = new LocalHookEngine(initial);
+  constructor(initial: RegisteredLocalHook[] = [], options?: LocalHookEngineOptions) {
+    this.engine = new LocalHookEngine(initial, {
+      handlerTimeoutMs: options?.handlerTimeoutMs ?? DEFAULT_LOCAL_HOOK_HANDLER_TIMEOUT_MS,
+    });
   }
 
   getEngine(): LocalHookEngine {

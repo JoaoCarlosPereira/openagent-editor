@@ -2,11 +2,19 @@ import { ProtocolError } from "@openagent/protocol";
 
 import { validatePolicyCapability } from "../capability.js";
 import { validatePolicyTarget } from "../target.js";
+import {
+  invokeRegisteredHookHandler,
+  resolveHandlerTimeoutMs,
+  type LocalHookEngineOptions,
+} from "./timeout.js";
 import type {
   LocalHookAction,
   LocalHookEvaluationResult,
   RegisteredLocalHook,
 } from "./types.js";
+
+export type { LocalHookEngineOptions } from "./timeout.js";
+export { DEFAULT_LOCAL_HOOK_HANDLER_TIMEOUT_MS } from "./timeout.js";
 
 function isNonEmptyString(value: unknown): value is string {
   return typeof value === "string" && value.trim().length > 0;
@@ -66,9 +74,11 @@ export function validateLocalHookAction(raw: unknown): LocalHookAction {
 /** Motor sequencial de hooks locais: primeira negação interrompe a ação (CUS-03). */
 export class LocalHookEngine {
   private readonly hooks: RegisteredLocalHook[];
+  private readonly handlerTimeoutMs: number;
 
-  constructor(hooks: RegisteredLocalHook[] = []) {
+  constructor(hooks: RegisteredLocalHook[] = [], options?: LocalHookEngineOptions) {
     this.hooks = [...hooks];
+    this.handlerTimeoutMs = resolveHandlerTimeoutMs(options);
   }
 
   register(hook: RegisteredLocalHook): void {
@@ -87,7 +97,11 @@ export class LocalHookEngine {
   async evaluate(rawAction: unknown): Promise<LocalHookEvaluationResult> {
     const action = validateLocalHookAction(rawAction);
     for (const hook of this.hooks) {
-      const outcome = await hook.handler(action);
+      const invoked = await invokeRegisteredHookHandler(hook, action, this.handlerTimeoutMs);
+      if (invoked.kind === "timeout") {
+        continue;
+      }
+      const outcome = invoked.outcome;
       if (outcome.decision === "deny") {
         const justification = normalizeHookJustification(outcome.justification);
         return {

@@ -96,11 +96,13 @@ export {
   type StructuredLogWriteInput,
 } from "./logger.js";
 export {
+  DEFAULT_LOCAL_HOOK_HANDLER_TIMEOUT_MS,
   LocalHookEngine,
   assertLocalHooksAllowAction,
   hookActionDeniedError,
   validateLocalHookAction,
 } from "./hooks/engine.js";
+export type { LocalHookEngineOptions } from "./hooks/engine.js";
 export { formatHookDenialForDisplay } from "./hooks/display.js";
 export type {
   HookDenialDisplay,
