@@ -39,7 +39,7 @@ export {
   type CollectUnreferencedCasBlobsResult,
 } from "./cas-gc.js";
 
-export { deleteSessionStorage, type DeleteSessionStorageResult } from "./delete.js";
+export { deleteSessionStorage, type DeleteSessionStorageResult } from "./delete/index.js";
 
 export {
   exportSessionTextFile,

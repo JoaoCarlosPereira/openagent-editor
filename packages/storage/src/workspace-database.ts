@@ -8,7 +8,7 @@ import {
   type AppendHarnessEventInput,
 } from "./event-log.js";
 import { putCasBlob, readCasBlob, type PutCasBlobResult } from "./cas.js";
-import { deleteSessionStorage, type DeleteSessionStorageResult } from "./delete.js";
+import { deleteSessionStorage, type DeleteSessionStorageResult } from "./delete/index.js";
 import { runStorageMigrations } from "./migration-runner.js";
 import { STORAGE_MIGRATIONS } from "./migrations/index.js";
 import { STORAGE_SCHEMA_VERSION } from "./schema-version.js";
