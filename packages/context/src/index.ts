@@ -28,6 +28,10 @@ export {
   type ExecuteContextAttachRpcOptions,
 } from "./rpc/context-attach.js";
 export {
+  executeContextIndexRpc,
+  type ExecuteContextIndexRpcOptions,
+} from "./rpc/context-index.js";
+export {
   buildContextExclusionRules,
   evaluateContextPathExclusion,
   filterIncludedContextPaths,
@@ -51,6 +55,8 @@ export {
 } from "./indexer/chunk-text.js";
 export { hashContextFileContent } from "./indexer/content-hash.js";
 export { indexContextFile } from "./indexer/index-context-file.js";
+export { reindexContextFileOnSave } from "./indexer/reindex-context-file-on-save.js";
+export type { ReindexContextFileOnSaveInput } from "./indexer/reindex-context-file-on-save.js";
 export { ensureContextIndexSchema } from "./indexer/schema.js";
 export { searchContextIndex } from "./indexer/search-context-index.js";
 export type {
