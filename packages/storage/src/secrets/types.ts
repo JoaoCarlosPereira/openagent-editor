@@ -3,6 +3,7 @@
  */
 export type SystemSecretVaultBackend =
   | "linux-secret-service"
+  | "macos-keychain"
   | "memory";
 
 export type SystemSecretVault = {

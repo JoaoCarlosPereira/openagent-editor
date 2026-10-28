@@ -6,6 +6,7 @@ import { ProtocolError } from "@openagent/protocol";
 import {
   createInMemorySystemSecretVault,
   createLinuxSecretServiceVault,
+  createMacOsKeychainVault,
   readProviderCredentialFromVault,
   registerProviderCredential,
 } from "../../src/secrets/index.js";
@@ -154,5 +155,58 @@ test("[API-01] adapter Linux Secret Service persiste e recupera via secret-tool 
     );
     const roundTrip = await readProviderCredentialFromVault(result.secretRef, vault);
     assert.equal(roundTrip?.credential, "linux-secret");
+  });
+});
+
+test("[API-01] adapter macOS Keychain persiste e recupera via security simulado", async () => {
+  const store = new Map<string, string>();
+
+  const vault = createMacOsKeychainVault({
+    runSecurity: async (args) => {
+      const command = args[0];
+      if (command === "add-generic-password") {
+        const service = args[args.indexOf("-s") + 1];
+        const account = args[args.indexOf("-a") + 1];
+        const secret = args[args.indexOf("-w") + 1];
+        assert.ok(service && account && secret);
+        store.set(`${service}/${account}`, secret);
+        return { stdout: "", stderr: "" };
+      }
+      if (command === "find-generic-password") {
+        const service = args[args.indexOf("-s") + 1];
+        const account = args[args.indexOf("-a") + 1];
+        const value = store.get(`${service}/${account}`);
+        if (!value) {
+          throw Object.assign(new Error("could not be found"), { exitCode: 44 });
+        }
+        return { stdout: `${value}\n`, stderr: "" };
+      }
+      if (command === "delete-generic-password") {
+        const service = args[args.indexOf("-s") + 1];
+        const account = args[args.indexOf("-a") + 1];
+        store.delete(`${service}/${account}`);
+        return { stdout: "", stderr: "" };
+      }
+      throw new Error(`comando inesperado: ${args.join(" ")}`);
+    },
+  });
+
+  await withMockModelsServer(["model-macos"], "macos-key", async (baseUrl) => {
+    const result = await registerProviderCredential(
+      {
+        profileId: "macos-profile",
+        endpoint: baseUrl,
+        model: "model-macos",
+        credential: "macos-key",
+      },
+      { vault },
+    );
+
+    assert.match(
+      result.secretRef,
+      /^sysvault:macos-keychain:openagent-editor\/provider\/macos-profile$/,
+    );
+    const roundTrip = await readProviderCredentialFromVault(result.secretRef, vault);
+    assert.equal(roundTrip?.credential, "macos-key");
   });
 });

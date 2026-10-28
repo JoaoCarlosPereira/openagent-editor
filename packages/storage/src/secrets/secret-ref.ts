@@ -26,7 +26,11 @@ export function parseSecretRef(secretRef: string): ParsedSecretRef | null {
     return null;
   }
   const backend = body.slice(0, colon) as SystemSecretVaultBackend;
-  if (backend !== "linux-secret-service" && backend !== "memory") {
+  if (
+    backend !== "linux-secret-service" &&
+    backend !== "macos-keychain" &&
+    backend !== "memory"
+  ) {
     return null;
   }
   const rest = body.slice(colon + 1);

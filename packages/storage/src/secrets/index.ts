@@ -6,6 +6,10 @@ export {
   type SecretToolRunner,
 } from "./linux-secret-service-vault.js";
 export {
+  createMacOsKeychainVault,
+  type MacOsSecurityRunner,
+} from "./macos-keychain-vault.js";
+export {
   probeOpenAiCompatibleProvider,
   readProviderCredentialFromVault,
   registerProviderCredential,

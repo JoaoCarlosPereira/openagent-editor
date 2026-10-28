@@ -68,6 +68,7 @@ export {
 export {
   createInMemorySystemSecretVault,
   createLinuxSecretServiceVault,
+  createMacOsKeychainVault,
   formatSecretRef,
   OPENAGENT_SECRET_SERVICE,
   parseSecretRef,
@@ -79,6 +80,7 @@ export {
   type ProviderCapabilities,
   type RegisterProviderCredentialInput,
   type RegisterProviderCredentialResult,
+  type MacOsSecurityRunner,
   type SecretToolRunner,
   type SystemSecretVault,
   type SystemSecretVaultBackend,
