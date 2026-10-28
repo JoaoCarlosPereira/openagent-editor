@@ -42,6 +42,12 @@ export {
 export { deleteSessionStorage, type DeleteSessionStorageResult } from "./delete.js";
 
 export {
+  exportSessionTextFile,
+  type ExportSessionTextFileInput,
+  type ExportSessionTextFileResult,
+} from "./export/index.js";
+
+export {
   applyHarnessEventToProjections,
   rebuildProjectionsFromEventLog,
   syncSessionResumeProjection,
