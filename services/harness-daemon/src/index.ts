@@ -3,15 +3,31 @@ export {
   resolveHarnessRuntimeDirectory,
   resolveHarnessDaemonAddress,
   resolveHarnessUserLockPath,
+  resolveHarnessWorkspaceBindingsPath,
 } from "./runtime-paths.js";
 
 export {
   acquireUserDaemonLock,
   isUserDaemonLockHeld,
+  isHarnessDaemonProcessAlive,
   readUserDaemonLockPath,
+  readUserDaemonLockRecord,
+  removeUserDaemonLockFile,
   type UserDaemonLock,
   type UserDaemonLockRecord,
 } from "./user-lock.js";
+
+export {
+  inspectHarnessDaemonOrphanState,
+  isHarnessDaemonTransportReady,
+  reconcileOrphanHarnessDaemon,
+  type HarnessDaemonOrphanState,
+} from "./daemon-health.js";
+
+export {
+  shutdownHarnessDaemonSupervised,
+  type ShutdownHarnessDaemonSupervisedOptions,
+} from "./supervised-shutdown.js";
 
 export {
   startHarnessDaemonServer,

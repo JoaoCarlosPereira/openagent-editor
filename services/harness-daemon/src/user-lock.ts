@@ -15,7 +15,7 @@ export type UserDaemonLock = {
   release(): void;
 };
 
-function isProcessAlive(pid: number): boolean {
+export function isHarnessDaemonProcessAlive(pid: number): boolean {
   if (!Number.isInteger(pid) || pid <= 0) {
     return false;
   }
@@ -55,7 +55,7 @@ function tryRemoveStaleLock(lockPath: string): boolean {
       return false;
     }
   }
-  if (isProcessAlive(record.pid)) {
+  if (isHarnessDaemonProcessAlive(record.pid)) {
     return false;
   }
   try {
@@ -124,7 +124,28 @@ export function isUserDaemonLockHeld(runtimeDirectory: string): boolean {
   if (!record) {
     return false;
   }
-  return isProcessAlive(record.pid);
+  return isHarnessDaemonProcessAlive(record.pid);
+}
+
+export function readUserDaemonLockRecord(
+  runtimeDirectory: string,
+): UserDaemonLockRecord | null {
+  const lockPath = resolveHarnessUserLockPath(runtimeDirectory);
+  if (!fs.existsSync(lockPath)) {
+    return null;
+  }
+  return readLockRecord(lockPath);
+}
+
+export function removeUserDaemonLockFile(runtimeDirectory: string): void {
+  const lockPath = resolveHarnessUserLockPath(runtimeDirectory);
+  try {
+    fs.unlinkSync(lockPath);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
+      throw error;
+    }
+  }
 }
 
 export function readUserDaemonLockPath(runtimeDirectory: string): string {
