@@ -1,7 +1,8 @@
 import fs from "node:fs";
 import path from "node:path";
 import type { WorkspaceTransportHello } from "@openagent/protocol";
-import { openWorkspaceDatabase } from "@openagent/storage";
+import { DatabaseSync } from "node:sqlite";
+import { listStoredSessionsByWorkspace, openWorkspaceDatabase } from "@openagent/storage";
 import { resolveHarnessWorkspaceBindingsPath } from "./runtime-paths.js";
 
 export type WorkspaceBindingState = {
@@ -107,8 +108,15 @@ export class WorkspaceStateRegistry {
         workspaceId: hello.workspaceId,
       });
       try {
-        const fromStorage = database.listSessionResumes().map((row) => row.sessionId);
-        return this.mergeUnique(hello.sessionIds, fromStorage);
+        const sqlite = new DatabaseSync(database.databasePath);
+        try {
+          const fromStorage = listStoredSessionsByWorkspace(sqlite, hello.workspaceId).map(
+            (row) => row.id,
+          );
+          return this.mergeUnique(hello.sessionIds, fromStorage);
+        } finally {
+          sqlite.close();
+        }
       } finally {
         database.close();
       }

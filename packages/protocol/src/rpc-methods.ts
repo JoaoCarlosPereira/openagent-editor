@@ -82,6 +82,14 @@ export interface SessionForkParams {
   branchId?: string;
 }
 
+export type SessionListItem = {
+  sessionId: string;
+  mode: AgentMode;
+  messagesJson: string;
+  toolsJson: string;
+  attachmentsJson: string;
+};
+
 export interface RunStartParams {
   mode?: AgentMode;
   input: UserInput;
@@ -206,7 +214,7 @@ export interface RpcParamsMap {
 
 export interface RpcResultMap {
   [RPC_METHOD.SESSION_CREATE]: { sessionId: string; workspaceId: string; mode: AgentMode };
-  [RPC_METHOD.SESSION_LIST]: { sessions: Array<{ sessionId: string; mode: AgentMode }> };
+  [RPC_METHOD.SESSION_LIST]: { sessions: SessionListItem[] };
   [RPC_METHOD.SESSION_SEARCH]: { sessions: Array<{ sessionId: string; mode: AgentMode }> };
   [RPC_METHOD.SESSION_EXPORT]: { exportRef: string };
   [RPC_METHOD.SESSION_DELETE]: { deleted: true };

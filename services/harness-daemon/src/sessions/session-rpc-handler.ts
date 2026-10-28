@@ -22,6 +22,7 @@ import {
   type WorkspaceDatabase,
 } from "@openagent/storage";
 import type { WorkspaceBindingState } from "../workspace-state.js";
+import { mapStoredSessionToListEntry } from "./session-resume.js";
 
 export type SessionRpcContext = {
   dataRoot: string;
@@ -170,7 +171,7 @@ function handleSessionList(
   const params = (request.payload ?? {}) as RpcParamsMap[typeof RPC_METHOD.SESSION_LIST];
   const limit = params.limit ?? 100;
 
-  let sessions: Array<{ sessionId: string; mode: AgentMode }> = [];
+  let sessions: ReturnType<typeof mapStoredSessionToListEntry>[] = [];
   withSqlite(db, (sqlite) => {
     let stored = listStoredSessionsByWorkspace(sqlite, context.binding.workspaceId);
     if (params.cursor) {
@@ -179,10 +180,10 @@ function handleSessionList(
         stored = stored.slice(cursorIndex + 1);
       }
     }
-    sessions = stored.slice(0, limit).map((row) => ({
-      sessionId: row.id,
-      mode: isAgentMode(row.mode) ? row.mode : "agent",
-    }));
+    sessions = stored.slice(0, limit).map((row) => {
+      const mode = isAgentMode(row.mode) ? row.mode : "agent";
+      return mapStoredSessionToListEntry(db, row, mode);
+    });
   });
 
   return { sessions };

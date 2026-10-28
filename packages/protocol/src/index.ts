@@ -84,6 +84,7 @@ export {
   type SessionExportParams,
   type SessionForkParams,
   type SessionListParams,
+  type SessionListItem,
   type SessionSearchParams,
   type ToolInvokeParams,
   type WorkspaceBindingFacet,
