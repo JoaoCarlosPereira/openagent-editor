@@ -32,3 +32,11 @@ export {
   sha256Hex,
   type PutCasBlobResult,
 } from "./cas.js";
+
+export {
+  collectUnreferencedCasBlobs,
+  releaseCasBlobRef,
+  type CollectUnreferencedCasBlobsResult,
+} from "./cas-gc.js";
+
+export { deleteSessionStorage, type DeleteSessionStorageResult } from "./delete.js";
