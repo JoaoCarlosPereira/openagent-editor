@@ -1,5 +1,15 @@
-/** Placeholder da fase de revisão/diff (tasks AGT-03+). */
+/** Revisão/diff do agente (AGT-03+) e reexportes de permissões na UI. */
 export const REVIEW_MODULE_ID = "openagent.editor.review";
+
+export {
+  AgentRunReviewController,
+  buildAgentRunReviewView,
+  type AgentRunReviewPushInput,
+  type AgentRunReviewViewSnapshot,
+  type AgentToolResultRow,
+  type DiffGroupedEventPayload,
+  type ToolResultEventPayload,
+} from "./agent-run-review.js";
 
 export {
   ReadOnlyExecutionBlockController,
