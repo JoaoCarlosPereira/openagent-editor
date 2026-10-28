@@ -57,6 +57,14 @@ export {
   validateWorkspacePathInputs,
   type WorkspacePathResolution,
 } from "./paths.js";
+export {
+  assertValidStandardLogToolAction,
+  formatStandardLogToolAction,
+  redactForStandardLog,
+  STANDARD_LOG_REDACTED,
+  validateStandardLogToolActionInput,
+  type StandardLogToolActionInput,
+} from "./redaction.js";
 export type {
   GrantScopeKind,
   PermissionDecision,
