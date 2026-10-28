@@ -22,3 +22,13 @@ export {
   listHarnessEvents,
   type AppendHarnessEventInput,
 } from "./event-log.js";
+
+export {
+  CAS_CONTENT_REF_PREFIX,
+  formatCasContentRef,
+  parseCasContentRef,
+  putCasBlob,
+  readCasBlob,
+  sha256Hex,
+  type PutCasBlobResult,
+} from "./cas.js";

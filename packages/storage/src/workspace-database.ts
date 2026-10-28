@@ -7,6 +7,7 @@ import {
   listHarnessEvents,
   type AppendHarnessEventInput,
 } from "./event-log.js";
+import { putCasBlob, readCasBlob, type PutCasBlobResult } from "./cas.js";
 import { runStorageMigrations } from "./migration-runner.js";
 import { STORAGE_MIGRATIONS } from "./migrations/index.js";
 import { STORAGE_SCHEMA_VERSION } from "./schema-version.js";
@@ -36,6 +37,8 @@ export type WorkspaceDatabase = {
   listSessionResumes(): SessionResumeRecord[];
   appendHarnessEvent(input: AppendHarnessEventInput): HarnessEvent;
   listHarnessEvents(runId?: string): HarnessEvent[];
+  putCasBlob(content: Uint8Array): PutCasBlobResult;
+  readCasBlob(contentRef: string): Uint8Array;
   close(): void;
 };
 
@@ -81,6 +84,8 @@ export function openWorkspaceDatabase(
 
   const workspaceDirectory = join(options.dataRoot, "workspaces", options.workspaceId);
   mkdirSync(workspaceDirectory, { recursive: true });
+  const casRoot = join(workspaceDirectory, "cas");
+  mkdirSync(casRoot, { recursive: true });
   const databasePath = join(workspaceDirectory, "state.sqlite3");
 
   const database = new DatabaseSync(databasePath);
@@ -134,6 +139,12 @@ export function openWorkspaceDatabase(
     },
     listHarnessEvents(runId?: string) {
       return listHarnessEvents(database, runId);
+    },
+    putCasBlob(content: Uint8Array) {
+      return putCasBlob(database, casRoot, content);
+    },
+    readCasBlob(contentRef: string) {
+      return readCasBlob(database, casRoot, contentRef);
     },
     close() {
       database.close();
