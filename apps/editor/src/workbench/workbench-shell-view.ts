@@ -34,6 +34,12 @@ import {
   themeTokensCssVariables,
   WORKBENCH_PANEL_WIDTH_DEFAULT_PX,
 } from "./theme.js";
+import {
+  WORKBENCH_HEALTH_SUBSYSTEMS,
+  describeWorkbenchHealthStatus,
+  describeWorkbenchHealthSubsystem,
+  type WorkbenchHealthSnapshot,
+} from "./health-indicator.js";
 
 export type WorkbenchCapabilitySlot =
   | "editor"
@@ -72,6 +78,7 @@ export interface WorkbenchShellViewInput {
   theme?: WorkbenchTheme;
   /** Largura do painel em px (UI-02). */
   panelWidthPx?: number;
+  health?: WorkbenchHealthSnapshot;
 }
 
 export interface WorkbenchShellViewSnapshot {
@@ -93,6 +100,7 @@ export interface WorkbenchShellViewSnapshot {
     theme: WorkbenchTheme;
     /** Largura do painel em px (UI-02). */
     panelWidthPx: number;
+    health: WorkbenchHealthSnapshot;
   };
   fileTree: FileTreeViewSnapshot;
   textEditor: TextEditorViewSnapshot;
@@ -150,6 +158,12 @@ export function buildWorkbenchShellView(
   const debugSession = input.debugSession ?? null;
   const theme = input.theme ?? WORKBENCH_THEME_DEFAULT;
   const panelWidthPx = input.panelWidthPx ?? WORKBENCH_PANEL_WIDTH_DEFAULT_PX;
+  const health = input.health ?? {
+    daemon: { subsystem: "daemon" as const, status: daemonConnected ? "connected" as const : "disconnected" as const, message: daemonConnected ? "Conectado" : "Desconectado" },
+    sandbox: { subsystem: "sandbox" as const, status: "degraded" as const, message: "Isolamento nativo não confirmado" },
+    index: { subsystem: "index" as const, status: "offline" as const, message: "Índice indisponível" },
+    cliproxyapi: { subsystem: "cliproxyapi" as const, status: "offline" as const, message: "Sidecar não iniciado" },
+  };
 
   const fileTree = buildFileTreeView({
     folderPath: input.folderPath,
@@ -185,6 +199,10 @@ export function buildWorkbenchShellView(
     ? "Main ligado ao harness-daemon"
     : "Main sem ligação ao daemon";
   const themeCssVars = themeTokensCssVariables(theme);
+  const healthHtml = WORKBENCH_HEALTH_SUBSYSTEMS.map((subsystem) => {
+    const item = health[subsystem];
+    return `<li data-testid="health-indicator-${subsystem}" data-health-subsystem="${subsystem}" data-health-status="${item.status}" role="status" aria-label="${describeWorkbenchHealthSubsystem(subsystem)}: ${describeWorkbenchHealthStatus(item.status)}">${describeWorkbenchHealthSubsystem(subsystem)}: ${describeWorkbenchHealthStatus(item.status)}. ${item.message}</li>`;
+  }).join("");
 
   const html = [
     `<main role="application" aria-label="${escapeHtml(input.identity.displayName)}"`,
@@ -209,6 +227,7 @@ export function buildWorkbenchShellView(
     `${escapeHtml(daemonLabel)}</p>`,
     `<p data-testid="workbench-renderer-tools" aria-live="polite" tabindex="0"`,
     ` data-tools-allowed="false">Renderer sem ferramentas</p>`,
+    `<ul data-testid="workbench-health-indicators" aria-label="Saúde dos subsistemas" aria-live="polite">${healthHtml}</ul>`,
     `<div data-testid="workbench-capabilities">${slotsHtml}</div>`,
     `</main>`,
   ].join("");
@@ -230,6 +249,7 @@ export function buildWorkbenchShellView(
       debug: debug.accessible,
       theme,
       panelWidthPx,
+      health,
     },
     fileTree,
     textEditor,

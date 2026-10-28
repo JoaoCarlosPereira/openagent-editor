@@ -57,6 +57,11 @@ import {
   WORKBENCH_THEME_DEFAULT,
   type WorkbenchTheme,
 } from "./theme.js";
+import {
+  createDefaultWorkbenchHealth,
+  updateWorkbenchSubsystemHealth,
+  type WorkbenchHealthSnapshot,
+} from "./health-indicator.js";
 
 export type { WorkbenchShellViewSnapshot, WorkbenchCapabilitySlot } from "./workbench-shell-view.js";
 export {
@@ -284,6 +289,7 @@ export class WorkbenchShellController {
   private debugSession: IntegratedDebugSession | null = null;
   private themeState: WorkbenchTheme = WORKBENCH_THEME_DEFAULT;
   private panelWidthState: number = WORKBENCH_PANEL_WIDTH_DEFAULT_PX;
+  private healthState: WorkbenchHealthSnapshot = createDefaultWorkbenchHealth();
   private readonly rendererBridge: RendererToolBridge = createRendererToolBridge();
   private view: WorkbenchShellViewSnapshot = buildWorkbenchShellView({
     identity: this.identity,
@@ -311,6 +317,28 @@ export class WorkbenchShellController {
 
   get panelWidthPx(): number {
     return this.panelWidthState;
+  }
+
+  get health(): WorkbenchHealthSnapshot {
+    return this.healthState;
+  }
+
+  setSubsystemHealth(
+    subsystem: unknown,
+    status: unknown,
+    message: unknown,
+  ): WorkbenchShellViewSnapshot {
+    const nextHealth = updateWorkbenchSubsystemHealth(
+      this.healthState,
+      subsystem,
+      status,
+      message,
+    );
+    this.healthState = nextHealth;
+    this.daemonConnected =
+      nextHealth.daemon.status === "connected" || nextHealth.daemon.status === "ready";
+    this.refreshView();
+    return this.view;
   }
 
   /** Ponte do renderer: nunca permite tool.invoke (LOC-01 / ADR-003). */
@@ -367,9 +395,14 @@ export class WorkbenchShellController {
 
   /** Reflete no shell que o processo main está ligado ao harness-daemon. */
   setDaemonConnected(connected: boolean): WorkbenchShellViewSnapshot {
-    this.daemonConnected = connected;
-    this.refreshView();
-    return this.view;
+    if (typeof connected !== "boolean") {
+      throw new ProtocolError("INVALID_STATE", "Estado de conexão do daemon inválido.", []);
+    }
+    return this.setSubsystemHealth(
+      "daemon",
+      connected ? "connected" : "disconnected",
+      connected ? "Conectado" : "Desconectado",
+    );
   }
 
   /**
@@ -672,6 +705,7 @@ export class WorkbenchShellController {
       debugSession: this.debugSession,
       theme: this.themeState,
       panelWidthPx: this.panelWidthState,
+      health: this.healthState,
     });
   }
 }

@@ -2,12 +2,16 @@ import { ProtocolError } from "@openagent/protocol";
 
 import {
   WorkbenchShellController,
+  type WorkbenchShellViewSnapshot,
   type WorkbenchDebugResult,
   type WorkbenchGitPanelResult,
   type WorkbenchShellOpenResult,
   type WorkbenchTerminalResult,
   type WorkbenchTextEditorResult,
 } from "../workbench/workbench-shell.js";
+import type {
+  WorkbenchHealthSnapshot,
+} from "../workbench/health-indicator.js";
 import {
   connectOpenAgentEditorMain,
   type OpenAgentEditorMainConnectInput,
@@ -117,6 +121,23 @@ export class ElectronMainController {
   /** Shell do workbench gerenciado pelo processo main (árvore no main, não no renderer). */
   get shell(): WorkbenchShellController {
     return this.workbench;
+  }
+
+  get health(): WorkbenchHealthSnapshot {
+    return this.workbench.health;
+  }
+
+  setSubsystemHealth(
+    subsystem: unknown,
+    status: unknown,
+    message: unknown,
+  ): WorkbenchShellViewSnapshot {
+    if (this.snapshot === null) {
+      throw new ProtocolError("INVALID_STATE", ELECTRON_MAIN_FOLDER_REQUIRED_MESSAGE, [
+        "launch() não foi chamado",
+      ]);
+    }
+    return this.workbench.setSubsystemHealth(subsystem, status, message);
   }
 
   launch(input: ElectronMainLaunchInput): ElectronMainLaunchSnapshot {

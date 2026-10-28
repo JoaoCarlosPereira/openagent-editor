@@ -106,3 +106,19 @@ export {
   type WorkbenchTheme,
   type WorkbenchThemeTokens,
 } from "./theme.js";
+export {
+  WORKBENCH_HEALTH_SUBSYSTEMS,
+  WORKBENCH_HEALTH_STATUSES,
+  WORKBENCH_HEALTH_INVALID_MESSAGE,
+  createDefaultWorkbenchHealth,
+  assertWorkbenchHealthSubsystem,
+  assertWorkbenchHealthStatus,
+  assertWorkbenchHealthMessage,
+  updateWorkbenchSubsystemHealth,
+  describeWorkbenchHealthStatus,
+  describeWorkbenchHealthSubsystem,
+  type WorkbenchHealthSubsystem,
+  type WorkbenchHealthStatus,
+  type WorkbenchSubsystemHealth,
+  type WorkbenchHealthSnapshot,
+} from "./health-indicator.js";
