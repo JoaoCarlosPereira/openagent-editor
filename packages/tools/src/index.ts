@@ -216,3 +216,8 @@ export {
   type McpAuthMaterial,
   type McpAuthSecretResolver,
 } from "./mcp/mcp-auth-material.js";
+
+export {
+  assertLocalHooksAllowMcpToolInvoke,
+  type McpToolHookGateInput,
+} from "./mcp/local-hook-gate.js";

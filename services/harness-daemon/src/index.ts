@@ -62,3 +62,8 @@ export { ensureHarnessDaemonReady, type EnsureHarnessDaemonOptions } from "./on-
 export { WorkspaceStateRegistry, type WorkspaceBindingState } from "./workspace-state.js";
 
 export { readPeerCredentialFromSocket } from "./peer-credential.js";
+
+export {
+  WorkspaceCustomizationHooks,
+  createWorkspaceCustomizationHooks,
+} from "./customization/local-hook-engine.js";

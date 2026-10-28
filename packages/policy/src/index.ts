@@ -95,6 +95,22 @@ export {
   type StructuredLogSink,
   type StructuredLogWriteInput,
 } from "./logger.js";
+export {
+  LocalHookEngine,
+  assertLocalHooksAllowAction,
+  hookActionDeniedError,
+  validateLocalHookAction,
+} from "./hooks/engine.js";
+export { formatHookDenialForDisplay } from "./hooks/display.js";
+export type {
+  HookDenialDisplay,
+  LocalHookAction,
+  LocalHookDecision,
+  LocalHookEvaluationResult,
+  LocalHookHandler,
+  LocalHookHandlerOutcome,
+  RegisteredLocalHook,
+} from "./hooks/types.js";
 export type {
   GrantScopeKind,
   PermissionDecision,
