@@ -32,6 +32,6 @@ test('agent sends a tool result back to the model before answering', async () =>
     assert.equal(answer, 'Encontrei src/app.js.');
     assert.equal(requests.length, 2);
     assert.equal(requests[1].messages.at(-1).role, 'tool');
-    assert.match(requests[1].messages.at(-1).content, /src\/app\.js/);
+    assert.match(requests[1].messages.at(-1).content, /src[/\\]app\.js/);
   } finally { global.fetch = originalFetch; }
 });
