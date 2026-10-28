@@ -44,8 +44,10 @@ export async function startHarnessDaemonServer(
       });
 
       try {
-        await performServerTransportHandshake(socket, (hello) =>
-          registry.upsertFromHello(hello),
+        await performServerTransportHandshake(
+          socket,
+          (hello) => registry.upsertFromHello(hello),
+          { dataRoot: options.dataRoot },
         );
       } catch {
         socket.destroy();
