@@ -1,6 +1,10 @@
 import { ProtocolError } from "@openagent/protocol";
 
 import {
+  WorkbenchShellController,
+  type WorkbenchShellOpenResult,
+} from "../workbench/workbench-shell.js";
+import {
   connectOpenAgentEditorMain,
   type OpenAgentEditorMainConnectInput,
   type OpenAgentEditorMainConnection,
@@ -32,6 +36,9 @@ export const ELECTRON_MAIN_INVALID_PLATFORM_MESSAGE =
 
 export const ELECTRON_MAIN_DAEMON_REQUIRED_MESSAGE =
   "Processo main precisa estar lançado antes de conectar ao harness-daemon.";
+
+export const ELECTRON_MAIN_FOLDER_REQUIRED_MESSAGE =
+  "Processo main precisa estar lançado antes de abrir uma pasta no workbench.";
 
 export type OpenAgentSupportedPlatform = "linux" | "win32" | "darwin";
 
@@ -92,6 +99,8 @@ function assertSupportedPlatform(platform: unknown): OpenAgentSupportedPlatform 
 export class ElectronMainController {
   private snapshot: ElectronMainLaunchSnapshot | null = null;
   private daemonConnection: OpenAgentEditorMainConnection | null = null;
+  private readonly workbench = new WorkbenchShellController();
+  private repoRoot: string | undefined;
 
   get current(): ElectronMainLaunchSnapshot | null {
     return this.snapshot;
@@ -101,10 +110,17 @@ export class ElectronMainController {
     return this.daemonConnection;
   }
 
+  /** Shell do workbench gerenciado pelo processo main (árvore no main, não no renderer). */
+  get shell(): WorkbenchShellController {
+    return this.workbench;
+  }
+
   launch(input: ElectronMainLaunchInput): ElectronMainLaunchSnapshot {
     const platform = assertSupportedPlatform(input.platform);
     const identity = createOpenAgentProductIdentity(input.repoRoot);
+    this.repoRoot = input.repoRoot;
     this.daemonConnection = null;
+    this.workbench.bootstrap({ platform, repoRoot: input.repoRoot });
     this.snapshot = {
       identity,
       platform,
@@ -130,6 +146,23 @@ export class ElectronMainController {
     return this.snapshot;
   }
 
+  /**
+   * Abre pasta pelo processo main e monta a árvore de arquivos (LOC-01 / task_120).
+   * A listagem roda no main; o renderer só consome o snapshot.
+   */
+  openFolder(folderPath: unknown): WorkbenchShellOpenResult {
+    if (this.snapshot === null) {
+      throw new ProtocolError("INVALID_STATE", ELECTRON_MAIN_FOLDER_REQUIRED_MESSAGE, [
+        "launch() não foi chamado",
+      ]);
+    }
+    return this.workbench.openFolder({
+      platform: this.snapshot.platform,
+      folderPath,
+      repoRoot: this.repoRoot,
+    });
+  }
+
   /** Liga o processo main ao harness-daemon (ADR-003). */
   async connectDaemon(
     input: OpenAgentEditorMainConnectInput,
@@ -148,12 +181,14 @@ export class ElectronMainController {
         toolsAllowedInRenderer: false,
       },
     };
+    this.workbench.setDaemonConnected(true);
     return connection;
   }
 
   closeDaemon(): void {
     this.daemonConnection?.client.close();
     this.daemonConnection = null;
+    this.workbench.setDaemonConnected(false);
     if (this.snapshot !== null) {
       this.snapshot = {
         ...this.snapshot,

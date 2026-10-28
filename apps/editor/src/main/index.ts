@@ -2,6 +2,7 @@ export {
   ElectronMainController,
   ELECTRON_MAIN_INVALID_PLATFORM_MESSAGE,
   ELECTRON_MAIN_DAEMON_REQUIRED_MESSAGE,
+  ELECTRON_MAIN_FOLDER_REQUIRED_MESSAGE,
   type ElectronBrowserWindowOptions,
   type ElectronMainLaunchInput,
   type ElectronMainLaunchSnapshot,
