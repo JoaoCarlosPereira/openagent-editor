@@ -268,6 +268,7 @@ export class WebSocketCdpTransport implements CdpTransport {
     {
       resolve: (value: Record<string, unknown>) => void;
       reject: (error: Error) => void;
+      timeout: ReturnType<typeof setTimeout>;
     }
   >();
   private readonly listeners = new Map<
@@ -295,6 +296,7 @@ export class WebSocketCdpTransport implements CdpTransport {
         ws.onclose = () => {
           this.closed = true;
           for (const [, pending] of this.pending) {
+            clearTimeout(pending.timeout);
             pending.reject(
               new ProtocolError(
                 PROTOCOL_ERROR_CODES.INVALID_STATE,
@@ -317,6 +319,7 @@ export class WebSocketCdpTransport implements CdpTransport {
               const pending = this.pending.get(message["id"]);
               if (pending) {
                 this.pending.delete(message["id"]);
+                clearTimeout(pending.timeout);
                 if (message["error"]) {
                   pending.reject(
                     new ProtocolError(
@@ -364,6 +367,15 @@ export class WebSocketCdpTransport implements CdpTransport {
       this.ws.close();
       this.ws = null;
     }
+    for (const [, pending] of this.pending) {
+      clearTimeout(pending.timeout);
+      pending.reject(
+        new ProtocolError(
+          PROTOCOL_ERROR_CODES.INVALID_STATE,
+          "Conexão WebSocket CDP encerrada.",
+        ),
+      );
+    }
     this.pending.clear();
     this.listeners.clear();
   }
@@ -390,6 +402,7 @@ export class WebSocketCdpTransport implements CdpTransport {
     method: string,
     params?: Record<string, unknown>,
     sessionId?: string,
+    timeoutMs = 15_000,
   ): Promise<Record<string, unknown>> {
     if (this.closed || !this.ws) {
       throw new ProtocolError(
@@ -409,13 +422,94 @@ export class WebSocketCdpTransport implements CdpTransport {
     }
 
     return new Promise((resolve, reject) => {
-      this.pending.set(id, { resolve, reject });
+      const timeout = setTimeout(() => {
+        const pending = this.pending.get(id);
+        if (!pending) {
+          return;
+        }
+        this.pending.delete(id);
+        this.ws?.close();
+        this.closed = true;
+        pending.reject(
+          new ProtocolError(
+            PROTOCOL_ERROR_CODES.INVALID_STATE,
+            `Tempo limite excedido ao executar ${method} via CDP.`,
+          ),
+        );
+      }, timeoutMs);
+      this.pending.set(id, { resolve, reject, timeout });
       try {
         this.ws?.send(JSON.stringify(payload));
       } catch (error) {
+        clearTimeout(timeout);
         this.pending.delete(id);
         reject(error);
       }
     });
+  }
+}
+
+export class TimedCdpTransport implements CdpTransport {
+  constructor(
+    private readonly transport: CdpTransport,
+    private readonly timeoutMs: number,
+  ) {}
+
+  send(
+    method: string,
+    params?: Record<string, unknown>,
+    sessionId?: string,
+  ): Promise<Record<string, unknown>> {
+    if (this.transport instanceof WebSocketCdpTransport) {
+      return this.transport.send(method, params, sessionId, this.timeoutMs);
+    }
+
+    return new Promise((resolve, reject) => {
+      let settled = false;
+      const timer = setTimeout(() => {
+        settled = true;
+        void this.transport.close();
+        reject(
+          new ProtocolError(
+            PROTOCOL_ERROR_CODES.INVALID_STATE,
+            `Tempo limite excedido ao executar ${method} via CDP.`,
+          ),
+        );
+      }, this.timeoutMs);
+      try {
+        this.transport.send(method, params, sessionId).then(
+          (result) => {
+            if (!settled) {
+              clearTimeout(timer);
+              resolve(result);
+            }
+          },
+          (error: unknown) => {
+            if (!settled) {
+              clearTimeout(timer);
+              reject(error);
+            }
+          },
+        );
+      } catch (error) {
+        clearTimeout(timer);
+        reject(error);
+      }
+    });
+  }
+
+  on(
+    event: string,
+    listener: (params: Record<string, unknown>, sessionId?: string) => void,
+  ): () => void {
+    return this.transport.on(event, listener);
+  }
+
+  close(): Promise<void> {
+    return this.transport.close();
+  }
+
+  isClosed(): boolean {
+    return this.transport.isClosed();
   }
 }

@@ -146,7 +146,7 @@ test("[AUT-01] preparePolicyBrowserOpen: executa após decisão allow", async ()
   const targetManager = new CdpTargetManager(transport);
   const result = await executePolicyBrowserOpen(targetManager, {
     url: "http://localhost:3000/test.html",
-  });
+  }, undefined, { flow, requestId: prepared.permission.request.requestId });
 
   assert.equal(result.capability, "browser.open");
   assert.equal(result.tool, "browser.open");
@@ -155,6 +155,7 @@ test("[AUT-01] preparePolicyBrowserOpen: executa após decisão allow", async ()
   assert.ok(result.browserContextId.startsWith("ctx-"));
   assert.ok(result.screenshot.startsWith("iVBOR"));
   assert.ok(result.screenshot.length > 0);
+  assert.equal(targetManager.listActiveTargetIds().length, 0);
 
   await targetManager.dispose();
 });
@@ -163,15 +164,33 @@ test("[AUT-01] executePolicyBrowserOpen: interação click e type executam com s
   const transport = new InMemoryCdpTransport();
   const targetManager = new CdpTargetManager(transport);
 
+  const { RunToolPermissionFlow } = await import("@openagent/policy");
+  const flow = new RunToolPermissionFlow();
+  const clickPermission = preparePolicyBrowserOpen(flow, agentContext(), {
+    runId: "run-click",
+    sessionId: "sess-click",
+    requestId: "perm-click",
+    url: "http://localhost:3000/form.html",
+    interaction: { type: "click", selector: "#submit-btn" },
+  });
+  flow.decide(clickPermission.permission.request.requestId, "allow", "once");
   const clickResult = await executePolicyBrowserOpen(targetManager, {
     url: "http://localhost:3000/form.html",
     interaction: {
       type: "click",
       selector: "#submit-btn",
     },
-  });
+  }, undefined, { flow, requestId: clickPermission.permission.request.requestId });
   assert.ok(clickResult.interactionResult);
 
+  const typePermission = preparePolicyBrowserOpen(flow, agentContext(), {
+    runId: "run-type",
+    sessionId: "sess-type",
+    requestId: "perm-type",
+    url: "http://localhost:3000/form.html",
+    interaction: { type: "type", selector: "#input-field", text: "OpenAgent Browser" },
+  });
+  flow.decide(typePermission.permission.request.requestId, "allow", "once");
   const typeResult = await executePolicyBrowserOpen(targetManager, {
     url: "http://localhost:3000/form.html",
     interaction: {
@@ -179,7 +198,7 @@ test("[AUT-01] executePolicyBrowserOpen: interação click e type executam com s
       selector: "#input-field",
       text: "OpenAgent Browser",
     },
-  });
+  }, undefined, { flow, requestId: typePermission.permission.request.requestId });
   assert.ok(typeResult.interactionResult);
 
   await targetManager.dispose();
@@ -193,7 +212,8 @@ test("[AUT-01] executePolicyBrowserOpen: interação inválida retorna INVALID_S
     await executePolicyBrowserOpen(targetManager, {
       url: "http://localhost:3000/error.html",
       interaction: {
-        type: "unknown-type",
+        type: "evaluate",
+        expression: "   ",
       },
     });
     assert.fail("Deveria ter lançado ProtocolError");
@@ -204,6 +224,51 @@ test("[AUT-01] executePolicyBrowserOpen: interação inválida retorna INVALID_S
 
   assert.equal(targetManager.listActiveTargetIds().length, 0);
   await targetManager.dispose();
+});
+
+test("[AUT-01] executePolicyBrowserOpen: sem autorização retorna INVALID_STATE sem criar target", async () => {
+  const transport = new InMemoryCdpTransport();
+  const targetManager = new CdpTargetManager(transport);
+
+  await assert.rejects(
+    executePolicyBrowserOpen(targetManager, {
+      url: "http://localhost:3000/unauthorized.html",
+    }),
+    (error: unknown) => {
+      assert.ok(error instanceof ProtocolError);
+      assert.equal(error.code, PROTOCOL_ERROR_CODES.INVALID_STATE);
+      return true;
+    },
+  );
+  assert.equal(targetManager.listActiveTargetIds().length, 0);
+});
+
+test("[AUT-01] executePolicyBrowserOpen: autorização negada não cria target", async () => {
+  const { RunToolPermissionFlow } = await import("@openagent/policy");
+  const flow = new RunToolPermissionFlow();
+  const prepared = preparePolicyBrowserOpen(flow, agentContext(), {
+    runId: "run-deny",
+    sessionId: "sess-deny",
+    requestId: "perm-deny",
+    url: "http://localhost:3000/denied.html",
+  });
+  flow.decide(prepared.permission.request.requestId, "deny", "once");
+  const targetManager = new CdpTargetManager(new InMemoryCdpTransport());
+
+  await assert.rejects(
+    executePolicyBrowserOpen(
+      targetManager,
+      { url: "http://localhost:3000/denied.html" },
+      undefined,
+      { flow, requestId: prepared.permission.request.requestId },
+    ),
+    (error: unknown) => {
+      assert.ok(error instanceof ProtocolError);
+      assert.equal(error.code, PROTOCOL_ERROR_CODES.OUT_OF_SCOPE);
+      return true;
+    },
+  );
+  assert.equal(targetManager.listActiveTargetIds().length, 0);
 });
 
 // ================================================================
@@ -271,7 +336,7 @@ test("[AUT-01] executePolicyBrowserOpen: navega e captura screenshot com console
   const targetManager = new CdpTargetManager(transport);
   const result = await executePolicyBrowserOpen(targetManager, {
     url: "http://localhost:3000/screen.html",
-  });
+  }, undefined, { flow, requestId: prepared.permission.request.requestId });
 
   assert.ok(result.screenshot === MOCK_SCREENSHOT_BASE64 || result.screenshot.length > 10);
   assert.ok(result.consoleLogs.length > 0);
@@ -280,6 +345,8 @@ test("[AUT-01] executePolicyBrowserOpen: navega e captura screenshot com console
   const formatted = formatAgentBrowserToolResult(result);
   assert.equal(formatted.capability, "browser.open");
   assert.ok(formatted.screenshotLength > 0);
+  assert.equal(formatted.screenshot, result.screenshot);
+  assert.equal(formatted.screenshotMimeType, "image/png");
   assert.ok(formatted.consoleLogCount > 0);
 
   await targetManager.dispose();
@@ -299,6 +366,10 @@ test("[AUT-01] executePolicyBrowserOpen: interação evaluate retorna resultado"
     sessionId: "sess-interact",
     requestId: "perm-browser-interact",
     url: "http://localhost:3000/interact.html",
+    interaction: {
+      type: "evaluate",
+      expression: "document.title",
+    },
   });
   assert.equal(prepared.permission.phase, "pending");
   const allowed = flow.decide(prepared.permission.request.requestId, "allow", "once");
@@ -312,7 +383,7 @@ test("[AUT-01] executePolicyBrowserOpen: interação evaluate retorna resultado"
       type: "evaluate",
       expression: "document.title",
     },
-  });
+  }, undefined, { flow, requestId: prepared.permission.request.requestId });
 
   assert.ok(result.interactionResult);
 

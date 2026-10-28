@@ -238,6 +238,7 @@ export {
   validateBrowserUrl,
   CdpTargetManager,
   InMemoryCdpTransport,
+  TimedCdpTransport,
   WebSocketCdpTransport,
   MOCK_SCREENSHOT_BASE64,
   executePolicyBrowserOpen,

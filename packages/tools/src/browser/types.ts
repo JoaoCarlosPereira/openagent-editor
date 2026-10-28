@@ -45,12 +45,11 @@ export interface BrowserConsoleLogEntry {
   args?: unknown[];
 }
 
-export interface BrowserInteraction {
-  type: "evaluate" | "click" | "type" | "none";
-  expression?: string;
-  selector?: string;
-  text?: string;
-}
+export type BrowserInteraction =
+  | { type: "evaluate"; expression: string }
+  | { type: "click"; selector: string }
+  | { type: "type"; selector: string; text: string }
+  | { type: "none" };
 
 export interface BrowserUrlPolicyOptions {
   workspaceRoot?: string;
@@ -64,7 +63,7 @@ export interface OpenAuthorizedBrowserUrlInput {
   runId?: string;
   sessionId?: string;
   requestId?: string;
-  interaction?: unknown;
+  interaction?: BrowserInteraction;
   timeoutMs?: number;
 }
 
@@ -77,6 +76,7 @@ export interface BrowserCdpToolResult {
   sessionId: string;
   title: string;
   screenshot: string;
+  screenshotMimeType: "image/png";
   consoleLogs: readonly BrowserConsoleLogEntry[];
   interactionResult?: unknown;
 }

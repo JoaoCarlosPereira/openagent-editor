@@ -15,7 +15,8 @@ import {
   type SandboxToolDispatchPrepareResult,
 } from "../sandbox/tool-sandbox-dispatch.js";
 import { validateBrowserUrl } from "./browser-url-policy.js";
-import type { CdpTargetManager } from "./cdp-target-manager.js";
+import { TimedCdpTransport } from "./cdp-transport.js";
+import { CdpTargetManager } from "./cdp-target-manager.js";
 import type {
   BrowserCdpToolResult,
   BrowserConsoleLogEntry,
@@ -34,7 +35,7 @@ export interface PreparePolicyBrowserOpenInput {
   sessionId: string;
   requestId: string;
   url: unknown;
-  interaction?: unknown;
+  interaction?: BrowserInteraction;
 }
 
 export interface AgentBrowserToolInvocationResult {
@@ -44,10 +45,17 @@ export interface AgentBrowserToolInvocationResult {
   targetId: string;
   browserContextId: string;
   title: string;
+  screenshot: string;
+  screenshotMimeType: "image/png";
   screenshotLength: number;
   consoleLogCount: number;
   consoleLogs: readonly BrowserConsoleLogEntry[];
   interactionResult?: unknown;
+}
+
+export interface BrowserOpenAuthorization {
+  flow: RunToolPermissionFlow;
+  requestId: string;
 }
 
 function validateInteraction(raw: unknown): BrowserInteraction | undefined {
@@ -122,7 +130,7 @@ export function preparePolicyBrowserOpen(
 ): SandboxToolDispatchPrepareResult {
   assertCapabilityAllowedForAgentMode(context.agentMode, "browser.open");
   const validatedUrl = validateBrowserUrl(input.url, context);
-  const interaction = validateInteraction(input.interaction);
+  const interaction = input.interaction;
 
   return prepareSandboxToolDispatch(
     flow,
@@ -152,6 +160,7 @@ export async function executePolicyBrowserOpen(
   targetManager: CdpTargetManager,
   input: OpenAuthorizedBrowserUrlInput,
   policyOptions?: BrowserUrlPolicyOptions,
+  authorization?: BrowserOpenAuthorization,
 ): Promise<BrowserCdpToolResult> {
   const validatedUrl = validateBrowserUrl(input.url, policyOptions);
   const interaction = validateInteraction(input.interaction);
@@ -163,10 +172,42 @@ export async function executePolicyBrowserOpen(
     );
   }
 
-  const targetSession = await targetManager.createIsolatedTarget(validatedUrl);
-  const transport = targetManager.getTransport();
-  const consoleLogs: BrowserConsoleLogEntry[] = [];
+  if (!authorization?.requestId) {
+    throw new ProtocolError(
+      PROTOCOL_ERROR_CODES.INVALID_STATE,
+      "Abertura do navegador exige uma decisão de autorização.",
+    );
+  }
+  const authorizedRequest =
+    authorization.flow.consumeAuthorizedRequest(authorization.requestId);
+  const authorizedUrl = interaction
+    ? `${validatedUrl} [interaction:${interaction.type}]`
+    : validatedUrl;
+  if (
+    !authorizedRequest ||
+    authorizedRequest.capability !== "browser.open" ||
+    authorizedRequest.target.kind !== "url" ||
+    authorizedRequest.target.url !== authorizedUrl
+  ) {
+    const denied = authorization.flow.wasDenied(authorization.requestId);
+    throw new ProtocolError(
+      denied
+        ? PROTOCOL_ERROR_CODES.OUT_OF_SCOPE
+        : PROTOCOL_ERROR_CODES.INVALID_STATE,
+      denied
+        ? "Abertura do navegador foi recusada."
+        : "A decisão de autorização não corresponde à URL e interação solicitadas.",
+    );
+  }
 
+  const transport = new TimedCdpTransport(
+    targetManager.getTransport(),
+    timeoutMs,
+  );
+  const targetManagerForExecution = new CdpTargetManager(transport);
+  const targetSession =
+    await targetManagerForExecution.createIsolatedTarget(validatedUrl);
+  const consoleLogs: BrowserConsoleLogEntry[] = [];
   const offConsole = transport.on(
     "Runtime.consoleAPICalled",
     (params, sid) => {
@@ -283,7 +324,7 @@ export async function executePolicyBrowserOpen(
       // Ignora erro de título
     }
 
-    return {
+    const result: BrowserCdpToolResult = {
       capability: "browser.open",
       tool: "browser.open",
       url: validatedUrl,
@@ -292,12 +333,18 @@ export async function executePolicyBrowserOpen(
       sessionId: targetSession.sessionId,
       title,
       screenshot,
+      screenshotMimeType: "image/png",
       consoleLogs: [...consoleLogs],
       interactionResult,
     };
+    await targetManagerForExecution.closeTarget(targetSession.targetId);
+    return result;
   } finally {
     offConsole();
     offConsoleMsg();
+    if (targetManagerForExecution.getSession(targetSession.targetId)) {
+      await targetManagerForExecution.closeTarget(targetSession.targetId);
+    }
   }
 }
 
@@ -314,6 +361,8 @@ export function formatAgentBrowserToolResult(
     targetId: result.targetId,
     browserContextId: result.browserContextId,
     title: result.title,
+    screenshot: result.screenshot,
+    screenshotMimeType: result.screenshotMimeType,
     screenshotLength: result.screenshot.length,
     consoleLogCount: result.consoleLogs.length,
     consoleLogs: result.consoleLogs,
