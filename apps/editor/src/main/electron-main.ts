@@ -2,6 +2,7 @@ import { ProtocolError } from "@openagent/protocol";
 
 import {
   WorkbenchShellController,
+  type WorkbenchGitPanelResult,
   type WorkbenchShellOpenResult,
   type WorkbenchTerminalResult,
   type WorkbenchTextEditorResult,
@@ -229,6 +230,39 @@ export class ElectronMainController {
       ]);
     }
     return this.workbench.setTerminalCwd(relativeDirectory);
+  }
+
+  /**
+   * Abre o painel Git pelo processo main (LOC-01 / task_123).
+   * Status/diff no main; o renderer só consome o snapshot.
+   */
+  openGit(): WorkbenchGitPanelResult {
+    if (this.snapshot === null) {
+      throw new ProtocolError("INVALID_STATE", ELECTRON_MAIN_FOLDER_REQUIRED_MESSAGE, [
+        "launch() não foi chamado",
+      ]);
+    }
+    return this.workbench.openGit();
+  }
+
+  /** Atualiza status Git do painel aberto (main). */
+  refreshGitStatus(): WorkbenchGitPanelResult {
+    if (this.snapshot === null) {
+      throw new ProtocolError("INVALID_STATE", ELECTRON_MAIN_FOLDER_REQUIRED_MESSAGE, [
+        "launch() não foi chamado",
+      ]);
+    }
+    return this.workbench.refreshGitStatus();
+  }
+
+  /** Carrega git diff no painel (main; caminho relativo confinado). */
+  loadGitDiff(relativePath?: unknown): WorkbenchGitPanelResult {
+    if (this.snapshot === null) {
+      throw new ProtocolError("INVALID_STATE", ELECTRON_MAIN_FOLDER_REQUIRED_MESSAGE, [
+        "launch() não foi chamado",
+      ]);
+    }
+    return this.workbench.loadGitDiff(relativePath);
   }
 
   /** Liga o processo main ao harness-daemon (ADR-003). */

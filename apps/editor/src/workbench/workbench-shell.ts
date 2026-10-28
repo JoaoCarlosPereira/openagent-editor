@@ -24,6 +24,12 @@ import {
   type TextEditorDocument,
 } from "./text-editor.js";
 import {
+  loadIntegratedGitDiff,
+  openIntegratedGitPanel,
+  refreshIntegratedGitStatus,
+  type IntegratedGitPanel,
+} from "./git-panel.js";
+import {
   openIntegratedTerminal,
   runIntegratedTerminalCommand,
   setIntegratedTerminalCwd,
@@ -95,6 +101,24 @@ export {
   type TerminalViewInput,
   type TerminalViewSnapshot,
 } from "./terminal-view.js";
+export {
+  openIntegratedGitPanel,
+  refreshIntegratedGitStatus,
+  loadIntegratedGitDiff,
+  GIT_PANEL_FOLDER_REQUIRED_MESSAGE,
+  GIT_PANEL_NO_PANEL_MESSAGE,
+  GIT_PANEL_NOT_A_REPOSITORY_MESSAGE,
+  GIT_PANEL_PATH_REQUIRED_MESSAGE,
+  GIT_PANEL_STATUS_FAILED_MESSAGE,
+  GIT_PANEL_DIFF_FAILED_MESSAGE,
+  OUT_OF_SCOPE_PATH_LOG_MESSAGE as GIT_PANEL_OUT_OF_SCOPE_MESSAGE,
+  type IntegratedGitPanel,
+} from "./git-panel.js";
+export {
+  buildGitPanelView,
+  type GitPanelViewInput,
+  type GitPanelViewSnapshot,
+} from "./git-panel-view.js";
 
 export const WORKBENCH_FOLDER_REQUIRED_MESSAGE =
   "Caminho de pasta obrigatório para abrir o workbench OpenAgent.";
@@ -106,6 +130,8 @@ export const WORKBENCH_TEXT_EDITOR_FOLDER_NOT_OPEN_MESSAGE =
   "Nenhuma pasta aberta no workbench para editar arquivos.";
 export const WORKBENCH_TERMINAL_FOLDER_NOT_OPEN_MESSAGE =
   "Nenhuma pasta aberta no workbench para o terminal integrado.";
+export const WORKBENCH_GIT_FOLDER_NOT_OPEN_MESSAGE =
+  "Nenhuma pasta aberta no workbench para o painel Git.";
 
 export interface WorkbenchShellOpenInput {
   platform: string;
@@ -127,6 +153,11 @@ export interface WorkbenchTextEditorResult {
 
 export interface WorkbenchTerminalResult {
   session: IntegratedTerminalSession;
+  view: WorkbenchShellViewSnapshot;
+}
+
+export interface WorkbenchGitPanelResult {
+  panel: IntegratedGitPanel;
   view: WorkbenchShellViewSnapshot;
 }
 
@@ -171,7 +202,7 @@ function assertFolderPath(folderPath: unknown): string {
 }
 
 /**
- * LOC-01: workbench Electron — slots, árvore (120), editor (121) e terminal (122).
+ * LOC-01: workbench Electron — slots, árvore (120), editor (121), terminal (122) e Git (123).
  */
 export class WorkbenchShellController {
   private identity: ElectronProductIdentity = createOpenAgentProductIdentity();
@@ -182,6 +213,7 @@ export class WorkbenchShellController {
   private expandedDirectories: string[] = [];
   private textEditorDocument: TextEditorDocument | null = null;
   private terminalSession: IntegratedTerminalSession | null = null;
+  private gitPanel: IntegratedGitPanel | null = null;
   private readonly rendererBridge: RendererToolBridge = createRendererToolBridge();
   private view: WorkbenchShellViewSnapshot = buildWorkbenchShellView({
     identity: this.identity,
@@ -193,6 +225,7 @@ export class WorkbenchShellController {
     expandedDirectories: [],
     textEditorDocument: null,
     terminalSession: null,
+    gitPanel: null,
   });
 
   get snapshot(): WorkbenchShellViewSnapshot {
@@ -214,6 +247,11 @@ export class WorkbenchShellController {
     return this.terminalSession;
   }
 
+  /** Painel Git aberto (null se fechado). */
+  get openGitPanel(): IntegratedGitPanel | null {
+    return this.gitPanel;
+  }
+
   /** Inicializa o shell com identidade OpenAgent antes de abrir pasta. */
   bootstrap(input: { platform: string; repoRoot?: string }): WorkbenchShellViewSnapshot {
     this.platform = input.platform;
@@ -224,6 +262,7 @@ export class WorkbenchShellController {
     this.expandedDirectories = [];
     this.textEditorDocument = null;
     this.terminalSession = null;
+    this.gitPanel = null;
     this.refreshView();
     return this.view;
   }
@@ -244,6 +283,7 @@ export class WorkbenchShellController {
     this.fileTreeEntries = collectVisibleEntries(folderPath, this.expandedDirectories);
     this.textEditorDocument = null;
     this.terminalSession = null;
+    this.gitPanel = null;
     this.refreshView();
     return {
       identity: this.identity,
@@ -355,6 +395,42 @@ export class WorkbenchShellController {
     return { session: this.terminalSession, view: this.view };
   }
 
+  /**
+   * Abre o painel Git e carrega status (LOC-01 / task_123).
+   * Sem pasta / sem .git → INVALID_STATE.
+   */
+  openGit(): WorkbenchGitPanelResult {
+    if (this.folderPath === null) {
+      throw new ProtocolError("INVALID_STATE", WORKBENCH_GIT_FOLDER_NOT_OPEN_MESSAGE, []);
+    }
+    this.gitPanel = openIntegratedGitPanel(this.folderPath);
+    this.refreshView();
+    return { panel: this.gitPanel, view: this.view };
+  }
+
+  /** Atualiza o status Git do painel aberto. */
+  refreshGitStatus(): WorkbenchGitPanelResult {
+    if (this.folderPath === null) {
+      throw new ProtocolError("INVALID_STATE", WORKBENCH_GIT_FOLDER_NOT_OPEN_MESSAGE, []);
+    }
+    this.gitPanel = refreshIntegratedGitStatus(this.folderPath, this.gitPanel);
+    this.refreshView();
+    return { panel: this.gitPanel, view: this.view };
+  }
+
+  /**
+   * Carrega git diff no painel (workspace ou caminho relativo).
+   * Fora do root → OUT_OF_SCOPE; path inválido → INVALID_STATE.
+   */
+  loadGitDiff(relativePath?: unknown): WorkbenchGitPanelResult {
+    if (this.folderPath === null) {
+      throw new ProtocolError("INVALID_STATE", WORKBENCH_GIT_FOLDER_NOT_OPEN_MESSAGE, []);
+    }
+    this.gitPanel = loadIntegratedGitDiff(this.folderPath, this.gitPanel, relativePath);
+    this.refreshView();
+    return { panel: this.gitPanel, view: this.view };
+  }
+
   private refreshView(): void {
     this.view = buildWorkbenchShellView({
       identity: this.identity,
@@ -366,6 +442,7 @@ export class WorkbenchShellController {
       expandedDirectories: this.expandedDirectories,
       textEditorDocument: this.textEditorDocument,
       terminalSession: this.terminalSession,
+      gitPanel: this.gitPanel,
     });
   }
 }
