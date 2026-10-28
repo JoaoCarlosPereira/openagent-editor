@@ -145,6 +145,12 @@ function handleSessionCreate(
   const mode = params.mode ?? (isAgentMode(context.binding.mode) ? context.binding.mode : "agent");
   const sessionId = `ses-${randomUUID()}`;
 
+  const rulesSnapshot = context.customizationRules.beginSession({
+    workspaceRoot: context.binding.workspaceRoot,
+    sessionId,
+    rulesRef: context.binding.rulesRef,
+  });
+
   withSqlite(db, (sqlite) => {
     ensureWorkspaceRow(sqlite, context.binding.workspaceId, context.binding.workspaceRoot);
     createStoredSession(sqlite, {
@@ -157,12 +163,6 @@ function handleSessionCreate(
   if (!context.binding.sessionIds.includes(sessionId)) {
     context.binding.sessionIds.push(sessionId);
   }
-
-  const rulesSnapshot = context.customizationRules.beginSession({
-    workspaceRoot: context.binding.workspaceRoot,
-    sessionId,
-    rulesRef: context.binding.rulesRef,
-  });
 
   return {
     sessionId,
