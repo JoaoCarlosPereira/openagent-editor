@@ -5,6 +5,8 @@ export {
   type SettingsProviderPort,
   type SettingsProviderResult,
   type SettingsState,
+  type IndexSizeSnapshot,
+  type ExclusionRuleDisplay,
 } from "./settings-controller.js";
 export {
   buildSettingsView,

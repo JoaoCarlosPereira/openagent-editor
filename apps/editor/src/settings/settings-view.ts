@@ -9,6 +9,9 @@ export interface SettingsViewInput {
   secretRef: string | null;
   contextLimitTokens: number | null;
   errorMessage: string | null;
+  exclusionRules?: readonly { pattern: string; source: "project-ignore" | "workspace-config"; removable: boolean }[];
+  indexSizeSnapshot?: { indexedFileCount: number; chunkCount: number; lexicalBytes: number } | null;
+  isClearingIndex?: boolean;
 }
 
 export interface SettingsViewSnapshot {
@@ -21,6 +24,9 @@ export interface SettingsViewSnapshot {
     secretRef: string | null;
     contextLimitTokens: number;
     errorMessage: string | null;
+    exclusionRules: readonly { pattern: string; source: "project-ignore" | "workspace-config"; removable: boolean }[];
+    indexSizeSnapshot: { indexedFileCount: number; chunkCount: number; lexicalBytes: number } | null;
+    isClearingIndex: boolean;
   };
 }
 
@@ -50,6 +56,30 @@ export function buildSettingsView(input: SettingsViewInput): SettingsViewSnapsho
   const errorHtml = input.errorMessage
     ? `<p role="alert" data-testid="settings-error">${escapeHtml(input.errorMessage)}</p>`
     : "";
+  const rules = input.exclusionRules ?? [];
+  const exclusionHtml = [
+    `<section data-testid="settings-exclusions" aria-label="Regras de exclusão">`,
+    `<h2>Exclusões do workspace</h2>`,
+    `<p>Os caminhos excluídos não entram na indexação, no contexto automático nem na busca do agente.</p>`,
+    `<ul data-testid="exclusion-rules">${rules.length ? rules.map((rule) => `<li data-source="${rule.source}">${escapeHtml(rule.pattern)} <span>${rule.source === "project-ignore" ? ".gitignore" : "Workspace"}</span>${rule.removable ? `<button type="button" data-testid="remove-exclusion" data-pattern="${escapeHtml(rule.pattern)}">Remover</button>` : ""}</li>`).join("") : `<li data-testid="exclusion-rules-empty">Nenhuma regra de exclusão configurada.</li>`}</ul>`,
+    `<label for="settings-exclusion-pattern">Novo padrão de exclusão</label><input id="settings-exclusion-pattern" data-testid="settings-exclusion-pattern" placeholder="ex.: secrets/**" />`,
+    `<button type="button" data-testid="add-exclusion">Adicionar exclusão</button>`,
+    `</section>`,
+  ].join("");
+  const size = input.indexSizeSnapshot;
+  const clearHtml = [
+    `<section data-testid="settings-index-cleanup" aria-label="Limpeza do índice">`,
+    `<h2>Limpar índice do workspace</h2>`,
+    `<p>Escopo: workspace atual. Os dados locais indexados serão apagados.</p>`,
+    size
+      ? `<div data-testid="index-size-preview"><p>Arquivos: ${size.indexedFileCount}</p><p>Trechos: ${size.chunkCount}</p><p>Tamanho textual: ${size.lexicalBytes} bytes</p></div>`
+      : `<p data-testid="index-size-unavailable">Consulte o tamanho antes de limpar.</p>`,
+    `<button type="button" data-testid="describe-index-size">Consultar escopo e tamanho</button>`,
+    `<button type="button" data-testid="clear-index"${size ? "" : " disabled"}>Limpar índice do workspace</button>`,
+    `<label><input type="checkbox" data-testid="confirm-clear-index" /> Confirmo apagar os dados locais do índice deste workspace</label>`,
+    `<p data-testid="index-clear-result" role="status">${input.isClearingIndex ? "Limpando índice…" : size && size.indexedFileCount === 0 && size.chunkCount === 0 ? "Índice do workspace vazio." : "A limpeza exige confirmação explícita."}</p>`,
+    `</section>`,
+  ].join("");
   const html = [
     `<section data-testid="settings-panel" aria-label="Configurações">`,
     `<h1>Configurações</h1>`,
@@ -67,6 +97,8 @@ export function buildSettingsView(input: SettingsViewInput): SettingsViewSnapsho
     `<input id="settings-context-limit" type="number" min="1" step="1" data-testid="settings-context-limit" value="${contextLimit}" />`,
     `<p data-testid="settings-context-limit-value">Teto: ${contextLimit} tokens</p>`,
     errorHtml,
+    exclusionHtml,
+    clearHtml,
     `</section>`,
   ].join("");
   return {
@@ -79,6 +111,9 @@ export function buildSettingsView(input: SettingsViewInput): SettingsViewSnapsho
       secretRef: input.secretRef,
       contextLimitTokens: contextLimit,
       errorMessage: input.errorMessage,
+      exclusionRules: rules,
+      indexSizeSnapshot: size,
+      isClearingIndex: input.isClearingIndex ?? false,
     },
   };
 }

@@ -17,6 +17,13 @@ export interface SettingsProviderResult {
   secretRef: string;
 }
 
+/** Tamanho descritivo do índice de contexto (CTX-04). */
+export interface IndexSizeSnapshot {
+  indexedFileCount: number;
+  chunkCount: number;
+  lexicalBytes: number;
+}
+
 export interface SettingsProviderPort {
   testAndSaveProvider(input: {
     endpoint: string;
@@ -25,6 +32,22 @@ export interface SettingsProviderPort {
     profileId: string;
   }): Promise<SettingsProviderResult>;
   persistContextLimitTokens?(value: number): Promise<void>;
+  /** CTX-03: retorna os padrões atuais de exclusão do workspace. */
+  getExclusionPatterns?(): Promise<string[]>;
+  /** CTX-03: grava os padrões de exclusão do workspace (array de glob). */
+  setExclusionPatterns?(patterns: string[]): Promise<void>;
+  /** CTX-04: descrepe escopo e tamanho do índice antes de limpar. */
+  describeIndexSize?(): Promise<IndexSizeSnapshot>;
+  /** CTX-04: confirma e executa a limpeza do índice local. */
+  confirmAndClearIndex?(): Promise<{ cleared: true; scope: "workspace"; size: IndexSizeSnapshot }>;
+}
+
+/** Fragmento de uma regra de exclusão em exibição. */
+export interface ExclusionRuleDisplay {
+  pattern: string;
+  /** "project-ignore" ou "workspace-config". */
+  source: "project-ignore" | "workspace-config";
+  removable: boolean;
 }
 
 export interface SettingsState {
@@ -37,6 +60,12 @@ export interface SettingsState {
   isTestingConnection: boolean;
   isSavingCredential: boolean;
   errorMessage: string | null;
+  /** CTX-03: lista de regras de exclusão ativas para exibição. */
+  exclusionRules: ExclusionRuleDisplay[];
+  /** CTX-04: tamanho descritivo do índice antes de limpeza. */
+  indexSizeSnapshot: IndexSizeSnapshot | null;
+  /** CTX-04: true enquanto a limpeza está em andamento. */
+  isClearingIndex: boolean;
 }
 
 export type SettingsListener = (state: SettingsState) => void;
@@ -57,6 +86,7 @@ function normalizeEndpoint(raw: string): string {
 export class SettingsController {
   private value: SettingsState;
   private readonly listeners = new Set<SettingsListener>();
+  private configuredExclusionPatterns: string[] = [];
 
   constructor(private readonly port?: SettingsProviderPort, initial?: {
     providerEndpoint?: string | null;
@@ -76,6 +106,9 @@ export class SettingsController {
       isTestingConnection: false,
       isSavingCredential: false,
       errorMessage: null,
+      exclusionRules: [],
+      indexSizeSnapshot: null,
+      isClearingIndex: false,
     };
   }
 
@@ -189,6 +222,106 @@ export class SettingsController {
     };
     this.notify();
     return this.snapshot;
+  }
+
+  /** Carrega padrões editáveis do workspace e regras herdadas de .gitignore. */
+  async loadExclusionRules(projectIgnorePatterns: readonly string[] = []): Promise<Readonly<SettingsState>> {
+    const configured = this.port?.getExclusionPatterns
+      ? await this.port.getExclusionPatterns()
+      : this.configuredExclusionPatterns;
+    if (!Array.isArray(configured) || configured.some((pattern) => typeof pattern !== "string" || !pattern.trim())) {
+      throw invalidState("Regras de exclusão inválidas.", ["exclusions"]);
+    }
+    this.configuredExclusionPatterns = [...configured].map((pattern) => pattern.trim());
+    this.value = {
+      ...this.value,
+      exclusionRules: [
+        ...projectIgnorePatterns.map((pattern) => ({ pattern, source: "project-ignore" as const, removable: false })),
+        ...this.configuredExclusionPatterns.map((pattern) => ({ pattern, source: "workspace-config" as const, removable: true })),
+      ],
+    };
+    this.notify();
+    return this.snapshot;
+  }
+
+  /** Persiste apenas regras de workspace; invalidação ocorre antes da chamada externa. */
+  async setExclusionPatterns(rawPatterns: readonly unknown[]): Promise<Readonly<SettingsState>> {
+    if (!Array.isArray(rawPatterns) || rawPatterns.some((pattern) => typeof pattern !== "string" || !pattern.trim())) {
+      throw invalidState("Cada regra deve ser um padrão glob não-vazio.", ["exclusions"]);
+    }
+    const patterns = rawPatterns.map((pattern) => (pattern as string).trim());
+    if (new Set(patterns).size !== patterns.length) {
+      throw invalidState("Regras de exclusão duplicadas.", ["exclusions"]);
+    }
+    if (this.value.isClearingIndex || this.value.isTestingConnection || this.value.isSavingCredential) {
+      throw invalidState("Já existe uma operação de configuração em andamento.", ["state"]);
+    }
+    if (!this.port?.setExclusionPatterns) {
+      throw invalidState("A persistência das regras de exclusão não está disponível.", ["port"]);
+    }
+    const previous = this.configuredExclusionPatterns;
+    try {
+      await this.port.setExclusionPatterns(patterns);
+    } catch {
+      throw invalidState("Não foi possível persistir as regras de exclusão.", ["persistence"]);
+    }
+    this.configuredExclusionPatterns = [...patterns];
+    const projectRules = this.value.exclusionRules.filter((rule) => rule.source === "project-ignore");
+    this.value = {
+      ...this.value,
+      exclusionRules: [
+        ...projectRules,
+        ...patterns.map((pattern) => ({ pattern, source: "workspace-config" as const, removable: true })),
+      ],
+      errorMessage: null,
+    };
+    void previous;
+    this.notify();
+    return this.snapshot;
+  }
+
+  /** Obtém metadados exibíveis, sem limpar dados. */
+  async describeIndexSize(): Promise<Readonly<SettingsState>> {
+    if (!this.port?.describeIndexSize) {
+      throw invalidState("A descrição do índice não está disponível.", ["port"]);
+    }
+    const size = await this.port.describeIndexSize();
+    if (!size || ![size.indexedFileCount, size.chunkCount, size.lexicalBytes].every((value) => Number.isSafeInteger(value) && value >= 0)) {
+      throw invalidState("Tamanho do índice inválido.", ["indexSize"]);
+    }
+    this.value = { ...this.value, indexSizeSnapshot: { ...size } };
+    this.notify();
+    return this.snapshot;
+  }
+
+  /** Executa limpeza somente após confirmação explícita e mantendo o resultado observável. */
+  async clearIndex(confirmed: boolean, expectedSize?: IndexSizeSnapshot): Promise<Readonly<SettingsState>> {
+    if (confirmed !== true) throw invalidState("A limpeza exige confirmação explícita.", ["confirmed"]);
+    if (this.value.isClearingIndex || this.value.isTestingConnection || this.value.isSavingCredential) {
+      throw invalidState("Já existe uma operação de configuração em andamento.", ["state"]);
+    }
+    if (!this.port?.confirmAndClearIndex) throw invalidState("A limpeza do índice não está disponível.", ["port"]);
+    if (!this.value.indexSizeSnapshot) throw invalidState("Consulte o escopo e tamanho antes da limpeza.", ["indexSize"]);
+    const baseline = expectedSize ?? this.value.indexSizeSnapshot;
+    if (JSON.stringify(baseline) !== JSON.stringify(this.value.indexSizeSnapshot)) {
+      throw invalidState("O tamanho do índice mudou; atualize a prévia antes de confirmar.", ["indexSize"]);
+    }
+    this.value = { ...this.value, isClearingIndex: true, errorMessage: null };
+    this.notify();
+    try {
+      const result = await this.port.confirmAndClearIndex();
+      if (result.cleared !== true || result.scope !== "workspace" || !result.size) {
+        throw invalidState("Resultado de limpeza inválido.", ["result"]);
+      }
+      this.value = { ...this.value, isClearingIndex: false, indexSizeSnapshot: { ...result.size } };
+      this.notify();
+      return this.snapshot;
+    } catch (error) {
+      this.value = { ...this.value, isClearingIndex: false };
+      this.notify();
+      if (error instanceof ProtocolError) throw error;
+      throw invalidState("Não foi possível limpar o índice do workspace.", ["clear"]);
+    }
   }
 
   private notify(): void {
