@@ -66,6 +66,25 @@ export {
 } from "./storage-backup.js";
 
 export {
+  createInMemorySystemSecretVault,
+  createLinuxSecretServiceVault,
+  formatSecretRef,
+  OPENAGENT_SECRET_SERVICE,
+  parseSecretRef,
+  probeOpenAiCompatibleProvider,
+  providerAccount,
+  readProviderCredentialFromVault,
+  registerProviderCredential,
+  resolveSystemSecretVault,
+  type ProviderCapabilities,
+  type RegisterProviderCredentialInput,
+  type RegisterProviderCredentialResult,
+  type SecretToolRunner,
+  type SystemSecretVault,
+  type SystemSecretVaultBackend,
+} from "./secrets/index.js";
+
+export {
   insertStoredAgentNode,
   insertStoredMessage,
   insertStoredQueueItem,
