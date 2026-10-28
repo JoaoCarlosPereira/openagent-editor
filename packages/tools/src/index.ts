@@ -233,3 +233,26 @@ export {
   loadLocalCustomizationAssetsFromPaths,
   type LoadLocalCustomizationAssetsInput,
 } from "./mcp/load-local-customization-assets.js";
+
+export {
+  validateBrowserUrl,
+  CdpTargetManager,
+  InMemoryCdpTransport,
+  WebSocketCdpTransport,
+  MOCK_SCREENSHOT_BASE64,
+  executePolicyBrowserOpen,
+  formatAgentBrowserToolResult,
+  preparePolicyBrowserOpen,
+  type AgentBrowserToolInvocationResult,
+  type BrowserCdpToolResult,
+  type BrowserConsoleLogEntry,
+  type BrowserInteraction,
+  type BrowserTargetInfo,
+  type BrowserTargetSession,
+  type BrowserUrlPolicyOptions,
+  type CdpEvent,
+  type CdpTransport,
+  type OpenAuthorizedBrowserUrlInput,
+  type PolicyBrowserToolContext,
+  type PreparePolicyBrowserOpenInput,
+} from "./browser/index.js";
