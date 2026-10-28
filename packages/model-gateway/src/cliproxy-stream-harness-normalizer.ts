@@ -3,10 +3,19 @@ import {
   PROTOCOL_ERROR_CODES,
   ProtocolError,
   incompleteStreamError,
-  providerFailureError,
   type HarnessEvent,
-  type ProviderFailureReason,
 } from "@openagent/protocol";
+
+import {
+  assertNonEmptyCliProxyField,
+  mapCliProxyInlineStreamErrorObject,
+  providerFailurePreservationHints,
+} from "./cliproxy-provider-errors.js";
+
+export {
+  mapCliProxyChatCompletionHttpFailure,
+  mapCliProxyOpenAiHttpFailure,
+} from "./cliproxy-provider-errors.js";
 
 export const CLI_PROXY_STREAM_HARNESS_EVENT_TYPES = {
   MESSAGE_DELTA: "message.delta",
@@ -46,102 +55,13 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-function requireNonEmptyString(value: unknown, label: string): string {
-  if (typeof value !== "string" || value.trim().length === 0) {
-    throw new ProtocolError(
-      PROTOCOL_ERROR_CODES.INVALID_STATE,
-      "Entrada inválida para normalização de streaming.",
-      [label],
-    );
-  }
-  return value.trim();
-}
-
-function preservationHints(): Record<string, boolean> {
-  return { preservePrompt: true, preserveDiff: true };
-}
-
-function parseOpenAiErrorBody(bodyText: string): string {
-  const trimmed = bodyText.trim();
-  if (!trimmed) {
-    return "Provedor recusou a requisição de streaming.";
-  }
-  try {
-    const parsed = JSON.parse(trimmed) as { error?: { message?: string } };
-    const message = parsed.error?.message?.trim();
-    if (message) {
-      return message;
-    }
-  } catch {
-    // texto bruto abaixo
-  }
-  return trimmed.slice(0, 500);
-}
-
-function inferProviderFailureReason(
-  status: number,
-  providerCause: string,
-): ProviderFailureReason {
-  if (status === 429) {
-    return "rate_limit";
-  }
-  if (status === 408 || status === 504) {
-    return "timeout";
-  }
-  const lower = providerCause.toLowerCase();
-  if (
-    lower.includes("rate") ||
-    lower.includes("429") ||
-    lower.includes("too many")
-  ) {
-    return "rate_limit";
-  }
-  if (lower.includes("timeout") || lower.includes("deadline") || lower.includes("expired")) {
-    return "timeout";
-  }
-  if (
-    lower.includes("capability") ||
-    lower.includes("not support") ||
-    lower.includes("unsupported") ||
-    lower.includes("model")
-  ) {
-    return "capability_missing";
-  }
-  if (status === 404 || status === 422) {
-    return "capability_missing";
-  }
-  return "timeout";
-}
-
-/**
- * API-02: mapeia falha HTTP do chat/completions para código estável PROVIDER_* com causa preservada.
- */
-export function mapCliProxyChatCompletionHttpFailure(
-  status: number,
-  bodyText: string,
-): ProtocolError {
-  const providerCause = parseOpenAiErrorBody(bodyText);
-  const reason = inferProviderFailureReason(status, providerCause);
-  return providerFailureError(reason, providerCause);
-}
-
-function mapInlineStreamError(error: OpenAiStreamChunk["error"]): ProtocolError {
-  const providerCause =
-    error?.message?.trim() ||
-    error?.type?.trim() ||
-    "Provedor interrompeu o streaming.";
-  const codeHint = String(error?.code ?? error?.type ?? "");
-  const reason = inferProviderFailureReason(400, `${providerCause} ${codeHint}`);
-  return providerFailureError(reason, providerCause);
-}
-
 export function assertCliProxyStreamHarnessNormalizerInput(
   input: CliProxyStreamHarnessNormalizerInput,
 ): CliProxyStreamHarnessNormalizerInput {
   return {
-    runId: requireNonEmptyString(input.runId, "runId"),
-    sessionId: requireNonEmptyString(input.sessionId, "sessionId"),
-    messageId: requireNonEmptyString(input.messageId, "messageId"),
+    runId: assertNonEmptyCliProxyField(input.runId, "runId"),
+    sessionId: assertNonEmptyCliProxyField(input.sessionId, "sessionId"),
+    messageId: assertNonEmptyCliProxyField(input.messageId, "messageId"),
     startingSequence: input.startingSequence,
     now: input.now,
   };
@@ -207,7 +127,7 @@ export class CliProxyStreamHarnessNormalizer {
       sessionId: this.sessionId,
       messageId: this.messageId,
       role: "assistant",
-      ...preservationHints(),
+      ...providerFailurePreservationHints(),
     };
   }
 
@@ -252,7 +172,7 @@ export class CliProxyStreamHarnessNormalizer {
     }
 
     if (parsed.error) {
-      const failure = mapInlineStreamError(parsed.error);
+      const failure = mapCliProxyInlineStreamErrorObject(parsed.error);
       this.closed = true;
       throw failure;
     }
@@ -299,12 +219,13 @@ export class CliProxyStreamHarnessNormalizer {
   }
 
   buildProviderFailureNormalization(error: ProtocolError): CliProxyStreamHarnessNormalization {
+    const hints = providerFailurePreservationHints();
     if (this.closed) {
       return this.emit(CLI_PROXY_STREAM_HARNESS_EVENT_TYPES.PROVIDER_FAILURE, {
         ...this.basePayload(),
         code: error.code,
         providerCause: error.hints?.providerCause ?? error.message,
-        ...preservationHints(),
+        ...hints,
       });
     }
     this.closed = true;
@@ -313,7 +234,7 @@ export class CliProxyStreamHarnessNormalizer {
       code: error.code,
       providerCause: error.hints?.providerCause ?? error.message,
       text: this.accumulatedText,
-      ...preservationHints(),
+      ...hints,
     });
   }
 }
@@ -375,5 +296,5 @@ export function parseOpenAiStreamErrorObject(raw: unknown): ProtocolError | unde
   if (!isRecord(error)) {
     return undefined;
   }
-  return mapInlineStreamError(error as OpenAiStreamChunk["error"]);
+  return mapCliProxyInlineStreamErrorObject(error as OpenAiStreamChunk["error"]);
 }

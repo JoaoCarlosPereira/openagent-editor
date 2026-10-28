@@ -44,6 +44,39 @@ async function withMockOpenAiModelsServer(
   }
 }
 
+test("[API-02] 429 do provedor normaliza para PROVIDER_RATE_LIMIT com causa e preservação", async () => {
+  const server = http.createServer((_req, res) => {
+    res.writeHead(429, { "content-type": "application/json" });
+    res.end(JSON.stringify({ error: { message: "429 Too Many Requests" } }));
+  });
+  server.listen(0, "127.0.0.1");
+  await once(server, "listening");
+  const address = server.address();
+  assert.ok(address && typeof address === "object");
+  const openAiBaseUrl = `http://127.0.0.1:${address.port}/v1`;
+  try {
+    await assert.rejects(
+      () =>
+        catalogCliProxyProviderCapabilities({
+          endpoint: openAiBaseUrl,
+          model: "gpt-test",
+          credential: "token",
+        }),
+      (error: unknown) => {
+        assert.ok(error instanceof ProtocolError);
+        assert.equal(error.code, "PROVIDER_RATE_LIMIT");
+        assert.equal(error.hints?.providerCause, "429 Too Many Requests");
+        assert.equal(error.hints?.preservePrompt, true);
+        assert.equal(error.hints?.preserveDiff, true);
+        return true;
+      },
+    );
+  } finally {
+    server.close();
+    await once(server, "close");
+  }
+});
+
 test("[API-01] catalogCliProxyProviderCapabilities testa conexão e expõe catálogo com pin CLIProxyAPI", async () => {
   const credential = "catalog-token-api-01";
 
@@ -132,7 +165,9 @@ test("[API-01] caminho de erro: entrada inválida retorna INVALID_STATE sem efei
         }),
       (error: unknown) => {
         assert.ok(error instanceof ProtocolError);
-        assert.equal(error.code, PROTOCOL_ERROR_CODES.INVALID_STATE);
+        assert.equal(error.code, "PROVIDER_CAPABILITY_MISSING");
+        assert.equal(error.hints?.preservePrompt, true);
+        assert.equal(error.hints?.preserveDiff, true);
         return true;
       },
     );

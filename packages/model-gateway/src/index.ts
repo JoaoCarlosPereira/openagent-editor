@@ -45,11 +45,21 @@ export {
   type StartCliProxySidecarSupervisorOptions,
 } from "./cliproxy-sidecar-supervisor.js";
 export {
+  inferCliProxyProviderFailureReason,
+  mapCliProxyChatCompletionHttpFailure,
+  mapCliProxyFetchNetworkError,
+  mapCliProxyFetchTimeoutError,
+  mapCliProxyInlineStreamErrorObject,
+  mapCliProxyOpenAiHttpFailure,
+  parseOpenAiCompatibleErrorBody,
+  providerFailurePreservationHints,
+} from "./cliproxy-provider-errors.js";
+export { probeCliProxyOpenAiCompatibleProvider } from "./cliproxy-provider-probe.js";
+export {
   CLI_PROXY_STREAM_HARNESS_EVENT_TYPES,
   CliProxyStreamHarnessNormalizer,
   assertCliProxyStreamHarnessNormalizerInput,
   consumeOpenAiSseResponse,
-  mapCliProxyChatCompletionHttpFailure,
   parseOpenAiStreamErrorObject,
   toHarnessEventFromNormalization,
   type CliProxyStreamHarnessNormalization,

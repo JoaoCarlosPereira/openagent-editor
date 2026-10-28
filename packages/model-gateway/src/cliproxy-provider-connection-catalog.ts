@@ -1,7 +1,7 @@
 import type { ProviderCapabilities, RegisterProviderCredentialInput } from "@openagent/storage";
-import { probeOpenAiCompatibleProvider } from "@openagent/storage";
 
 import { loadPinnedCliProxyApiSidecar } from "./load-pinned-cliproxyapi-sidecar.js";
+import { probeCliProxyOpenAiCompatibleProvider } from "./cliproxy-provider-probe.js";
 import type { CliProxySidecarPinManifest } from "./types.js";
 
 export type CliProxyProviderConnectionInput = {
@@ -50,7 +50,7 @@ export async function catalogCliProxyProviderCapabilities(
   },
 ): Promise<CliProxyProviderCapabilitiesCatalog> {
   const { endpoint, manifest } = await resolveCliProxyOpenAiBaseUrl(input.endpoint);
-  const probe = options?.probe ?? probeOpenAiCompatibleProvider;
+  const probe = options?.probe ?? probeCliProxyOpenAiCompatibleProvider;
   const capabilities = await probe({
     profileId: "catalog-probe",
     endpoint,
