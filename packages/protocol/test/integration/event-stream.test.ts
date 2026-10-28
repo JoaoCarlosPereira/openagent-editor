@@ -36,6 +36,12 @@ const SESSION_RESUME_PLAN: Array<{ type: string; payloadRef: string }> = [
   { type: "attachment.retained", payloadRef: "sha256:attachments-still-on-disk" },
 ];
 
+function resumePlanStep(index: number): { type: string; payloadRef: string } {
+  const step = SESSION_RESUME_PLAN[index];
+  assert.ok(step, `SESSION_RESUME_PLAN[${index}] ausente`);
+  return step;
+}
+
 function pushWithBackpressure(
   controller: HarnessEventStreamController,
   event: HarnessEvent,
@@ -52,19 +58,21 @@ function pushWithBackpressure(
   assert.equal(pushed.accepted, true);
 }
 
-test("[SES-01] ordenação, backpressure e snapshot permitem retomar sessão após restart simulado", () => {
+test("[SES-01] ordenação, backpressure e snapshot permitem retomar sessão após restart simulado", async () => {
   const controller = new HarnessEventStreamController({
     runId: RUN_ID,
     maxBufferedEvents: 2,
   });
 
+  const firstStep = resumePlanStep(0);
+  const secondStep = resumePlanStep(1);
   pushWithBackpressure(
     controller,
-    sessionEvent(1, SESSION_RESUME_PLAN[0].type, SESSION_RESUME_PLAN[0].payloadRef),
+    sessionEvent(1, firstStep.type, firstStep.payloadRef),
   );
   pushWithBackpressure(
     controller,
-    sessionEvent(2, SESSION_RESUME_PLAN[1].type, SESSION_RESUME_PLAN[1].payloadRef),
+    sessionEvent(2, secondStep.type, secondStep.payloadRef),
   );
   controller.tryShift();
 
@@ -72,15 +80,31 @@ test("[SES-01] ordenação, backpressure e snapshot permitem retomar sessão ap�
   assert.equal(snapshot.events.length, 2);
   assert.equal(snapshot.nextSequence, 3);
 
-  const afterRestart = restoreHarnessEventStreamFromSnapshot(snapshot, 2);
+  const afterRestart = restoreHarnessEventStreamFromSnapshot(
+    snapshot,
+    SESSION_RESUME_PLAN.length,
+  );
+  const consumeAfterRestart = (async () => {
+    const consumed: HarnessEvent[] = [];
+    for await (const event of afterRestart.consume()) {
+      consumed.push(event);
+    }
+    return consumed;
+  })();
+
   for (let index = 2; index < SESSION_RESUME_PLAN.length; index += 1) {
-    const step = SESSION_RESUME_PLAN[index];
+    const step = resumePlanStep(index);
     pushWithBackpressure(
       afterRestart,
       sessionEvent(index + 1, step.type, step.payloadRef),
     );
   }
   afterRestart.close();
+  const consumedAfterRestart = await consumeAfterRestart;
+  assert.deepEqual(
+    consumedAfterRestart.map((event) => event.type),
+    ["message.snapshot", "tool.registry", "attachment.retained"],
+  );
 
   const validation = validateHarnessEventStream(afterRestart.snapshot().events);
   assert.equal(validation.valid, true);
