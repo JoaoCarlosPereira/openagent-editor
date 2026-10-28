@@ -45,3 +45,19 @@ export {
   type ContextExclusionRuleset,
   type ContextExclusionSource,
 } from "./exclusions/types.js";
+export {
+  chunkContextFileText,
+  DEFAULT_CONTEXT_INDEX_CHUNK_SIZE,
+} from "./indexer/chunk-text.js";
+export { hashContextFileContent } from "./indexer/content-hash.js";
+export { indexContextFile } from "./indexer/index-context-file.js";
+export { ensureContextIndexSchema } from "./indexer/schema.js";
+export { searchContextIndex } from "./indexer/search-context-index.js";
+export type {
+  ContextIndexChunk,
+  ContextIndexSearchHit,
+  IndexContextFileInput,
+  IndexContextFileResult,
+  SearchContextIndexInput,
+  SearchContextIndexResult,
+} from "./indexer/types.js";
