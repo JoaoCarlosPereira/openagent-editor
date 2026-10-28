@@ -158,3 +158,46 @@ export function validateExtensionManifest(candidate: unknown): {
 export function formatExtensionIdentifier(publisher: string, name: string): string {
   return `${publisher.trim()}.${name.trim()}`.toLowerCase();
 }
+
+// ─── Superfície congelada declarativa (task_158) ────────────────────────────────
+// FROZEN_EXTENSION_API_VERSION já é exportada acima (mesmo valor "3.24.18").
+export {
+  type FrozenVersion,
+  createFrozenSurface,
+  EXPECTED_SURFACE_KEYS,
+  EXPECTED_SURFACE_TYPES,
+  type FrozenExtensionApiSurface,
+  type CommandEntry,
+  type CommandRegistration,
+  type CommandsNamespace,
+  type StatusBarItem,
+  type WindowNamespace,
+  type TextDocumentData,
+  type TextEditorDecorationType,
+  type WorkspaceFile,
+  type WorkspaceNamespace,
+  type CompletionItem,
+  type SignatureHelp,
+  type SignatureInfo,
+  type SignatureParameterInfo,
+  type HoverContents,
+  type DefinitionLocation,
+  type CodeActionKind,
+  type CodeActionContext,
+  type CodeAction,
+  type DiagnosticSeverityCodes,
+  type Diagnostic,
+  type LanguagesNamespace,
+  type EnvironmentNamespace,
+  type MementoData,
+  type OutputChannel,
+  type OutputNamespace,
+} from "./frozen-surface.js";
+
+export {
+  validateFrozenSurface,
+  isFrozenSurfaceValid,
+  type ValidationIssue,
+  type ValidationResult,
+  ValidationError,
+} from "./validator.js";

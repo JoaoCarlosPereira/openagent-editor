@@ -7,7 +7,9 @@
   "types": "./src/index.ts",
   "private": true,
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./frozen-surface": "./src/frozen-surface.ts",
+    "./validator": "./src/validator.ts"
   },
   "dependencies": {
     "@openagent/protocol": "0.1.0"
