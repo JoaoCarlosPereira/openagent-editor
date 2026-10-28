@@ -24,6 +24,12 @@ import {
   type TextEditorDocument,
 } from "./text-editor.js";
 import {
+  openIntegratedTerminal,
+  runIntegratedTerminalCommand,
+  setIntegratedTerminalCwd,
+  type IntegratedTerminalSession,
+} from "./terminal.js";
+import {
   buildWorkbenchShellView,
   type WorkbenchShellViewSnapshot,
 } from "./workbench-shell-view.js";
@@ -71,6 +77,24 @@ export {
   type TextEditorViewInput,
   type TextEditorViewSnapshot,
 } from "./text-editor-view.js";
+export {
+  openIntegratedTerminal,
+  runIntegratedTerminalCommand,
+  setIntegratedTerminalCwd,
+  TERMINAL_FOLDER_REQUIRED_MESSAGE,
+  TERMINAL_NO_SESSION_MESSAGE,
+  TERMINAL_COMMAND_REQUIRED_MESSAGE,
+  TERMINAL_DIRECTORY_REQUIRED_MESSAGE,
+  TERMINAL_NOT_A_DIRECTORY_MESSAGE,
+  OUT_OF_SCOPE_PATH_LOG_MESSAGE as TERMINAL_OUT_OF_SCOPE_MESSAGE,
+  type IntegratedTerminalSession,
+  type IntegratedTerminalStatus,
+} from "./terminal.js";
+export {
+  buildTerminalView,
+  type TerminalViewInput,
+  type TerminalViewSnapshot,
+} from "./terminal-view.js";
 
 export const WORKBENCH_FOLDER_REQUIRED_MESSAGE =
   "Caminho de pasta obrigatório para abrir o workbench OpenAgent.";
@@ -80,6 +104,8 @@ export const WORKBENCH_FOLDER_NOT_OPEN_MESSAGE =
   "Nenhuma pasta aberta no workbench para expandir a árvore.";
 export const WORKBENCH_TEXT_EDITOR_FOLDER_NOT_OPEN_MESSAGE =
   "Nenhuma pasta aberta no workbench para editar arquivos.";
+export const WORKBENCH_TERMINAL_FOLDER_NOT_OPEN_MESSAGE =
+  "Nenhuma pasta aberta no workbench para o terminal integrado.";
 
 export interface WorkbenchShellOpenInput {
   platform: string;
@@ -96,6 +122,11 @@ export interface WorkbenchShellOpenResult {
 
 export interface WorkbenchTextEditorResult {
   document: TextEditorDocument;
+  view: WorkbenchShellViewSnapshot;
+}
+
+export interface WorkbenchTerminalResult {
+  session: IntegratedTerminalSession;
   view: WorkbenchShellViewSnapshot;
 }
 
@@ -140,7 +171,7 @@ function assertFolderPath(folderPath: unknown): string {
 }
 
 /**
- * LOC-01: workbench Electron — slots, árvore (120) e editor de texto (121).
+ * LOC-01: workbench Electron — slots, árvore (120), editor (121) e terminal (122).
  */
 export class WorkbenchShellController {
   private identity: ElectronProductIdentity = createOpenAgentProductIdentity();
@@ -150,6 +181,7 @@ export class WorkbenchShellController {
   private fileTreeEntries: FileTreeEntry[] = [];
   private expandedDirectories: string[] = [];
   private textEditorDocument: TextEditorDocument | null = null;
+  private terminalSession: IntegratedTerminalSession | null = null;
   private readonly rendererBridge: RendererToolBridge = createRendererToolBridge();
   private view: WorkbenchShellViewSnapshot = buildWorkbenchShellView({
     identity: this.identity,
@@ -160,6 +192,7 @@ export class WorkbenchShellController {
     fileTreeEntries: [],
     expandedDirectories: [],
     textEditorDocument: null,
+    terminalSession: null,
   });
 
   get snapshot(): WorkbenchShellViewSnapshot {
@@ -176,6 +209,11 @@ export class WorkbenchShellController {
     return this.textEditorDocument;
   }
 
+  /** Sessão do terminal integrado (null se fechada). */
+  get openTerminalSession(): IntegratedTerminalSession | null {
+    return this.terminalSession;
+  }
+
   /** Inicializa o shell com identidade OpenAgent antes de abrir pasta. */
   bootstrap(input: { platform: string; repoRoot?: string }): WorkbenchShellViewSnapshot {
     this.platform = input.platform;
@@ -185,6 +223,7 @@ export class WorkbenchShellController {
     this.fileTreeEntries = [];
     this.expandedDirectories = [];
     this.textEditorDocument = null;
+    this.terminalSession = null;
     this.refreshView();
     return this.view;
   }
@@ -204,6 +243,7 @@ export class WorkbenchShellController {
     this.expandedDirectories = [];
     this.fileTreeEntries = collectVisibleEntries(folderPath, this.expandedDirectories);
     this.textEditorDocument = null;
+    this.terminalSession = null;
     this.refreshView();
     return {
       identity: this.identity,
@@ -269,6 +309,52 @@ export class WorkbenchShellController {
     return { document: this.textEditorDocument, view: this.view };
   }
 
+  /**
+   * Abre o terminal integrado com CWD na pasta (LOC-01 / task_122).
+   * Sem pasta → INVALID_STATE.
+   */
+  openTerminal(): WorkbenchTerminalResult {
+    if (this.folderPath === null) {
+      throw new ProtocolError("INVALID_STATE", WORKBENCH_TERMINAL_FOLDER_NOT_OPEN_MESSAGE, []);
+    }
+    this.terminalSession = openIntegratedTerminal(this.folderPath);
+    this.refreshView();
+    return { session: this.terminalSession, view: this.view };
+  }
+
+  /**
+   * Executa comando no terminal aberto (I/O no main; cwd confinado).
+   */
+  runTerminalCommand(command: unknown): WorkbenchTerminalResult {
+    if (this.folderPath === null) {
+      throw new ProtocolError("INVALID_STATE", WORKBENCH_TERMINAL_FOLDER_NOT_OPEN_MESSAGE, []);
+    }
+    this.terminalSession = runIntegratedTerminalCommand(
+      this.folderPath,
+      this.terminalSession,
+      command,
+    );
+    this.refreshView();
+    return { session: this.terminalSession, view: this.view };
+  }
+
+  /**
+   * Altera o CWD relativo do terminal sob a pasta.
+   * Fora do root → OUT_OF_SCOPE; path inválido → INVALID_STATE.
+   */
+  setTerminalCwd(relativeDirectory: unknown): WorkbenchTerminalResult {
+    if (this.folderPath === null) {
+      throw new ProtocolError("INVALID_STATE", WORKBENCH_TERMINAL_FOLDER_NOT_OPEN_MESSAGE, []);
+    }
+    this.terminalSession = setIntegratedTerminalCwd(
+      this.folderPath,
+      this.terminalSession,
+      relativeDirectory,
+    );
+    this.refreshView();
+    return { session: this.terminalSession, view: this.view };
+  }
+
   private refreshView(): void {
     this.view = buildWorkbenchShellView({
       identity: this.identity,
@@ -279,6 +365,7 @@ export class WorkbenchShellController {
       fileTreeEntries: this.fileTreeEntries,
       expandedDirectories: this.expandedDirectories,
       textEditorDocument: this.textEditorDocument,
+      terminalSession: this.terminalSession,
     });
   }
 }

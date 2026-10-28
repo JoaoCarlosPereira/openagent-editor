@@ -3,6 +3,7 @@ import { ProtocolError } from "@openagent/protocol";
 import {
   WorkbenchShellController,
   type WorkbenchShellOpenResult,
+  type WorkbenchTerminalResult,
   type WorkbenchTextEditorResult,
 } from "../workbench/workbench-shell.js";
 import {
@@ -195,6 +196,39 @@ export class ElectronMainController {
       ]);
     }
     return this.workbench.saveTextDocument();
+  }
+
+  /**
+   * Abre o terminal integrado pelo processo main (LOC-01 / task_122).
+   * Spawn/CWD no main; o renderer só consome o snapshot.
+   */
+  openTerminal(): WorkbenchTerminalResult {
+    if (this.snapshot === null) {
+      throw new ProtocolError("INVALID_STATE", ELECTRON_MAIN_FOLDER_REQUIRED_MESSAGE, [
+        "launch() não foi chamado",
+      ]);
+    }
+    return this.workbench.openTerminal();
+  }
+
+  /** Executa comando no terminal aberto (main). */
+  runTerminalCommand(command: unknown): WorkbenchTerminalResult {
+    if (this.snapshot === null) {
+      throw new ProtocolError("INVALID_STATE", ELECTRON_MAIN_FOLDER_REQUIRED_MESSAGE, [
+        "launch() não foi chamado",
+      ]);
+    }
+    return this.workbench.runTerminalCommand(command);
+  }
+
+  /** Altera CWD relativo do terminal sob a pasta (main). */
+  setTerminalCwd(relativeDirectory: unknown): WorkbenchTerminalResult {
+    if (this.snapshot === null) {
+      throw new ProtocolError("INVALID_STATE", ELECTRON_MAIN_FOLDER_REQUIRED_MESSAGE, [
+        "launch() não foi chamado",
+      ]);
+    }
+    return this.workbench.setTerminalCwd(relativeDirectory);
   }
 
   /** Liga o processo main ao harness-daemon (ADR-003). */

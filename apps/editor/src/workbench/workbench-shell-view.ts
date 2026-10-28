@@ -13,6 +13,11 @@ import {
   buildTextEditorView,
   type TextEditorViewSnapshot,
 } from "./text-editor-view.js";
+import type { IntegratedTerminalSession } from "./terminal.js";
+import {
+  buildTerminalView,
+  type TerminalViewSnapshot,
+} from "./terminal-view.js";
 
 export type WorkbenchCapabilitySlot =
   | "editor"
@@ -41,6 +46,8 @@ export interface WorkbenchShellViewInput {
   expandedDirectories?: readonly string[];
   /** Documento aberto no editor de texto (task_121). */
   textEditorDocument?: TextEditorDocument | null;
+  /** Sessão do terminal integrado (task_122). */
+  terminalSession?: IntegratedTerminalSession | null;
 }
 
 export interface WorkbenchShellViewSnapshot {
@@ -55,9 +62,11 @@ export interface WorkbenchShellViewSnapshot {
     toolsAllowedInRenderer: false;
     fileTree: FileTreeViewSnapshot["accessible"];
     textEditor: TextEditorViewSnapshot["accessible"];
+    terminal: TerminalViewSnapshot["accessible"];
   };
   fileTree: FileTreeViewSnapshot;
   textEditor: TextEditorViewSnapshot;
+  terminal: TerminalViewSnapshot;
 }
 
 function escapeHtml(text: string): string {
@@ -71,9 +80,13 @@ function escapeHtml(text: string): string {
 function renderCapabilitySlot(
   slot: WorkbenchCapabilitySlot,
   textEditor: TextEditorViewSnapshot,
+  terminal: TerminalViewSnapshot,
 ): string {
   if (slot === "editor") {
     return textEditor.html;
+  }
+  if (slot === "terminal") {
+    return terminal.html;
   }
   return [
     `<section data-testid="workbench-slot-${slot}" data-capability="${slot}"`,
@@ -83,7 +96,7 @@ function renderCapabilitySlot(
   ].join("");
 }
 
-/** LOC-01: shell do workbench com identidade OpenAgent, slots, árvore e editor. */
+/** LOC-01: shell do workbench com identidade OpenAgent, slots, árvore, editor e terminal. */
 export function buildWorkbenchShellView(
   input: WorkbenchShellViewInput,
 ): WorkbenchShellViewSnapshot {
@@ -92,6 +105,7 @@ export function buildWorkbenchShellView(
   const fileTreeEntries = input.fileTreeEntries ?? [];
   const expandedDirectories = input.expandedDirectories ?? [];
   const textEditorDocument = input.textEditorDocument ?? null;
+  const terminalSession = input.terminalSession ?? null;
 
   const fileTree = buildFileTreeView({
     folderPath: input.folderPath,
@@ -99,6 +113,7 @@ export function buildWorkbenchShellView(
     expandedDirectories,
   });
   const textEditor = buildTextEditorView({ document: textEditorDocument });
+  const terminal = buildTerminalView({ session: terminalSession });
 
   const focusOrder = [
     "workbench-product-name",
@@ -108,14 +123,15 @@ export function buildWorkbenchShellView(
     "workbench-daemon-link",
     "workbench-renderer-tools",
     "workbench-slot-editor",
-    ...WORKBENCH_CAPABILITY_SLOTS.filter((slot) => slot !== "editor").map(
-      (slot) => `workbench-slot-${slot}`,
-    ),
+    "workbench-slot-terminal",
+    ...WORKBENCH_CAPABILITY_SLOTS.filter(
+      (slot) => slot !== "editor" && slot !== "terminal",
+    ).map((slot) => `workbench-slot-${slot}`),
   ] as const;
 
   const folderLabel = input.folderPath ?? "Nenhuma pasta aberta";
   const slotsHtml = WORKBENCH_CAPABILITY_SLOTS.map((slot) =>
-    renderCapabilitySlot(slot, textEditor),
+    renderCapabilitySlot(slot, textEditor, terminal),
   ).join("");
   const daemonLabel = daemonConnected
     ? "Main ligado ao harness-daemon"
@@ -157,8 +173,10 @@ export function buildWorkbenchShellView(
       toolsAllowedInRenderer,
       fileTree: fileTree.accessible,
       textEditor: textEditor.accessible,
+      terminal: terminal.accessible,
     },
     fileTree,
     textEditor,
+    terminal,
   };
 }
