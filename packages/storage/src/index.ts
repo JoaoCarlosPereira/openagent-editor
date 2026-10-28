@@ -97,6 +97,14 @@ export {
 } from "./secrets/index.js";
 
 export {
+  createStoredSession,
+  listStoredSessionsByWorkspace,
+  type CreateStoredSessionInput,
+  type StoredSession,
+  type StoredSessionWithResume,
+} from "./sessions/index.js";
+
+export {
   insertStoredAgentNode,
   insertStoredMessage,
   insertStoredQueueItem,
