@@ -116,7 +116,8 @@ test("timeout encerra a árvore de processos e confirma saída dos PIDs", async 
 
     const result = await runProcess(process.execPath, ["-e", script, pidFile], {
       cwd: directory,
-      timeoutMs: 300,
+      // Cold start do Node (-e) pode passar de 300ms sob carga; o kill ainda ocorre antes do setInterval terminar.
+      timeoutMs: 2000,
       terminationGraceMs: 100,
     });
     assert.equal(result.timedOut, true);
