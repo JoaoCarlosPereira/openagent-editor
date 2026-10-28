@@ -1,6 +1,5 @@
 import type { DatabaseSync } from "node:sqlite";
 import type { StorageMigration } from "../migration-runner.js";
-import { STORAGE_SCHEMA_VERSION } from "../schema-version.js";
 
 const INITIAL_SCHEMA_SQL = `
 CREATE TABLE IF NOT EXISTS storage_meta (
@@ -27,6 +26,6 @@ export const migration001InitialSchema: StorageMigration = {
         `INSERT INTO storage_meta(key, value) VALUES('schema_version', ?)
          ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
       )
-      .run(String(STORAGE_SCHEMA_VERSION));
+      .run("1");
   },
 };

@@ -8,9 +8,9 @@ import { PROTOCOL_ERROR_CODES, ProtocolError } from "@openagent/protocol";
 import {
   openWorkspaceDatabase,
   runStorageMigrations,
-  STORAGE_MIGRATIONS,
   type StorageMigration,
 } from "../../src/index.js";
+import { migration001InitialSchema } from "../../src/migrations/001-initial-schema.js";
 
 async function withTempDatabase(run: (database: DatabaseSync) => void | Promise<void>) {
   const directory = await mkdtemp(join(tmpdir(), "openagent-migrate-"));
@@ -53,19 +53,17 @@ test("[SES-01] runner aplica migrações e reinício preserva sessão com modo, 
 
 test("[SES-01] migração com falha faz rollback e retorna INVALID_STATE sem tabela parcial", async () => {
   await withTempDatabase((database) => {
-    const catalog: StorageMigration[] = [
-      ...STORAGE_MIGRATIONS,
-      {
-        version: 2,
-        description: "falha proposital",
-        up(db) {
-          db.exec("CREATE TABLE migration_probe (id INTEGER PRIMARY KEY)");
-          throw new Error("falha simulada");
-        },
+    const failingMigration: StorageMigration = {
+      version: 2,
+      description: "falha proposital",
+      up(db) {
+        db.exec("CREATE TABLE migration_probe (id INTEGER PRIMARY KEY)");
+        throw new Error("falha simulada");
       },
-    ];
+    };
+    const catalog: StorageMigration[] = [migration001InitialSchema, failingMigration];
 
-    runStorageMigrations(database, STORAGE_MIGRATIONS);
+    runStorageMigrations(database, [migration001InitialSchema]);
 
     assert.throws(
       () => runStorageMigrations(database, catalog),
