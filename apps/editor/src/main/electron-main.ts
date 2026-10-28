@@ -3,6 +3,7 @@ import { ProtocolError } from "@openagent/protocol";
 import {
   WorkbenchShellController,
   type WorkbenchShellOpenResult,
+  type WorkbenchTextEditorResult,
 } from "../workbench/workbench-shell.js";
 import {
   connectOpenAgentEditorMain,
@@ -161,6 +162,39 @@ export class ElectronMainController {
       folderPath,
       repoRoot: this.repoRoot,
     });
+  }
+
+  /**
+   * Abre arquivo de texto no editor pelo processo main (LOC-01 / task_121).
+   * I/O no main; o renderer só consome o snapshot.
+   */
+  openTextFile(relativePath: unknown): WorkbenchTextEditorResult {
+    if (this.snapshot === null) {
+      throw new ProtocolError("INVALID_STATE", ELECTRON_MAIN_FOLDER_REQUIRED_MESSAGE, [
+        "launch() não foi chamado",
+      ]);
+    }
+    return this.workbench.openTextFile(relativePath);
+  }
+
+  /** Edita o buffer do documento aberto (main; sem gravar disco). */
+  editTextDocument(content: unknown): WorkbenchTextEditorResult {
+    if (this.snapshot === null) {
+      throw new ProtocolError("INVALID_STATE", ELECTRON_MAIN_FOLDER_REQUIRED_MESSAGE, [
+        "launch() não foi chamado",
+      ]);
+    }
+    return this.workbench.editTextDocument(content);
+  }
+
+  /** Salva o documento aberto no disco sob a pasta (main). */
+  saveTextDocument(): WorkbenchTextEditorResult {
+    if (this.snapshot === null) {
+      throw new ProtocolError("INVALID_STATE", ELECTRON_MAIN_FOLDER_REQUIRED_MESSAGE, [
+        "launch() não foi chamado",
+      ]);
+    }
+    return this.workbench.saveTextDocument();
   }
 
   /** Liga o processo main ao harness-daemon (ADR-003). */
