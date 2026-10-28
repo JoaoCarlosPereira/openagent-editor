@@ -39,10 +39,18 @@ test("[PER-01] Grant once expira após consumo único", () => {
     scope: "once",
     context: baseContext,
   });
-  assert.equal(grant.expiresAtMs, baseContext.nowMs);
+  assert.equal(grant.expiresAtMs, null);
   assert.equal(isGrantExpired(grant, baseContext.nowMs), false);
+  assert.equal(isGrantExpired(grant, baseContext.nowMs + 1), false);
   assert.equal(
     grantMatchesRequest(grant, "file.write", { kind: "path", path: "src/a.ts" }, baseContext),
+    true,
+  );
+  assert.equal(
+    grantMatchesRequest(grant, "file.write", { kind: "path", path: "src/a.ts" }, {
+      ...baseContext,
+      nowMs: baseContext.nowMs + 1,
+    }),
     true,
   );
 
@@ -150,6 +158,21 @@ test("[PER-01] Caminho de erro: contexto inválido e deny no gate", () => {
     context: baseContext,
   });
   assert.throws(() => consumeOnceGrant({ ...onceGrant, scope: "session" }), ProtocolError);
+
+  assert.throws(
+    () =>
+      issuePermissionGrant({
+        grantId: "   ",
+        request,
+        scope: "once",
+        context: baseContext,
+      }),
+    (error: unknown) => {
+      assert.ok(error instanceof ProtocolError);
+      assert.equal(error.code, "INVALID_STATE");
+      return true;
+    },
+  );
 });
 
 test("[PER-01] Registry encontra grant ativo", () => {
