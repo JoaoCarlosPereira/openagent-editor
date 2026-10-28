@@ -76,3 +76,9 @@ export {
   type CliProxyStreamHarnessNormalization,
   type CliProxyStreamHarnessNormalizerInput,
 } from "./cliproxy-stream-harness-normalizer.js";
+export {
+  assertIncompleteStreamRunStateUnchanged,
+  resolveCliProxyIncompleteStreamRetry,
+  type IncompleteStreamRetryOutcome,
+  type IncompleteStreamRunState,
+} from "./cliproxy-incomplete-stream.js";

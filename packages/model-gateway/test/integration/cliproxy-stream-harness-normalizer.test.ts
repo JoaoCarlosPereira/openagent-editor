@@ -86,7 +86,7 @@ test("[API-02] falha do provedor expõe causa e preserva prompt/diff via Harness
   });
 });
 
-test("[ERR-03] queda durante streaming marca message.incomplete e retry idempotente", async () => {
+test("[ERR-03] consumeOpenAiSseResponse detecta queda sem [DONE] e emite message.incomplete", async () => {
   await withMockChatCompletionsServer((_req, res) => {
     res.writeHead(200, {
       "content-type": "text/event-stream",
@@ -106,16 +106,17 @@ test("[ERR-03] queda durante streaming marca message.incomplete e retry idempote
     const normalizer = createNormalizer();
     const collected: CliProxyStreamHarnessNormalization[] = [];
 
-    await consumeOpenAiSseResponse(response.body, normalizer, (item) => {
-      collected.push(item);
-    });
-
-    const { normalization, error } = normalizer.markStreamInterrupted();
-    collected.push(normalization);
-
-    assert.equal(error.code, PROTOCOL_ERROR_CODES.INCOMPLETE_STREAM);
-    assert.equal(error.hints?.idempotentRetry, true);
-    assert.equal(error.hints?.skipRepeatedMutations, true);
+    await assert.rejects(
+      () =>
+        consumeOpenAiSseResponse(response.body, normalizer, (item) => {
+          collected.push(item);
+        }),
+      (error: unknown) => {
+        assert.ok(error instanceof ProtocolError);
+        assert.equal(error.code, PROTOCOL_ERROR_CODES.INCOMPLETE_STREAM);
+        return true;
+      },
+    );
 
     const incomplete = collected.at(-1);
     assert.equal(incomplete?.type, CLI_PROXY_STREAM_HARNESS_EVENT_TYPES.MESSAGE_INCOMPLETE);

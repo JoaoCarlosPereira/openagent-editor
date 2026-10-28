@@ -110,6 +110,14 @@ export class CliProxyStreamHarnessNormalizer {
     return this.accumulatedText;
   }
 
+  get isStreamClosed(): boolean {
+    return this.closed;
+  }
+
+  get hasStreamStarted(): boolean {
+    return this.streamOpened;
+  }
+
   private emit(type: string, payload: Record<string, unknown>): CliProxyStreamHarnessNormalization {
     const item: CliProxyStreamHarnessNormalization = {
       sequence: this.sequence,
@@ -285,6 +293,12 @@ export async function consumeOpenAiSseResponse(
     throw error;
   } finally {
     reader.releaseLock();
+  }
+
+  if (normalizer.hasStreamStarted && !normalizer.isStreamClosed) {
+    const { normalization, error } = normalizer.markStreamInterrupted();
+    onNormalization(normalization);
+    throw error;
   }
 }
 
