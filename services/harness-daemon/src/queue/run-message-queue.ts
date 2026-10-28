@@ -97,4 +97,17 @@ export class RunMessageQueue {
       .filter((item) => item.state === "pending")
       .map((item) => ({ ...item, input: { ...item.input } }));
   }
+
+  /** Restaura item pending já persistido (nova conexão ou reinício do daemon). */
+  restorePersistedPending(item: RunQueueItem): void {
+    if (item.state !== "pending") {
+      return;
+    }
+    const exists = this.items.some((entry) => entry.queueItemId === item.queueItemId);
+    if (exists) {
+      return;
+    }
+    this.items.push({ ...item, input: { ...item.input } });
+    this.nextOrdinal = Math.max(this.nextOrdinal, item.ordinal + 1);
+  }
 }

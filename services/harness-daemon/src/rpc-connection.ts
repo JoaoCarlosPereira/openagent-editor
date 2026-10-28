@@ -24,7 +24,11 @@ const SESSION_RPC_METHODS = new Set<string>([
   RPC_METHOD.SESSION_FORK,
 ]);
 
-const RUN_RPC_METHODS = new Set<string>([RPC_METHOD.RUN_START]);
+const RUN_RPC_METHODS = new Set<string>([
+  RPC_METHOD.RUN_START,
+  RPC_METHOD.RUN_QUEUE_ADD,
+  RPC_METHOD.RUN_QUEUE_REMOVE,
+]);
 
 function writeProtocolError(socket: net.Socket, code: ProtocolErrorCode, message: string): void {
   writeProtocolFrame(

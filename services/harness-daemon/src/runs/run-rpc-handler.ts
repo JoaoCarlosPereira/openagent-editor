@@ -10,6 +10,12 @@ import {
   type RpcResultMap,
 } from "@openagent/protocol";
 import { openWorkspaceDatabase, type WorkspaceDatabase } from "@openagent/storage";
+import { RunMessageQueue } from "../queue/run-message-queue.js";
+import {
+  consumePendingRunQueueAtRunEnd,
+  enqueueRunMessage,
+  removePendingRunMessage,
+} from "../queue/run-queue-coordinator.js";
 import { RunStateMachine } from "../state/run-state-machine.js";
 import type { RunLifecycleState } from "../state/run-state.js";
 import type { SessionRpcContext } from "../sessions/session-rpc-handler.js";
@@ -17,7 +23,11 @@ import type { SessionRpcContext } from "../sessions/session-rpc-handler.js";
 export type DaemonRpcContext = SessionRpcContext & {
   /** Máquinas de estado por runId na conexão (STA-01). */
   runMachines: Map<string, RunStateMachine>;
+  /** Filas em memória por runId (AGT-06), sincronizadas com SQLite. */
+  runQueues: Map<string, RunMessageQueue>;
 };
+
+export { consumePendingRunQueueAtRunEnd };
 
 const RUN_STARTED_EVENT_TYPE = "run.started";
 
@@ -86,6 +96,37 @@ function persistRunStart(
   });
 }
 
+function persistRunCompleted(db: WorkspaceDatabase, runId: string, endedAtIso: string): void {
+  withSqlite(db, (sqlite) => {
+    sqlite
+      .prepare(`UPDATE run SET state = ?, ended_at = ? WHERE id = ?`)
+      .run("completed", endedAtIso, runId);
+  });
+}
+
+/**
+ * Encerra uma execução em andamento: consome itens pending da fila e persiste estado completed.
+ * Usado pelo loop do agente ao fim de uma iteração (AGT-06).
+ */
+export function completeRunningRunLifecycle(
+  context: DaemonRpcContext,
+  runId: string,
+): ReturnType<typeof consumePendingRunQueueAtRunEnd> {
+  const db = openWorkspaceDatabase({
+    dataRoot: context.dataRoot,
+    workspaceId: context.binding.workspaceId,
+  });
+  try {
+    const machine = machineForRun(context, db, runId);
+    const consumed = consumePendingRunQueueAtRunEnd(context, runId);
+    machine.complete();
+    persistRunCompleted(db, runId, new Date().toISOString());
+    return consumed;
+  } finally {
+    db.close();
+  }
+}
+
 function machineForRun(context: DaemonRpcContext, db: WorkspaceDatabase, runId: string): RunStateMachine {
   let machine = context.runMachines.get(runId);
   if (machine) {
@@ -101,13 +142,7 @@ export function handleRunStart(
   context: DaemonRpcContext,
   request: RpcRequestEnvelope<typeof RPC_METHOD.RUN_START>,
 ): RpcResultMap[typeof RPC_METHOD.RUN_START] {
-  if (request.workspaceId !== context.binding.workspaceId) {
-    throw new ProtocolError(
-      PROTOCOL_ERROR_CODES.INVALID_STATE,
-      "workspaceId da requisição não corresponde ao workspace da conexão.",
-      [request.workspaceId, context.binding.workspaceId],
-    );
-  }
+  assertRunWorkspace(context, request);
 
   const params = (request.payload ?? {}) as RpcParamsMap[typeof RPC_METHOD.RUN_START];
   const inputResult = validateUserInput(params.input);
@@ -166,6 +201,34 @@ export function handleRunStart(
   }
 }
 
+function assertRunWorkspace(context: DaemonRpcContext, request: RpcRequestEnvelope): void {
+  if (request.workspaceId !== context.binding.workspaceId) {
+    throw new ProtocolError(
+      PROTOCOL_ERROR_CODES.INVALID_STATE,
+      "workspaceId da requisição não corresponde ao workspace da conexão.",
+      [request.workspaceId, context.binding.workspaceId],
+    );
+  }
+}
+
+function handleRunQueueAdd(
+  context: DaemonRpcContext,
+  request: RpcRequestEnvelope<typeof RPC_METHOD.RUN_QUEUE_ADD>,
+): RpcResultMap[typeof RPC_METHOD.RUN_QUEUE_ADD] {
+  assertRunWorkspace(context, request);
+  const params = (request.payload ?? {}) as RpcParamsMap[typeof RPC_METHOD.RUN_QUEUE_ADD];
+  return enqueueRunMessage(context, request.runId, params.input);
+}
+
+function handleRunQueueRemove(
+  context: DaemonRpcContext,
+  request: RpcRequestEnvelope<typeof RPC_METHOD.RUN_QUEUE_REMOVE>,
+): RpcResultMap[typeof RPC_METHOD.RUN_QUEUE_REMOVE] {
+  assertRunWorkspace(context, request);
+  const params = (request.payload ?? {}) as RpcParamsMap[typeof RPC_METHOD.RUN_QUEUE_REMOVE];
+  return removePendingRunMessage(context, request.runId, params.queueItemId);
+}
+
 export function handleRunRpc(
   context: DaemonRpcContext,
   request: RpcRequestEnvelope,
@@ -173,6 +236,16 @@ export function handleRunRpc(
   switch (request.method) {
     case RPC_METHOD.RUN_START:
       return handleRunStart(context, request as RpcRequestEnvelope<typeof RPC_METHOD.RUN_START>);
+    case RPC_METHOD.RUN_QUEUE_ADD:
+      return handleRunQueueAdd(
+        context,
+        request as RpcRequestEnvelope<typeof RPC_METHOD.RUN_QUEUE_ADD>,
+      );
+    case RPC_METHOD.RUN_QUEUE_REMOVE:
+      return handleRunQueueRemove(
+        context,
+        request as RpcRequestEnvelope<typeof RPC_METHOD.RUN_QUEUE_REMOVE>,
+      );
     default:
       throw new ProtocolError(
         PROTOCOL_ERROR_CODES.INVALID_STATE,
