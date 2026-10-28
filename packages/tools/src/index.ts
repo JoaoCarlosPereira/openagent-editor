@@ -1,8 +1,24 @@
 export {
   describeSandboxCapability,
+  type DescribeSandboxCapabilityOptions,
   type SandboxCapabilitySnapshot,
   type SandboxIsolationLevel,
 } from "./sandbox/sandbox-capability.js";
+
+export {
+  probeLinuxSandbox,
+  probeUnshareUserNamespaceAvailability,
+  type LinuxSandboxProbe,
+  type LinuxSandboxProbeResult,
+  type LinuxNativeSandboxPrimitive,
+} from "./sandbox/linux-sandbox-probe.js";
+
+export {
+  prepareSandboxToolDispatch,
+  sandboxDegradationNoticeForPermission,
+  type SandboxToolDispatchInput,
+  type SandboxToolDispatchPrepareResult,
+} from "./sandbox/tool-sandbox-dispatch.js";
 
 export {
   createTypedToolDispatchRegistry,
