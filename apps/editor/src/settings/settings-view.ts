@@ -75,8 +75,8 @@ export function buildSettingsView(input: SettingsViewInput): SettingsViewSnapsho
       ? `<div data-testid="index-size-preview"><p>Arquivos: ${size.indexedFileCount}</p><p>Trechos: ${size.chunkCount}</p><p>Tamanho textual: ${size.lexicalBytes} bytes</p></div>`
       : `<p data-testid="index-size-unavailable">Consulte o tamanho antes de limpar.</p>`,
     `<button type="button" data-testid="describe-index-size">Consultar escopo e tamanho</button>`,
-    `<button type="button" data-testid="clear-index"${size ? "" : " disabled"}>Limpar índice do workspace</button>`,
-    `<label><input type="checkbox" data-testid="confirm-clear-index" /> Confirmo apagar os dados locais do índice deste workspace</label>`,
+    `<button type="button" data-testid="clear-index"${size && input.isClearingIndex !== true ? "" : " disabled"}>Limpar índice do workspace</button>`,
+    `<label><input type="checkbox" data-testid="confirm-clear-index"${size && input.isClearingIndex !== true ? "" : " disabled"} /> Confirmo apagar os dados locais do índice deste workspace</label>`,
     `<p data-testid="index-clear-result" role="status">${input.isClearingIndex ? "Limpando índice…" : size && size.indexedFileCount === 0 && size.chunkCount === 0 ? "Índice do workspace vazio." : "A limpeza exige confirmação explícita."}</p>`,
     `</section>`,
   ].join("");
@@ -112,7 +112,7 @@ export function buildSettingsView(input: SettingsViewInput): SettingsViewSnapsho
       contextLimitTokens: contextLimit,
       errorMessage: input.errorMessage,
       exclusionRules: rules,
-      indexSizeSnapshot: size,
+      indexSizeSnapshot: size ?? null,
       isClearingIndex: input.isClearingIndex ?? false,
     },
   };

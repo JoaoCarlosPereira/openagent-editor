@@ -2,6 +2,7 @@ import type { ProviderCapabilities } from "@openagent/storage";
 import { PROTOCOL_ERROR_CODES, ProtocolError } from "@openagent/protocol";
 import {
   DEFAULT_CONTEXT_TOKEN_LIMIT,
+  parseWorkspaceExclusionPatterns,
   validateContextTokenLimitInput,
 } from "@openagent/context";
 
@@ -87,6 +88,8 @@ export class SettingsController {
   private value: SettingsState;
   private readonly listeners = new Set<SettingsListener>();
   private configuredExclusionPatterns: string[] = [];
+  private readonly projectExclusionPatterns: string[] = [];
+  private operationInProgress = false;
 
   constructor(private readonly port?: SettingsProviderPort, initial?: {
     providerEndpoint?: string | null;
@@ -229,14 +232,16 @@ export class SettingsController {
     const configured = this.port?.getExclusionPatterns
       ? await this.port.getExclusionPatterns()
       : this.configuredExclusionPatterns;
-    if (!Array.isArray(configured) || configured.some((pattern) => typeof pattern !== "string" || !pattern.trim())) {
+    const parsed = parseWorkspaceExclusionPatterns(configured);
+    if (!parsed.valid || !Array.isArray(projectIgnorePatterns) || projectIgnorePatterns.some((pattern) => typeof pattern !== "string" || !pattern.trim())) {
       throw invalidState("Regras de exclusão inválidas.", ["exclusions"]);
     }
-    this.configuredExclusionPatterns = [...configured].map((pattern) => pattern.trim());
+    this.configuredExclusionPatterns = [...parsed.patterns];
+    this.projectExclusionPatterns.splice(0, this.projectExclusionPatterns.length, ...projectIgnorePatterns.map((pattern) => pattern.trim()));
     this.value = {
       ...this.value,
       exclusionRules: [
-        ...projectIgnorePatterns.map((pattern) => ({ pattern, source: "project-ignore" as const, removable: false })),
+        ...this.projectExclusionPatterns.map((pattern) => ({ pattern, source: "project-ignore" as const, removable: false })),
         ...this.configuredExclusionPatterns.map((pattern) => ({ pattern, source: "workspace-config" as const, removable: true })),
       ],
     };
@@ -253,29 +258,29 @@ export class SettingsController {
     if (new Set(patterns).size !== patterns.length) {
       throw invalidState("Regras de exclusão duplicadas.", ["exclusions"]);
     }
-    if (this.value.isClearingIndex || this.value.isTestingConnection || this.value.isSavingCredential) {
+    if (this.operationInProgress || this.value.isClearingIndex || this.value.isTestingConnection || this.value.isSavingCredential) {
       throw invalidState("Já existe uma operação de configuração em andamento.", ["state"]);
     }
     if (!this.port?.setExclusionPatterns) {
       throw invalidState("A persistência das regras de exclusão não está disponível.", ["port"]);
     }
-    const previous = this.configuredExclusionPatterns;
+    this.operationInProgress = true;
     try {
       await this.port.setExclusionPatterns(patterns);
     } catch {
       throw invalidState("Não foi possível persistir as regras de exclusão.", ["persistence"]);
+    } finally {
+      this.operationInProgress = false;
     }
     this.configuredExclusionPatterns = [...patterns];
-    const projectRules = this.value.exclusionRules.filter((rule) => rule.source === "project-ignore");
     this.value = {
       ...this.value,
       exclusionRules: [
-        ...projectRules,
+        ...this.projectExclusionPatterns.map((pattern) => ({ pattern, source: "project-ignore" as const, removable: false })),
         ...patterns.map((pattern) => ({ pattern, source: "workspace-config" as const, removable: true })),
       ],
       errorMessage: null,
     };
-    void previous;
     this.notify();
     return this.snapshot;
   }
@@ -297,7 +302,7 @@ export class SettingsController {
   /** Executa limpeza somente após confirmação explícita e mantendo o resultado observável. */
   async clearIndex(confirmed: boolean, expectedSize?: IndexSizeSnapshot): Promise<Readonly<SettingsState>> {
     if (confirmed !== true) throw invalidState("A limpeza exige confirmação explícita.", ["confirmed"]);
-    if (this.value.isClearingIndex || this.value.isTestingConnection || this.value.isSavingCredential) {
+    if (this.operationInProgress || this.value.isClearingIndex || this.value.isTestingConnection || this.value.isSavingCredential) {
       throw invalidState("Já existe uma operação de configuração em andamento.", ["state"]);
     }
     if (!this.port?.confirmAndClearIndex) throw invalidState("A limpeza do índice não está disponível.", ["port"]);
@@ -306,6 +311,7 @@ export class SettingsController {
     if (JSON.stringify(baseline) !== JSON.stringify(this.value.indexSizeSnapshot)) {
       throw invalidState("O tamanho do índice mudou; atualize a prévia antes de confirmar.", ["indexSize"]);
     }
+    this.operationInProgress = true;
     this.value = { ...this.value, isClearingIndex: true, errorMessage: null };
     this.notify();
     try {
@@ -321,6 +327,8 @@ export class SettingsController {
       this.notify();
       if (error instanceof ProtocolError) throw error;
       throw invalidState("Não foi possível limpar o índice do workspace.", ["clear"]);
+    } finally {
+      this.operationInProgress = false;
     }
   }
 

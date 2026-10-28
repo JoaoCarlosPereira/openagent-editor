@@ -122,6 +122,8 @@ export {
   type SettingsProviderPort,
   type SettingsProviderResult,
   type SettingsState,
+  type IndexSizeSnapshot,
+  type ExclusionRuleDisplay,
   type SettingsViewInput,
   type SettingsViewSnapshot,
 } from "./settings/index.js";
