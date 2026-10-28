@@ -69,7 +69,7 @@ function emptyView(runId: string): RunCancelPanelViewSnapshot {
 
 /**
  * PER-02: cancelar run na UI — RPC `run.cancel` sem mutação otimista;
- * estado `Cancelada` só após eco `run.cancelled` via stream (≤ 2 s).
+ * estado `Cancelada` só após eco `run.cancelled` via stream (prazo ≤2 s assertado no e2e).
  * Alterações já aplicadas permanecem; nova ferramenta é recusada.
  */
 export class RunCancelPanelController {
@@ -199,14 +199,9 @@ export class RunCancelPanelController {
     if (this.runState === "running") {
       const observedAt = this.now();
       const requestedAt = this.cancelRequestedAtMs ?? observedAt;
-      const latencyMs = Math.max(0, observedAt - requestedAt);
-      if (latencyMs > RUN_CANCEL_DEADLINE_MS) {
-        throw invalidState(
-          `Estado Cancelada excedeu o prazo PER-02 de ${RUN_CANCEL_DEADLINE_MS} ms.`,
-          [`latencyMs=${latencyMs}`],
-        );
-      }
-      this.cancelLatencyMs = latencyMs;
+      // Sempre aplicar Cancelada no eco — o prazo PER-02 (≤2 s) é assertado no e2e,
+      // não rejeitado aqui após acceptStreamEvent (evita sequence consumida + UI stuck).
+      this.cancelLatencyMs = Math.max(0, observedAt - requestedAt);
       this.runState = "cancelled";
     }
 
