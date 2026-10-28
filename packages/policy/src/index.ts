@@ -65,6 +65,16 @@ export {
   validateStandardLogToolActionInput,
   type StandardLogToolActionInput,
 } from "./redaction.js";
+export {
+  createLocalStructuredLogger,
+  STRUCTURED_LOG_LEVELS,
+  validateStructuredLogWriteInput,
+  type LocalStructuredLogContext,
+  type LocalStructuredLogger,
+  type StructuredLogLevel,
+  type StructuredLogSink,
+  type StructuredLogWriteInput,
+} from "./logger.js";
 export type {
   GrantScopeKind,
   PermissionDecision,
