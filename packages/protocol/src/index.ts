@@ -150,3 +150,17 @@ export {
   type ProtocolVersionHello,
   type ProtocolVersionValidationResult,
 } from "./protocol-version.js";
+
+export {
+  buildHarnessRpcOkFrame,
+  connectHarnessClient,
+  type ConnectHarnessClientOptions,
+  type CreateSession,
+  type GrantDecision,
+  type HarnessClient,
+  type HarnessWorkspaceBinding,
+  type QueueItem,
+  type RestoreResult,
+  type Session,
+  type StartRun,
+} from "./harness-client.js";
