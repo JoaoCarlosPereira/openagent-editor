@@ -1,6 +1,7 @@
 export {
   ElectronMainController,
   ELECTRON_MAIN_INVALID_PLATFORM_MESSAGE,
+  ELECTRON_MAIN_DAEMON_REQUIRED_MESSAGE,
   type ElectronBrowserWindowOptions,
   type ElectronMainLaunchInput,
   type ElectronMainLaunchSnapshot,
@@ -11,4 +12,9 @@ export {
   OPENAGENT_ICON_RELATIVE_PATH,
   resolveOpenAgentIconPath,
   createOpenAgentProductIdentity,
+  connectOpenAgentEditorMain,
+  OPENAGENT_EDITOR_MAIN_CLIENT_ID,
+  EDITOR_MAIN_HELLO_INVALID_MESSAGE,
+  type OpenAgentEditorMainConnectInput,
+  type OpenAgentEditorMainConnection,
 } from "./electron-main.js";

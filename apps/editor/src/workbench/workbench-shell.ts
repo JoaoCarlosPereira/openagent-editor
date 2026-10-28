@@ -8,6 +8,10 @@ import {
   type ElectronProductIdentity,
 } from "../main/product-identity.js";
 import {
+  createRendererToolBridge,
+  type RendererToolBridge,
+} from "./renderer-tool-boundary.js";
+import {
   buildWorkbenchShellView,
   type WorkbenchShellViewSnapshot,
 } from "./workbench-shell-view.js";
@@ -17,6 +21,14 @@ export {
   buildWorkbenchShellView,
   WORKBENCH_CAPABILITY_SLOTS,
 } from "./workbench-shell-view.js";
+export {
+  assertRendererMayNotInvokeTool,
+  createRendererToolBridge,
+  RENDERER_TOOLS_FORBIDDEN_MESSAGE,
+  type EditorProcessRole,
+  type RendererToolBridge,
+  type RendererToolInvokeAttempt,
+} from "./renderer-tool-boundary.js";
 
 export const WORKBENCH_FOLDER_REQUIRED_MESSAGE =
   "Caminho de pasta obrigatório para abrir o workbench OpenAgent.";
@@ -51,21 +63,30 @@ function assertFolderPath(folderPath: unknown): string {
 }
 
 /**
- * LOC-01 (118): workbench Electron — abrir pasta e expor slots (edição, terminal, Git, debug, extensão)
- * com nome e ícone OpenAgent. Capacidades concretas entram nas tasks 120+.
+ * LOC-01: workbench Electron — slots + ligação main↔daemon; renderer sem ferramentas (task_119).
+ * Capacidades concretas (árvore, editor, …) entram nas tasks 120+.
  */
 export class WorkbenchShellController {
   private identity: ElectronProductIdentity = createOpenAgentProductIdentity();
   private folderPath: string | null = null;
   private platform = "linux";
+  private daemonConnected = false;
+  private readonly rendererBridge: RendererToolBridge = createRendererToolBridge();
   private view: WorkbenchShellViewSnapshot = buildWorkbenchShellView({
     identity: this.identity,
     folderPath: null,
     platform: this.platform,
+    daemonConnected: false,
+    toolsAllowedInRenderer: false,
   });
 
   get snapshot(): WorkbenchShellViewSnapshot {
     return this.view;
+  }
+
+  /** Ponte do renderer: nunca permite tool.invoke (LOC-01 / ADR-003). */
+  get rendererTools(): RendererToolBridge {
+    return this.rendererBridge;
   }
 
   /** Inicializa o shell com identidade OpenAgent antes de abrir pasta. */
@@ -73,6 +94,14 @@ export class WorkbenchShellController {
     this.platform = input.platform;
     this.identity = createOpenAgentProductIdentity(input.repoRoot);
     this.folderPath = null;
+    this.daemonConnected = false;
+    this.refreshView();
+    return this.view;
+  }
+
+  /** Reflete no shell que o processo main está ligado ao harness-daemon. */
+  setDaemonConnected(connected: boolean): WorkbenchShellViewSnapshot {
+    this.daemonConnected = connected;
     this.refreshView();
     return this.view;
   }
@@ -95,6 +124,8 @@ export class WorkbenchShellController {
       identity: this.identity,
       folderPath: this.folderPath,
       platform: this.platform,
+      daemonConnected: this.daemonConnected,
+      toolsAllowedInRenderer: false,
     });
   }
 }

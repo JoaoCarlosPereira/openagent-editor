@@ -12,6 +12,7 @@
     "./workbench": "./src/workbench/index.ts"
   },
   "dependencies": {
+    "@openagent/harness-daemon": "0.1.0",
     "@openagent/policy": "0.1.0",
     "@openagent/protocol": "0.1.0"
   }

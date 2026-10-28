@@ -36,6 +36,8 @@ describe("LOC-01 e2e — apps/editor Electron com nome e ícone OpenAgent", () =
       assert.match(launched.browserWindow.icon, /media[/\\]icon\.svg$/);
       assert.equal(launched.browserWindow.webPreferences.nodeIntegration, false);
       assert.equal(launched.browserWindow.webPreferences.contextIsolation, true);
+      assert.equal(launched.daemon.connected, false);
+      assert.equal(launched.daemon.toolsAllowedInRenderer, false);
       assert.equal(launched.platform, platform);
     }
   });
@@ -75,6 +77,9 @@ describe("LOC-01 e2e — apps/editor Electron com nome e ícone OpenAgent", () =
     ]);
     assert.equal(opened.view.accessible.productName, launched.identity.productName);
     assert.equal(shell.snapshot.accessible.focusOrder[0], "workbench-product-name");
+    assert.equal(opened.view.accessible.toolsAllowedInRenderer, false);
+    assert.match(opened.view.html, /data-tools-allowed-in-renderer="false"/);
+    assert.match(opened.view.html, /data-testid="workbench-renderer-tools"/);
   });
 
   it("caminho de erro: plataforma inválida retorna INVALID_STATE sem efeito colateral", () => {

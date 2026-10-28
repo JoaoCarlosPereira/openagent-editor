@@ -23,6 +23,9 @@ export interface WorkbenchShellViewInput {
   identity: ElectronProductIdentity;
   folderPath: string | null;
   platform: string;
+  /** Main ligado ao daemon (task_119); renderer permanece sem ferramentas. */
+  daemonConnected?: boolean;
+  toolsAllowedInRenderer?: false;
 }
 
 export interface WorkbenchShellViewSnapshot {
@@ -33,6 +36,8 @@ export interface WorkbenchShellViewSnapshot {
     folderPath: string | null;
     capabilitySlots: readonly WorkbenchCapabilitySlot[];
     focusOrder: readonly string[];
+    daemonConnected: boolean;
+    toolsAllowedInRenderer: false;
   };
 }
 
@@ -57,19 +62,29 @@ function renderCapabilitySlot(slot: WorkbenchCapabilitySlot): string {
 export function buildWorkbenchShellView(
   input: WorkbenchShellViewInput,
 ): WorkbenchShellViewSnapshot {
+  const daemonConnected = input.daemonConnected === true;
+  const toolsAllowedInRenderer = false as const;
+
   const focusOrder = [
     "workbench-product-name",
     "workbench-product-icon",
     "workbench-folder",
+    "workbench-daemon-link",
+    "workbench-renderer-tools",
     ...WORKBENCH_CAPABILITY_SLOTS.map((slot) => `workbench-slot-${slot}`),
   ] as const;
 
   const folderLabel = input.folderPath ?? "Nenhuma pasta aberta";
   const slotsHtml = WORKBENCH_CAPABILITY_SLOTS.map(renderCapabilitySlot).join("");
+  const daemonLabel = daemonConnected
+    ? "Main ligado ao harness-daemon"
+    : "Main sem ligação ao daemon";
 
   const html = [
     `<main role="application" aria-label="${escapeHtml(input.identity.displayName)}"`,
-    ` data-testid="workbench-shell" data-platform="${escapeHtml(input.platform)}">`,
+    ` data-testid="workbench-shell" data-platform="${escapeHtml(input.platform)}"`,
+    ` data-daemon-connected="${daemonConnected ? "true" : "false"}"`,
+    ` data-tools-allowed-in-renderer="false">`,
     `<header data-testid="workbench-branding">`,
     `<img data-testid="workbench-product-icon" src="${escapeHtml(input.identity.iconRelativePath)}"`,
     ` alt="${escapeHtml(OPENAGENT_PRODUCT_NAME)}" tabindex="0" />`,
@@ -78,6 +93,11 @@ export function buildWorkbenchShellView(
     `</header>`,
     `<p data-testid="workbench-folder" aria-live="polite" tabindex="0">`,
     `${escapeHtml(folderLabel)}</p>`,
+    `<p data-testid="workbench-daemon-link" aria-live="polite" tabindex="0"`,
+    ` data-connected="${daemonConnected ? "true" : "false"}">`,
+    `${escapeHtml(daemonLabel)}</p>`,
+    `<p data-testid="workbench-renderer-tools" aria-live="polite" tabindex="0"`,
+    ` data-tools-allowed="false">Renderer sem ferramentas</p>`,
     `<div data-testid="workbench-capabilities">${slotsHtml}</div>`,
     `</main>`,
   ].join("");
@@ -90,6 +110,8 @@ export function buildWorkbenchShellView(
       folderPath: input.folderPath,
       capabilitySlots: WORKBENCH_CAPABILITY_SLOTS,
       focusOrder,
+      daemonConnected,
+      toolsAllowedInRenderer,
     },
   };
 }
