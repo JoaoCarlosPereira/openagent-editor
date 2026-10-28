@@ -64,3 +64,36 @@ export type ValidationResult =
       data?: undefined;
       errors: ValidationErrorDetail[];
     };
+
+export type ProvenanceViolationCode =
+  | "INVALID_SCHEMA"
+  | "MISSING_AUTHORIZATION"
+  | "AUTHORIZATION_DOCUMENT_NOT_FOUND"
+  | "AUTHORIZATION_HASH_MISMATCH"
+  | "CURSOR_BRAND_ASSETS_FORBIDDEN"
+  | "FILE_READ_ERROR";
+
+export interface ProvenanceViolation {
+  file: string;
+  code: ProvenanceViolationCode;
+  message: string;
+  details?: unknown;
+}
+
+export interface ProvenanceGateOptions {
+  rootDir?: string;
+  patterns?: string[];
+  ignore?: string[];
+  verifyDocumentHash?: boolean;
+  silent?: boolean;
+}
+
+export interface ProvenanceGateReport {
+  ok: boolean;
+  rootDir: string;
+  filesScanned: number;
+  filesPassed: number;
+  violations: ProvenanceViolation[];
+  summary: string;
+}
+
