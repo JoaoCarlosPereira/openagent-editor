@@ -186,6 +186,7 @@ export type {
 
 export {
   discoverMcpStdioTools,
+  type DiscoverMcpStdioToolsOptions,
   type DiscoveredMcpStdioTool,
   type McpStdioToolDiscoveryResult,
 } from "./mcp/discover-mcp-stdio-tools.js";
@@ -197,6 +198,7 @@ export {
 
 export {
   discoverMcpHttpTools,
+  type DiscoverMcpHttpToolsOptions,
   type DiscoveredMcpHttpTool,
   type McpHttpToolDiscoveryResult,
 } from "./mcp/discover-mcp-http-tools.js";
@@ -205,3 +207,12 @@ export {
   parseMcpHttpServerEndpoint,
   type McpHttpServerEndpoint,
 } from "./mcp/mcp-http-config.js";
+
+export {
+  assertMcpAuthSecretRef,
+  mcpAuthMaterialToHttpHeaders,
+  resolveMcpHttpHeaders,
+  resolveMcpStdioEnv,
+  type McpAuthMaterial,
+  type McpAuthSecretResolver,
+} from "./mcp/mcp-auth-material.js";

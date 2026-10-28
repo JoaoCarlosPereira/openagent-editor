@@ -5,6 +5,10 @@ import {
   parseMcpStdioServerLaunch,
   type McpStdioServerLaunch,
 } from "./mcp-stdio-config.js";
+import {
+  resolveMcpStdioEnv,
+  type McpAuthSecretResolver,
+} from "./mcp-auth-material.js";
 
 export interface DiscoveredMcpStdioTool {
   name: string;
@@ -22,18 +26,24 @@ function normalizeLaunch(input: McpStdioServerLaunch | unknown): McpStdioServerL
   return parseMcpStdioServerLaunch(input);
 }
 
+export type DiscoverMcpStdioToolsOptions = {
+  resolveAuth?: McpAuthSecretResolver;
+};
+
 /**
  * Conecta a um servidor MCP stdio, executa discovery (`tools/list`) e encerra o processo.
  */
 export async function discoverMcpStdioTools(
   input: McpStdioServerLaunch | unknown,
+  options?: DiscoverMcpStdioToolsOptions,
 ): Promise<McpStdioToolDiscoveryResult> {
   const launch = normalizeLaunch(input);
+  const env = await resolveMcpStdioEnv(launch, options);
 
   const transport = new StdioClientTransport({
     command: launch.command,
     args: launch.args,
-    env: launch.env,
+    env,
     cwd: launch.cwd,
     stderr: "ignore",
   });

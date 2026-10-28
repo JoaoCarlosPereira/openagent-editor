@@ -13,5 +13,8 @@
     "@modelcontextprotocol/sdk": "1.12.1",
     "@openagent/policy": "0.1.0",
     "@openagent/protocol": "0.1.0"
+  },
+  "devDependencies": {
+    "@openagent/storage": "0.1.0"
   }
 }

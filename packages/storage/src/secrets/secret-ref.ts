@@ -50,3 +50,7 @@ export function parseSecretRef(secretRef: string): ParsedSecretRef | null {
 export function providerAccount(profileId: string): string {
   return `provider/${profileId}`;
 }
+
+export function mcpAuthAccount(serverId: string): string {
+  return `mcp/${serverId}`;
+}

@@ -4,6 +4,8 @@ export interface McpHttpServerEndpoint {
   serverId: string;
   url: string;
   headers?: Record<string, string>;
+  /** Token/OAuth no cofre do SO (sysvault:…); nunca persistir segredo em claro na config. */
+  authSecretRef?: string;
 }
 
 function isNonEmptyString(value: unknown): value is string {
@@ -51,10 +53,23 @@ export function parseMcpHttpServerEndpoint(input: unknown): McpHttpServerEndpoin
   if (raw.headers !== undefined && !isStringRecord(raw.headers)) {
     throw invalidToolInputError("Cabeçalhos do servidor MCP HTTP inválidos.");
   }
+  if (raw.authSecretRef !== undefined && !isNonEmptyString(raw.authSecretRef)) {
+    throw invalidToolInputError("Referência de autenticação MCP HTTP inválida.");
+  }
+  if (
+    raw.authSecretRef !== undefined &&
+    raw.headers !== undefined &&
+    Object.keys(raw.headers).some((key) => key.toLowerCase() === "authorization")
+  ) {
+    throw invalidToolInputError(
+      "Use authSecretRef no cofre do SO em vez de Authorization em headers.",
+    );
+  }
 
   return {
     serverId: raw.serverId.trim(),
     url: parseHttpUrl(raw.url),
     ...(raw.headers !== undefined ? { headers: raw.headers } : {}),
+    ...(raw.authSecretRef !== undefined ? { authSecretRef: raw.authSecretRef.trim() } : {}),
   };
 }

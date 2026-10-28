@@ -55,12 +55,26 @@ async function readJsonBody(req) {
 /**
  * Sobe um servidor MCP HTTP stateless (Streamable HTTP) em loopback para testes de integração.
  */
-export async function withMcpHttpDiscoveryServer(run) {
+function unauthorized(res) {
+  res.writeHead(401, { "content-type": "application/json" });
+  res.end(JSON.stringify({ error: "unauthorized" }));
+}
+
+export async function withMcpHttpDiscoveryServer(run, options) {
+  const expectedBearer = options?.expectedBearer;
   const httpServer = http.createServer(async (req, res) => {
     if (req.url !== "/mcp") {
       res.writeHead(404);
       res.end();
       return;
+    }
+
+    if (expectedBearer !== undefined) {
+      const auth = req.headers.authorization;
+      if (auth !== `Bearer ${expectedBearer}`) {
+        unauthorized(res);
+        return;
+      }
     }
 
     if (req.method === "GET" || req.method === "DELETE") {

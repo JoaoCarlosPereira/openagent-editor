@@ -39,10 +39,20 @@ export {
 export { resolveSystemSecretVault } from "./resolve-system-secret-vault.js";
 export {
   formatSecretRef,
+  mcpAuthAccount,
   parseSecretRef,
   providerAccount,
   type ParsedSecretRef,
 } from "./secret-ref.js";
+export {
+  createMcpAuthVaultResolver,
+  readMcpAuthCredentialFromVault,
+  registerMcpAuthCredential,
+  type McpAuthKind,
+  type RegisterMcpAuthCredentialInput,
+  type RegisterMcpAuthCredentialResult,
+  type StoredMcpAuthCredential,
+} from "./mcp-auth-credential.js";
 export {
   OPENAGENT_SECRET_SERVICE,
   type ProviderCapabilities,

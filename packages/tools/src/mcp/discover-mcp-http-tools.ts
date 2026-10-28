@@ -5,6 +5,10 @@ import {
   parseMcpHttpServerEndpoint,
   type McpHttpServerEndpoint,
 } from "./mcp-http-config.js";
+import {
+  resolveMcpHttpHeaders,
+  type McpAuthSecretResolver,
+} from "./mcp-auth-material.js";
 
 export interface DiscoveredMcpHttpTool {
   name: string;
@@ -22,19 +26,23 @@ function normalizeEndpoint(input: McpHttpServerEndpoint | unknown): McpHttpServe
   return parseMcpHttpServerEndpoint(input);
 }
 
+export type DiscoverMcpHttpToolsOptions = {
+  resolveAuth?: McpAuthSecretResolver;
+};
+
 /**
  * Conecta a um servidor MCP HTTP (Streamable HTTP), executa discovery (`tools/list`) e encerra a sessão.
  */
 export async function discoverMcpHttpTools(
   input: McpHttpServerEndpoint | unknown,
+  options?: DiscoverMcpHttpToolsOptions,
 ): Promise<McpHttpToolDiscoveryResult> {
   const endpoint = normalizeEndpoint(input);
   const url = new URL(endpoint.url);
+  const headers = await resolveMcpHttpHeaders(endpoint, options);
 
   const transport = new StreamableHTTPClientTransport(url, {
-    ...(endpoint.headers !== undefined
-      ? { requestInit: { headers: endpoint.headers } }
-      : {}),
+    ...(Object.keys(headers).length > 0 ? { requestInit: { headers } } : {}),
   });
 
   const client = new Client(

@@ -6,6 +6,8 @@ export interface McpStdioServerLaunch {
   args: string[];
   env?: Record<string, string>;
   cwd?: string;
+  /** Token/OAuth no cofre do SO (sysvault:…); injeta stdioEnv sem segredo em config. */
+  authSecretRef?: string;
 }
 
 function isNonEmptyString(value: unknown): value is string {
@@ -52,6 +54,9 @@ export function parseMcpStdioServerLaunch(input: unknown): McpStdioServerLaunch 
   if (raw.cwd !== undefined && !isNonEmptyString(raw.cwd)) {
     throw invalidToolInputError("Diretório de trabalho do servidor MCP stdio inválido.");
   }
+  if (raw.authSecretRef !== undefined && !isNonEmptyString(raw.authSecretRef)) {
+    throw invalidToolInputError("Referência de autenticação MCP stdio inválida.");
+  }
 
   return {
     serverId: raw.serverId.trim(),
@@ -59,5 +64,6 @@ export function parseMcpStdioServerLaunch(input: unknown): McpStdioServerLaunch 
     args,
     ...(raw.env !== undefined ? { env: raw.env } : {}),
     ...(raw.cwd !== undefined ? { cwd: raw.cwd.trim() } : {}),
+    ...(raw.authSecretRef !== undefined ? { authSecretRef: raw.authSecretRef.trim() } : {}),
   };
 }
