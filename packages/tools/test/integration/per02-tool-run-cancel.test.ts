@@ -7,6 +7,7 @@ import {
   createTypedToolDispatchRegistry,
   dispatchInIsolatedWorker,
   invalidToolInputError,
+  IsolatedWorkerToolRun,
   ToolRunCoordinator,
   type ToolHandlerMap,
 } from "../../src/index.js";
@@ -109,4 +110,56 @@ test("[PER-02] caminho de erro: entrada inválida retorna INVALID_STATE sem efei
 test("[PER-02] dispatch isolado em worker thread responde com resultado tipado", async () => {
   const output = await dispatchInIsolatedWorker("echo", { ok: true }, ["echo"]);
   assert.deepEqual(output, { ok: true });
+});
+
+test("[PER-02] cancelamento encerra worker isolado e impede novo dispatch", async () => {
+  let virtualNow = 5_000;
+  const run = await IsolatedWorkerToolRun.spawn({
+    cancelDeadlineMs: 2_000,
+    now: () => virtualNow,
+  });
+
+  const first = await run.dispatch("echo", { applied: "patch-a" }, "inv-w1");
+  assert.deepEqual(first, { applied: "patch-a" });
+
+  const slowPromise = run.dispatch("slowEcho", { pending: true }, "inv-w2");
+  const slowExpectation = assert.rejects(slowPromise, (error: unknown) => {
+    assert.ok(error instanceof ProtocolError);
+    assert.equal(error.code, PROTOCOL_ERROR_CODES.CANCELLED);
+    return true;
+  });
+
+  virtualNow += 80;
+  const cancelStarted = virtualNow;
+  const snapshot = await run.cancel();
+  virtualNow += 40;
+
+  assert.equal(snapshot.phase, "cancelled");
+  assert.ok(snapshot.cancelledAt !== null);
+  assert.ok(snapshot.cancelledAt - cancelStarted <= 2_000);
+  assert.equal(run.workerHost.isTerminated, true);
+
+  await slowExpectation;
+
+  assert.throws(
+    () => run.assertMayDispatch(),
+    (error: unknown) => {
+      assert.ok(error instanceof ProtocolError);
+      assert.equal(error.code, PROTOCOL_ERROR_CODES.INVALID_STATE);
+      assert.equal(error.hints?.runState, "cancelled");
+      return true;
+    },
+  );
+
+  await assert.rejects(
+    run.dispatch("echo", { n: 1 }, "inv-w3"),
+    (error: unknown) => {
+      assert.ok(error instanceof ProtocolError);
+      assert.equal(error.code, PROTOCOL_ERROR_CODES.INVALID_STATE);
+      return true;
+    },
+  );
+
+  assert.equal(run.snapshot().applied.length, 1);
+  assert.deepEqual(run.snapshot().applied[0]?.output, { applied: "patch-a" });
 });

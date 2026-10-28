@@ -20,6 +20,8 @@ const PER02_CANCEL_DEADLINE_MS = 2_000;
 export interface ToolRunCoordinatorOptions {
   cancelDeadlineMs?: number;
   now?: () => number;
+  /** Invocado logo após marcar cancelamento (ex.: encerrar worker isolado). */
+  onCancel?: () => void | Promise<void>;
 }
 
 export interface ToolRunSnapshot {
@@ -67,6 +69,7 @@ export class ToolRunCoordinator<TTools extends ToolHandlerMap> {
     this.phase = "cancelled";
     this.cancelledAt = now();
     this.abortController.abort();
+    await this.options.onCancel?.();
 
     const deadlineMs = this.options.cancelDeadlineMs ?? PER02_CANCEL_DEADLINE_MS;
     const deadline = now() + deadlineMs;

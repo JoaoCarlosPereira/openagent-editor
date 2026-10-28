@@ -21,6 +21,11 @@ export {
   IsolatedWorkerThreadHost,
 } from "./worker/isolated-worker-thread.js";
 
+export {
+  IsolatedWorkerToolRun,
+  type IsolatedWorkerToolRunOptions,
+} from "./worker/isolated-worker-tool-run.js";
+
 export type {
   AppliedToolRecord,
   InferToolInput,

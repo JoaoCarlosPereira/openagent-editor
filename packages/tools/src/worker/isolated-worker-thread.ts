@@ -1,7 +1,12 @@
 import { Worker } from "node:worker_threads";
 import { fileURLToPath } from "node:url";
 
-import { ProtocolError, PROTOCOL_ERROR_CODES } from "@openagent/protocol";
+import {
+  cancelledError,
+  ProtocolError,
+  PROTOCOL_ERROR_CODES,
+  refuseToolInTerminalRunError,
+} from "@openagent/protocol";
 
 import type { WorkerInvokeRequest, WorkerInvokeResponse } from "./types.js";
 
@@ -17,6 +22,7 @@ export interface IsolatedWorkerThreadHostOptions {
  */
 export class IsolatedWorkerThreadHost {
   private readonly worker: Worker;
+  private terminated = false;
   private readonly pending = new Map<
     string,
     {
@@ -85,6 +91,9 @@ export class IsolatedWorkerThreadHost {
   }
 
   async invoke(tool: string, input: unknown): Promise<unknown> {
+    if (this.terminated) {
+      throw refuseToolInTerminalRunError("cancelled");
+    }
     const requestId = `req-${this.nextRequestId++}`;
     const request: WorkerInvokeRequest = {
       kind: "invoke",
@@ -103,7 +112,19 @@ export class IsolatedWorkerThreadHost {
     });
   }
 
+  get isTerminated(): boolean {
+    return this.terminated;
+  }
+
   async terminate(): Promise<void> {
+    if (this.terminated) {
+      return;
+    }
+    this.terminated = true;
+    for (const [, entry] of this.pending) {
+      entry.reject(cancelledError());
+    }
+    this.pending.clear();
     await this.worker.terminate();
   }
 }
