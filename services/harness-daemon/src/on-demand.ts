@@ -1,8 +1,10 @@
 import { spawn } from "node:child_process";
-import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { connectLocalTransport } from "@openagent/protocol";
+import {
+  isHarnessDaemonTransportReady,
+  reconcileOrphanHarnessDaemon,
+} from "./daemon-health.js";
 import {
   resolveHarnessDataRoot,
   resolveHarnessDaemonAddress,
@@ -22,33 +24,13 @@ export type EnsureHarnessDaemonOptions = {
   daemonEntry?: string;
 };
 
-function isDaemonListening(address: string): boolean {
-  if (process.platform !== "win32") {
-    return fs.existsSync(address);
-  }
-  return false;
-}
-
-async function canConnectToDaemon(address: string): Promise<boolean> {
-  if (isDaemonListening(address)) {
-    return true;
-  }
-  try {
-    const socket = await connectLocalTransport(address);
-    socket.destroy();
-    return true;
-  } catch {
-    return false;
-  }
-}
-
 async function waitForDaemon(
   address: string,
   timeoutMs: number,
 ): Promise<void> {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
-    if (await canConnectToDaemon(address)) {
+    if (await isHarnessDaemonTransportReady(address)) {
       return;
     }
     await new Promise((resolve) => setTimeout(resolve, DEFAULT_POLL_INTERVAL_MS));
@@ -102,11 +84,22 @@ export async function ensureHarnessDaemonReady(
   const address = resolveHarnessDaemonAddress(runtimeDirectory, options.instanceId);
   const timeoutMs = options.connectTimeoutMs ?? DEFAULT_CONNECT_TIMEOUT_MS;
 
-  if (await canConnectToDaemon(address)) {
+  await reconcileOrphanHarnessDaemon({ runtimeDirectory, instanceId: options.instanceId });
+
+  if (await isHarnessDaemonTransportReady(address)) {
     return { address, dataRoot, runtimeDirectory };
   }
 
   if (isUserDaemonLockHeld(runtimeDirectory)) {
+    if (!(await isHarnessDaemonTransportReady(address))) {
+      await reconcileOrphanHarnessDaemon({
+        runtimeDirectory,
+        instanceId: options.instanceId,
+      });
+    }
+    if (await isHarnessDaemonTransportReady(address)) {
+      return { address, dataRoot, runtimeDirectory };
+    }
     await waitForDaemon(address, timeoutMs);
     return { address, dataRoot, runtimeDirectory };
   }

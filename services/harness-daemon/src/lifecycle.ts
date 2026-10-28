@@ -22,6 +22,7 @@ export type StartHarnessDaemonOptions = {
   dataRoot?: string;
   runtimeDirectory?: string;
   instanceId?: string;
+  drainTimeoutMs?: number;
 };
 
 export async function startHarnessDaemon(
@@ -35,8 +36,10 @@ export async function startHarnessDaemon(
     runtimeDirectory,
     dataRoot,
     instanceId: options.instanceId,
+    drainTimeoutMs: options.drainTimeoutMs,
   });
 
+  let stopped = false;
   return {
     address: server.address,
     dataRoot,
@@ -44,6 +47,10 @@ export async function startHarnessDaemon(
     lock,
     server,
     stop: async () => {
+      if (stopped) {
+        return;
+      }
+      stopped = true;
       await server.close();
       lock.release();
     },

@@ -23,6 +23,10 @@ export function resolveHarnessUserLockPath(runtimeDirectory: string): string {
   return path.join(runtimeDirectory, "openagent-harness-user.lock");
 }
 
+export function resolveHarnessWorkspaceBindingsPath(runtimeDirectory: string): string {
+  return path.join(runtimeDirectory, "workspace-bindings.json");
+}
+
 export function resolveHarnessDaemonAddress(
   runtimeDirectory: string,
   instanceId = DEFAULT_INSTANCE_ID,
