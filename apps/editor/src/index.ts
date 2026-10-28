@@ -42,3 +42,12 @@ export {
   type DebugEvidencePhase,
   type DebugVerificationOutcome,
 } from "./review/debug-evidence.js";
+export {
+  SubagentsPanelController,
+  buildSubagentsPanelView,
+  type SubagentsPanelPushInput,
+  type SubagentsPanelViewSnapshot,
+  type SubagentRow,
+  type SubagentUiState,
+  type SubagentCancelResult,
+} from "./review/subagents-panel.js";

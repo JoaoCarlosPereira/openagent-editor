@@ -51,6 +51,22 @@ export {
 } from "./debug-evidence.js";
 
 export {
+  SubagentsPanelController,
+  AGENT_SPAWNED_EVENT,
+  AGENT_COMPLETED_EVENT,
+  AGENT_CANCELLED_EVENT,
+  buildSubagentsPanelView,
+  type AgentSpawnedPayload,
+  type AgentCompletedPayload,
+  type AgentCancelledPayload,
+  type SubagentCancelResult,
+  type SubagentRow,
+  type SubagentUiState,
+  type SubagentsPanelPushInput,
+  type SubagentsPanelViewSnapshot,
+} from "./subagents-panel.js";
+
+export {
   ReadOnlyExecutionBlockController,
   evaluateReadOnlyExecutionBlock,
   type ReadOnlyBlockAttemptResult,
