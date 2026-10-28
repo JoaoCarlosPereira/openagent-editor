@@ -388,14 +388,37 @@ test("[LOC-01] workspace: createTextEditorDecorationType gera id único", () => 
   assert.equal(d2.backgroundColor, "blue");
 });
 
-test("[LOC-01] workspace: opções inválidas de decoração retornam INVALID_STATE sem consumir id", () => {
+test("[LOC-01] workspace: decorações validadas são observáveis e inválidas não alteram estado", () => {
   const ns = createWorkspaceNamespace("/root", "ws");
-  assert.throws(
-    () => ns.createTextEditorDecorationType(null as unknown as Omit<TextEditorDecorationType, "id">),
-    (error: unknown) => error instanceof ProtocolError && error.code === PROTOCOL_ERROR_CODES.INVALID_STATE,
-  );
-  assert.equal(ns.createTextEditorDecorationType({ opacity: 0.5 }).id, "decoration-0");
+  const valid = ns.createTextEditorDecorationType({
+    outlineColor: "#ff0000", backgroundColor: "rgba(0,0,0,.2)", opacity: 0.5, zIndex: 2,
+  });
+  assert.deepEqual(valid, {
+    id: "decoration-0", outlineColor: "#ff0000", backgroundColor: "rgba(0,0,0,.2)", opacity: 0.5, zIndex: 2,
+  });
+  const invalidValues: unknown[] = [
+    null,
+    { opacity: "0.5" },
+    { zIndex: Number.NaN },
+    { outlineColor: 42 },
+    { textDecoration: false },
+    { hoverMessage: {} },
+  ];
+  for (const value of invalidValues) {
+    assert.throws(
+      () => ns.createTextEditorDecorationType(value as Omit<TextEditorDecorationType, "id">),
+      (error: unknown) => error instanceof ProtocolError && error.code === PROTOCOL_ERROR_CODES.INVALID_STATE,
+    );
+  }
+  const next = ns.createTextEditorDecorationType({ opacity: 0.25 });
+  assert.equal(next.id, "decoration-1", "inválidos não registram estilos nem consomem identificadores");
+  assert.equal(next.opacity, 0.25);
 });
+
+// SPEC_DEVIATION: A fixture congelada 3.24.18 define TextDocumentData somente com
+// uri/version/lineCount/text() e WorkspaceNamespace não expõe edição nem editor.
+// Implementar mutação ou aplicação de decoração exigiria ampliar contrato sem
+// evidência diferencial; manter apenas os comportamentos representáveis na API.
 
 // ─── Frozen Surface ───────────────────────────────────────────────────────────────
 

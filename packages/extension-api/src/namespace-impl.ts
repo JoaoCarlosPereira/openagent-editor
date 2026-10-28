@@ -177,6 +177,22 @@ export function createWorkspaceNamespace(
       if (!options || typeof options !== "object" || Array.isArray(options)) {
         throw invalid("Opções de decoração inválidas.");
       }
+      const stringFields = [
+        "outlineColor", "backgroundColor", "overlineColor", "textDecoration",
+        "hoverMessage", "margin", "borderWidth", "borderStyle", "borderRadius",
+      ] as const;
+      for (const field of stringFields) {
+        const value: unknown = options[field];
+        if (value !== undefined && typeof value !== "string") {
+          throw invalid(`Campo '${field}' da decoração deve ser string.`);
+        }
+      }
+      for (const field of ["opacity", "zIndex"] as const) {
+        const value: unknown = options[field];
+        if (value !== undefined && (typeof value !== "number" || !Number.isFinite(value))) {
+          throw invalid(`Campo '${field}' da decoração deve ser número finito.`);
+        }
+      }
       const id = `decoration-${decorations.size}`;
       const decoration = { id, ...options };
       decorations.set(id, decoration);
