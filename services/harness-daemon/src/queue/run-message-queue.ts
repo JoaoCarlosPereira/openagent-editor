@@ -71,7 +71,10 @@ export class RunMessageQueue {
       throw invalidQueueState("Item de fila inexistente.");
     }
 
-    const item = this.items[index]!;
+    const item = this.items.at(index);
+    if (item === undefined) {
+      throw invalidQueueState("Item de fila inexistente.");
+    }
     if (item.state === "started") {
       throw invalidQueueState("Não é possível remover item de fila já iniciado.");
     }
