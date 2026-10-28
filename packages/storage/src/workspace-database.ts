@@ -52,6 +52,24 @@ function readJournalMode(database: DatabaseSync): "wal" {
   return "wal";
 }
 
+type SessionResumeRow = {
+  sessionId: string;
+  mode: string;
+  messagesJson: string;
+  toolsJson: string;
+  attachmentsJson: string;
+};
+
+function sessionResumeFromRow(row: SessionResumeRow): SessionResumeRecord {
+  return {
+    sessionId: row.sessionId,
+    mode: row.mode,
+    messagesJson: row.messagesJson,
+    toolsJson: row.toolsJson,
+    attachmentsJson: row.attachmentsJson,
+  };
+}
+
 function bootstrapSchema(database: DatabaseSync): void {
   database.exec(INITIAL_SCHEMA_SQL);
   database
@@ -122,7 +140,8 @@ export function openWorkspaceDatabase(
       );
     },
     listSessionResumes(): SessionResumeRecord[] {
-      return selectAll.all() as SessionResumeRecord[];
+      const rows = selectAll.all() as SessionResumeRow[];
+      return rows.map(sessionResumeFromRow);
     },
     close() {
       database.close();
