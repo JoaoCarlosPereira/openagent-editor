@@ -1,9 +1,5 @@
 {
-<<<<<<< HEAD
-  "module": "services/harness-daemon/src/state",
-=======
-  "module": "services/harness-daemon/src/lifecycle",
->>>>>>> feat/task-39
+  "module": "services/harness-daemon/src/sessions",
   "strategy": "behavioral-reimplementation",
   "sourceVersion": "3.24.18",
   "method": "techspec-and-adr-003",

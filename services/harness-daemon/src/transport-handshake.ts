@@ -12,10 +12,13 @@ import {
 import type { WorkspaceTransportHello } from "@openagent/protocol";
 import type { WorkspaceBindingState } from "./workspace-state.js";
 import { readPeerCredentialFromSocket } from "./peer-credential.js";
+import { serveRpcOnConnection } from "./rpc-connection.js";
+import type { SessionRpcContext } from "./sessions/session-rpc-handler.js";
 
 export async function performServerTransportHandshake(
   socket: net.Socket,
   resolveWorkspace: (hello: WorkspaceTransportHello) => WorkspaceBindingState,
+  options: { dataRoot: string },
 ): Promise<void> {
   const versionFrame = await readProtocolFrame(socket);
   const versionParsed = JSON.parse(versionFrame.toString("utf8")) as unknown;
@@ -85,5 +88,7 @@ export async function performServerTransportHandshake(
       "utf8",
     ),
   );
-  socket.end();
+
+  const rpcContext: SessionRpcContext = { dataRoot: options.dataRoot, binding };
+  await serveRpcOnConnection(socket, rpcContext);
 }

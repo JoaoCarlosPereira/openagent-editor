@@ -25,8 +25,10 @@ export async function startHarnessDaemonServer(
     address,
     async (socket: net.Socket) => {
       try {
-        await performServerTransportHandshake(socket, (hello) =>
-          registry.upsertFromHello(hello),
+        await performServerTransportHandshake(
+          socket,
+          (hello) => registry.upsertFromHello(hello),
+          { dataRoot: options.dataRoot },
         );
       } catch {
         socket.destroy();
