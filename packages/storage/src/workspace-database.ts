@@ -36,6 +36,13 @@ import {
   type RebuildProjectionsFromEventLogResult,
 } from "./event-log-projections.js";
 import {
+  indexMessageFts,
+  lexicalTextFromContentRef,
+  searchSessionMessages,
+  type SearchSessionMessagesInput,
+  type SearchSessionMessagesResult,
+} from "./search/index.js";
+import {
   recoverWorkspaceStorageAfterCrash,
   type RecoverWorkspaceStorageResult,
 } from "./storage-recovery.js";
@@ -79,6 +86,7 @@ export type WorkspaceDatabase = {
     runId: string,
     queueItemId: string,
   ): RemovePendingQueueItemResult;
+  searchSessionMessages(input: SearchSessionMessagesInput): SearchSessionMessagesResult;
   deleteSession(sessionId: string): DeleteSessionStorageResult;
   applyHarnessEventToProjections(event: HarnessEvent): void;
   rebuildProjectionsFromEventLog(sessionId: string): RebuildProjectionsFromEventLogResult;
@@ -209,7 +217,17 @@ export function openWorkspaceDatabase(
       return readCasBlob(database, casRoot, contentRef);
     },
     insertMessage(message: StoredMessage) {
-      return insertStoredMessage(database, message);
+      const stored = insertStoredMessage(database, message);
+      const lexicalText = lexicalTextFromContentRef(database, casRoot, stored.contentRef);
+      indexMessageFts(database, {
+        messageId: stored.id,
+        sessionId: stored.sessionId,
+        lexicalText,
+      });
+      return stored;
+    },
+    searchSessionMessages(input: SearchSessionMessagesInput) {
+      return searchSessionMessages(database, input);
     },
     listMessages(sessionId: string) {
       return listStoredMessages(database, sessionId);

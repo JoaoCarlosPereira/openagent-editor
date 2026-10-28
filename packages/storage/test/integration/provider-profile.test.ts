@@ -178,7 +178,7 @@ test("[API-01] entrada inválida retorna INVALID_STATE sem linha em provider_pro
   });
 });
 
-test("migração 006 expõe provider_profile e schema_version 6", async () => {
+test("migração 006 expõe provider_profile e schema_version atual", async () => {
   await withTempDataRoot(async (dataRoot) => {
     const db = openWorkspaceDatabase({ dataRoot, workspaceId: "ws-migrate-pp" });
     const database = new DatabaseSync(db.databasePath);
@@ -195,6 +195,6 @@ test("migração 006 expõe provider_profile e schema_version 6", async () => {
 
     assert.equal(table?.name, "provider_profile");
     assert.equal(schemaVersion.value, String(STORAGE_SCHEMA_VERSION));
-    assert.equal(STORAGE_SCHEMA_VERSION, 6);
+    assert.equal(STORAGE_SCHEMA_VERSION, 7);
   });
 });
