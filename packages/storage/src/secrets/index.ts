@@ -20,6 +20,22 @@ export {
   registerProviderCredential,
   type ProbeProviderConnection,
 } from "./provider-credential.js";
+export {
+  getStoredProviderProfile,
+  providerProfileSqliteContainsPlaintext,
+  upsertStoredProviderProfile,
+  type StoredProviderProfile,
+} from "./provider-profile-store.js";
+export {
+  registerProviderProfile,
+  type RegisterProviderProfileResult,
+} from "./register-provider-profile.js";
+export {
+  STANDARD_LOG_REDACTED,
+  formatStandardLogToolAction,
+  redactForStandardLog,
+  type StandardLogToolActionInput,
+} from "./standard-log-redaction.js";
 export { resolveSystemSecretVault } from "./resolve-system-secret-vault.js";
 export {
   formatSecretRef,
