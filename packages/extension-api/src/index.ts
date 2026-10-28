@@ -164,6 +164,9 @@ export function formatExtensionIdentifier(publisher: string, name: string): stri
 export {
   type FrozenVersion,
   createFrozenSurface,
+  createCommandsNamespace,
+  createWindowNamespace,
+  createWorkspaceNamespace,
   EXPECTED_SURFACE_KEYS,
   EXPECTED_SURFACE_TYPES,
   type FrozenExtensionApiSurface,
@@ -192,6 +195,8 @@ export {
   type MementoData,
   type OutputChannel,
   type OutputNamespace,
+  type WorkspaceAdapter,
+  type WindowAdapter,
 } from "./frozen-surface.js";
 
 export {
