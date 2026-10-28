@@ -1,0 +1,18 @@
+{
+  "name": "@openagent/extension-host",
+  "version": "0.1.0",
+  "description": "Host de extensões isolado do OpenAgent Editor fora do renderer (processo/worker isolado)",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "private": true,
+  "exports": {
+    ".": "./src/index.ts",
+    "./worker": "./src/worker-entry.mjs"
+  },
+  "dependencies": {
+    "@openagent/extension-api": "0.1.0",
+    "@openagent/policy": "0.1.0",
+    "@openagent/protocol": "0.1.0"
+  }
+}
