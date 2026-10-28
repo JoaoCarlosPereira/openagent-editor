@@ -13,3 +13,9 @@ export {
   type OpenAgentCliWorkspaceSession,
   type StartOpenAgentCliInWorkspaceInput,
 } from "./start-workspace-cli.js";
+
+export {
+  runOpenAgentCliHeadless,
+  type OpenAgentCliHeadlessResult,
+  type RunOpenAgentCliHeadlessInput,
+} from "./run-headless-cli.js";

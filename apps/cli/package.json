@@ -1,7 +1,7 @@
 {
   "name": "@openagent/cli",
   "version": "0.1.0",
-  "description": "CLI OpenAgent — cliente headless do harness-daemon (CLI-01)",
+  "description": "CLI OpenAgent — cliente headless do harness-daemon (CLI-01/CLI-02)",
   "type": "module",
   "private": true,
   "exports": {
