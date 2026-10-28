@@ -58,6 +58,20 @@ export interface BrowserOpenAuthorization {
   requestId: string;
 }
 
+function interactionAuthorizationKey(interaction: BrowserInteraction | undefined): string {
+  if (!interaction) return "none";
+  switch (interaction.type) {
+    case "none":
+      return "none";
+    case "evaluate":
+      return JSON.stringify(["evaluate", interaction.expression]);
+    case "click":
+      return JSON.stringify(["click", interaction.selector]);
+    case "type":
+      return JSON.stringify(["type", interaction.selector, interaction.text]);
+  }
+}
+
 function validateInteraction(raw: unknown): BrowserInteraction | undefined {
   if (raw === undefined) {
     return undefined;
@@ -130,7 +144,7 @@ export function preparePolicyBrowserOpen(
 ): SandboxToolDispatchPrepareResult {
   assertCapabilityAllowedForAgentMode(context.agentMode, "browser.open");
   const validatedUrl = validateBrowserUrl(input.url, context);
-  const interaction = input.interaction;
+  const interaction = validateInteraction(input.interaction);
 
   return prepareSandboxToolDispatch(
     flow,
@@ -141,9 +155,7 @@ export function preparePolicyBrowserOpen(
       capability: "browser.open",
       target: {
         kind: "url",
-        url: interaction
-          ? `${validatedUrl} [interaction:${interaction.type}]`
-          : validatedUrl,
+        url: `${validatedUrl} [interaction:${interactionAuthorizationKey(interaction)}]`,
       },
       requestId: input.requestId,
     },
@@ -180,9 +192,7 @@ export async function executePolicyBrowserOpen(
   }
   const authorizedRequest =
     authorization.flow.consumeAuthorizedRequest(authorization.requestId);
-  const authorizedUrl = interaction
-    ? `${validatedUrl} [interaction:${interaction.type}]`
-    : validatedUrl;
+  const authorizedUrl = `${validatedUrl} [interaction:${interactionAuthorizationKey(interaction)}]`;
   if (
     !authorizedRequest ||
     authorizedRequest.capability !== "browser.open" ||
@@ -205,13 +215,12 @@ export async function executePolicyBrowserOpen(
     timeoutMs,
   );
   const targetManagerForExecution = new CdpTargetManager(transport);
-  const targetSession =
-    await targetManagerForExecution.createIsolatedTarget(validatedUrl);
+  let targetSession: Awaited<ReturnType<CdpTargetManager["createIsolatedTarget"]>> | undefined;
   const consoleLogs: BrowserConsoleLogEntry[] = [];
   const offConsole = transport.on(
     "Runtime.consoleAPICalled",
     (params, sid) => {
-      if (sid === targetSession.sessionId) {
+      if (sid === targetSession?.sessionId && targetSession) {
         const logType =
           (params["type"] as BrowserConsoleLogEntry["type"]) ?? "log";
         const args = Array.isArray(params["args"]) ? params["args"] : [];
@@ -233,7 +242,7 @@ export async function executePolicyBrowserOpen(
   const offConsoleMsg = transport.on(
     "Console.messageAdded",
     (params, sid) => {
-      if (sid === targetSession.sessionId) {
+      if (sid === targetSession?.sessionId && targetSession) {
         const msg = (params["message"] ?? {}) as Record<string, unknown>;
         const text = String(msg["text"] ?? "");
         const level = (msg["level"] as BrowserConsoleLogEntry["type"]) ?? "log";
@@ -247,6 +256,7 @@ export async function executePolicyBrowserOpen(
   );
 
   try {
+    targetSession = await targetManagerForExecution.createIsolatedTarget(validatedUrl);
     await transport.send("Page.enable", {}, targetSession.sessionId);
     await transport.send("Runtime.enable", {}, targetSession.sessionId);
     await transport.send("Console.enable", {}, targetSession.sessionId);
@@ -324,13 +334,17 @@ export async function executePolicyBrowserOpen(
       // Ignora erro de título
     }
 
+    const session = targetSession;
+    if (!session) {
+      throw new ProtocolError(PROTOCOL_ERROR_CODES.INVALID_STATE, "Target do navegador não foi criado.");
+    }
     const result: BrowserCdpToolResult = {
       capability: "browser.open",
       tool: "browser.open",
       url: validatedUrl,
-      targetId: targetSession.targetId,
-      browserContextId: targetSession.browserContextId,
-      sessionId: targetSession.sessionId,
+      targetId: session.targetId,
+      browserContextId: session.browserContextId,
+      sessionId: session.sessionId,
       title,
       screenshot,
       screenshotMimeType: "image/png",
@@ -342,8 +356,10 @@ export async function executePolicyBrowserOpen(
   } finally {
     offConsole();
     offConsoleMsg();
-    if (targetManagerForExecution.getSession(targetSession.targetId)) {
+    if (targetSession && targetManagerForExecution.getSession(targetSession.targetId)) {
       await targetManagerForExecution.closeTarget(targetSession.targetId);
+    } else if (!targetSession && !transport.isClosed()) {
+      await targetManager.getTransport().close();
     }
   }
 }
