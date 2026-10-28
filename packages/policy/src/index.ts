@@ -17,6 +17,13 @@ export {
   validatePolicyCapability,
 } from "./capability.js";
 export {
+  AGENT_MODE_ASK_BLOCKED_MESSAGE,
+  assertCapabilityAllowedForAgentMode,
+  askAgentModeBlockedError,
+  POLICY_AGENT_MODES,
+  validatePolicyAgentMode,
+} from "./agent-mode.js";
+export {
   assertCapabilityAllowedForExecutionMode,
   EXECUTION_MODE_READ_ONLY_BLOCKED_MESSAGE,
   EXECUTION_MODES,
