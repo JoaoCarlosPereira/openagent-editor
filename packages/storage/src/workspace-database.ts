@@ -122,14 +122,7 @@ export function openWorkspaceDatabase(
       );
     },
     listSessionResumes(): SessionResumeRecord[] {
-      const rows = selectAll.all() as Array<Record<string, string>>;
-      return rows.map((row) => ({
-        sessionId: row.sessionId,
-        mode: row.mode,
-        messagesJson: row.messagesJson,
-        toolsJson: row.toolsJson,
-        attachmentsJson: row.attachmentsJson,
-      }));
+      return selectAll.all() as SessionResumeRecord[];
     },
     close() {
       database.close();
