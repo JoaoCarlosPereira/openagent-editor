@@ -29,6 +29,7 @@ export function parseSecretRef(secretRef: string): ParsedSecretRef | null {
   if (
     backend !== "linux-secret-service" &&
     backend !== "macos-keychain" &&
+    backend !== "win32-credential-manager" &&
     backend !== "memory"
   ) {
     return null;

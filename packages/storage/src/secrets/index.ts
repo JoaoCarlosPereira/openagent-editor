@@ -10,6 +10,11 @@ export {
   type MacOsSecurityRunner,
 } from "./macos-keychain-vault.js";
 export {
+  createWindowsCredentialManagerVault,
+  type CmdKeyRunner,
+  type WindowsCredentialReadRunner,
+} from "./windows-credential-manager-vault.js";
+export {
   probeOpenAiCompatibleProvider,
   readProviderCredentialFromVault,
   registerProviderCredential,

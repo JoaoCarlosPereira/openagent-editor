@@ -4,6 +4,7 @@
 export type SystemSecretVaultBackend =
   | "linux-secret-service"
   | "macos-keychain"
+  | "win32-credential-manager"
   | "memory";
 
 export type SystemSecretVault = {

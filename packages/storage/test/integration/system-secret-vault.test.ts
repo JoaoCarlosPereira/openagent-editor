@@ -7,6 +7,7 @@ import {
   createInMemorySystemSecretVault,
   createLinuxSecretServiceVault,
   createMacOsKeychainVault,
+  createWindowsCredentialManagerVault,
   readProviderCredentialFromVault,
   registerProviderCredential,
 } from "../../src/secrets/index.js";
@@ -208,5 +209,49 @@ test("[API-01] adapter macOS Keychain persiste e recupera via security simulado"
     );
     const roundTrip = await readProviderCredentialFromVault(result.secretRef, vault);
     assert.equal(roundTrip?.credential, "macos-key");
+  });
+});
+
+test("[API-01] adapter Windows Credential Manager persiste e recupera via cmdkey simulado", async () => {
+  const store = new Map<string, string>();
+
+  const vault = createWindowsCredentialManagerVault({
+    runCmdKey: async (args) => {
+      const genericArg = args.find((a) => a.startsWith("/generic:"));
+      const deleteArg = args.find((a) => a.startsWith("/delete:"));
+      if (genericArg) {
+        const target = genericArg.slice("/generic:".length);
+        const passArg = args.find((a) => a.startsWith("/pass:"));
+        assert.ok(passArg);
+        store.set(target, passArg.slice("/pass:".length));
+        return { stdout: "", stderr: "" };
+      }
+      if (deleteArg) {
+        const target = deleteArg.slice("/delete:".length);
+        store.delete(target);
+        return { stdout: "", stderr: "" };
+      }
+      throw new Error(`comando inesperado: ${args.join(" ")}`);
+    },
+    readCredential: async (target) => store.get(target) ?? null,
+  });
+
+  await withMockModelsServer(["model-win"], "win-key", async (baseUrl) => {
+    const result = await registerProviderCredential(
+      {
+        profileId: "win-profile",
+        endpoint: baseUrl,
+        model: "model-win",
+        credential: "win-key",
+      },
+      { vault },
+    );
+
+    assert.match(
+      result.secretRef,
+      /^sysvault:win32-credential-manager:openagent-editor\/provider\/win-profile$/,
+    );
+    const roundTrip = await readProviderCredentialFromVault(result.secretRef, vault);
+    assert.equal(roundTrip?.credential, "win-key");
   });
 });
