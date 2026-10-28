@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@openagent/protocol": "0.1.0",
-    "@openagent/storage": "0.1.0"
+    "@openagent/storage": "0.1.0",
+    "@openagent/tools": "0.1.0"
   }
 }

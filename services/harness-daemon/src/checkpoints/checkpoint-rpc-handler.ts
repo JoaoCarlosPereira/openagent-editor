@@ -9,7 +9,12 @@ import {
   type RpcRequestEnvelope,
   type RpcResultMap,
 } from "@openagent/protocol";
-import { createStoredCheckpoint, openWorkspaceDatabase } from "@openagent/storage";
+import {
+  createStoredCheckpoint,
+  loadCheckpointRestorePayload,
+  openWorkspaceDatabase,
+} from "@openagent/storage";
+import { restoreCheckpointOnWorkspace } from "@openagent/tools";
 import type { DaemonRpcContext } from "../runs/run-rpc-handler.js";
 
 function isNonEmptyString(value: unknown): value is string {
@@ -41,6 +46,48 @@ function assertCheckpointWorkspace(context: DaemonRpcContext, request: RpcReques
       PROTOCOL_ERROR_CODES.INVALID_STATE,
       "runId obrigatório para checkpoint.create.",
     );
+  }
+}
+
+export function handleCheckpointRestore(
+  context: DaemonRpcContext,
+  request: RpcRequestEnvelope<typeof RPC_METHOD.CHECKPOINT_RESTORE>,
+): RpcResultMap[typeof RPC_METHOD.CHECKPOINT_RESTORE] {
+  if (request.workspaceId !== context.binding.workspaceId) {
+    throw new ProtocolError(
+      PROTOCOL_ERROR_CODES.INVALID_STATE,
+      "workspaceId da requisição não corresponde ao workspace da conexão.",
+      [request.workspaceId, context.binding.workspaceId],
+    );
+  }
+
+  const params = (request.payload ?? {}) as RpcParamsMap[typeof RPC_METHOD.CHECKPOINT_RESTORE];
+  const db = openWorkspaceDatabase({
+    dataRoot: context.dataRoot,
+    workspaceId: context.binding.workspaceId,
+  });
+  try {
+    const sqlite = new DatabaseSync(db.databasePath);
+    try {
+      const loaded = loadCheckpointRestorePayload(
+        sqlite,
+        resolveCasRoot(db.databasePath),
+        params.checkpointId,
+      );
+      const outcome = restoreCheckpointOnWorkspace(context.binding.workspaceRoot, {
+        baseHashes: loaded.baseHashes,
+        resultHashes: loaded.resultHashes,
+        patchText: loaded.patchText,
+      });
+      if ("conflict" in outcome) {
+        return { conflict: true };
+      }
+      return { restored: true };
+    } finally {
+      sqlite.close();
+    }
+  } finally {
+    db.close();
   }
 }
 
@@ -83,6 +130,11 @@ export function handleCheckpointRpc(
       return handleCheckpointCreate(
         context,
         request as RpcRequestEnvelope<typeof RPC_METHOD.CHECKPOINT_CREATE>,
+      );
+    case RPC_METHOD.CHECKPOINT_RESTORE:
+      return handleCheckpointRestore(
+        context,
+        request as RpcRequestEnvelope<typeof RPC_METHOD.CHECKPOINT_RESTORE>,
       );
     default:
       throw new ProtocolError(

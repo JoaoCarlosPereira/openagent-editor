@@ -94,8 +94,16 @@ export {
 
 export {
   buildCheckpointPatchFromFileChanges,
+  parseCheckpointPatchText,
   type CheckpointPatchFileChange,
+  type ParsedCheckpointPatchEntry,
 } from "./git/checkpoint-patch.js";
+
+export {
+  restoreCheckpointOnWorkspace,
+  type CheckpointRestoreInput,
+  type CheckpointRestoreResult,
+} from "./git/checkpoint-restore.js";
 
 export {
   executePolicyGitDiffInWorker,

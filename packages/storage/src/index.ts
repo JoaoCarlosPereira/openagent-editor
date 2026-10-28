@@ -127,10 +127,12 @@ export {
 export {
   createStoredCheckpoint,
   getStoredCheckpointById,
+  loadCheckpointRestorePayload,
   readCheckpointHashesFromRef,
   readCheckpointPatchFromRef,
   type CheckpointFileHashes,
   type CreateCheckpointInput,
+  type LoadedCheckpointRestorePayload,
   type StoredCheckpointRecord,
 } from "./checkpoints/index.js";
 
