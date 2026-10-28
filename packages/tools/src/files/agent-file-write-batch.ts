@@ -25,8 +25,8 @@ export interface AgentFileWriteBatchResult {
 
 function assertAgentModeForWrite(agentMode: AgentMode): void {
   assertCapabilityAllowedForAgentMode(agentMode, "file.write");
-  if (agentMode !== "agent") {
-    throw invalidToolInputError("Escrita em lote AGT-03 exige modo Agent.");
+  if (agentMode !== "agent" && agentMode !== "plan") {
+    throw invalidToolInputError("Escrita em lote AGT-03 exige modo Agent ou Plan.");
   }
 }
 
