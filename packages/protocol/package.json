@@ -1,0 +1,13 @@
+{
+  "name": "@openagent/protocol",
+  "version": "0.1.0",
+  "description": "Contratos versionados RPC, envelopes e eventos do OpenAgent Editor",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "private": true,
+  "exports": {
+    ".": "./src/index.ts",
+    "./envelope": "./src/envelope.ts"
+  }
+}
