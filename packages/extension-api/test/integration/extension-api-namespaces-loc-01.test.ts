@@ -6,6 +6,7 @@ import {
   createFrozenSurface,
   createWindowNamespace,
   createWorkspaceNamespace,
+  type TextEditorDecorationType,
   type WindowAdapter,
   type WorkspaceAdapter,
 } from "../../src/index.js";
@@ -267,6 +268,27 @@ test("[LOC-01] workspace: saveTextDocument para URI não aberto retorna false", 
   assert.equal(result, false);
 });
 
+test("[LOC-01] workspace: documento aberto é estável e tem conteúdo e linhas consistentes", async () => {
+  const ns = createWorkspaceNamespace("/root", "ws", {
+    files: [], contents: { "file:///doc.txt": "primeira\nsegunda\n" },
+  });
+  const document = await ns.openTextDocument("file:///doc.txt");
+  assert.strictEqual(await ns.openTextDocument("file:///doc.txt"), document);
+  assert.equal(document.version, 1);
+  assert.equal(document.lineCount, 3);
+  assert.equal(document.text(), "primeira\nsegunda\n");
+});
+
+test("[LOC-01] workspace: documento sem conteúdo não é aberto após INVALID_STATE", async () => {
+  const ns = createWorkspaceNamespace("/root", "ws");
+  await assertLaunchError(
+    () => ns.openTextDocument("file:///missing.txt"),
+    "não disponível no workspace adapter",
+    PROTOCOL_ERROR_CODES.INVALID_STATE,
+  );
+  assert.equal(ns.openTextDocuments().length, 0);
+});
+
 test("[LOC-01] workspace: findFiles filtra por padrão", async () => {
   const adapter: WorkspaceAdapter = {
     files: [
@@ -364,6 +386,15 @@ test("[LOC-01] workspace: createTextEditorDecorationType gera id único", () => 
   assert.ok(d1.id !== d2.id);
   assert.equal(d1.outlineColor, "red");
   assert.equal(d2.backgroundColor, "blue");
+});
+
+test("[LOC-01] workspace: opções inválidas de decoração retornam INVALID_STATE sem consumir id", () => {
+  const ns = createWorkspaceNamespace("/root", "ws");
+  assert.throws(
+    () => ns.createTextEditorDecorationType(null as unknown as Omit<TextEditorDecorationType, "id">),
+    (error: unknown) => error instanceof ProtocolError && error.code === PROTOCOL_ERROR_CODES.INVALID_STATE,
+  );
+  assert.equal(ns.createTextEditorDecorationType({ opacity: 0.5 }).id, "decoration-0");
 });
 
 // ─── Frozen Surface ───────────────────────────────────────────────────────────────

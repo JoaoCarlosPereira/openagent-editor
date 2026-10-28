@@ -174,6 +174,9 @@ export function createWorkspaceNamespace(
       return Object.keys(result).length ? result : undefined;
     },
     createTextEditorDecorationType(options) {
+      if (!options || typeof options !== "object" || Array.isArray(options)) {
+        throw invalid("Opções de decoração inválidas.");
+      }
       const id = `decoration-${decorations.size}`;
       const decoration = { id, ...options };
       decorations.set(id, decoration);
