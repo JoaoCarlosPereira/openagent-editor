@@ -1,2 +1,9 @@
 /** Placeholder da fase de revisão/diff (tasks AGT-03+). */
 export const REVIEW_MODULE_ID = "openagent.editor.review";
+
+export {
+  ReadOnlyExecutionBlockController,
+  evaluateReadOnlyExecutionBlock,
+  type ReadOnlyBlockAttemptResult,
+  type ReadOnlyBlockViewSnapshot,
+} from "../permissions/read-only-block.js";
