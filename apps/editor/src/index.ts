@@ -19,6 +19,17 @@ export {
   type RunQueueRemoveRequestResult,
 } from "./agent/run-queue-panel.js";
 export {
+  RunCancelPanelController,
+  RUN_CANCEL_DEADLINE_MS,
+  RUN_CANCELLED_EVENT,
+  buildRunCancelPanelView,
+  runCancelStatusLabel,
+  type AppliedChangeRow,
+  type RunCancelPanelViewSnapshot,
+  type RunCancelRequestResult,
+  type RunCancelUiState,
+} from "./agent/run-cancel-panel.js";
+export {
   PermissionDialogController,
   buildPermissionDialogView,
   type PermissionDialogViewSnapshot,

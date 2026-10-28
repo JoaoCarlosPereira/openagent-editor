@@ -35,3 +35,14 @@ export {
   type RunQueuePanelViewSnapshot,
   type RunQueueRemoveRequestResult,
 } from "./run-queue-panel.js";
+export {
+  RunCancelPanelController,
+  RUN_CANCEL_DEADLINE_MS,
+  RUN_CANCELLED_EVENT,
+  buildRunCancelPanelView,
+  runCancelStatusLabel,
+  type AppliedChangeRow,
+  type RunCancelPanelViewSnapshot,
+  type RunCancelRequestResult,
+  type RunCancelUiState,
+} from "./run-cancel-panel.js";
