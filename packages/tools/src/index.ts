@@ -74,6 +74,20 @@ export {
 } from "./files/search-workspace-files.js";
 
 export {
+  execWorkspaceCommand,
+  type ExecWorkspaceCommandResult,
+} from "./shell/exec-workspace-command.js";
+
+export {
+  executePolicyShellExec,
+  formatAgentShellToolResult,
+  preparePolicyShellExec,
+  type AgentShellToolInvocationResult,
+  type PolicyShellToolContext,
+  type PreparePolicyShellExecInput,
+} from "./shell/policy-shell-tools.js";
+
+export {
   createTypedToolDispatchRegistry,
   TypedToolDispatchRegistry,
 } from "./worker/dispatch-registry.js";
