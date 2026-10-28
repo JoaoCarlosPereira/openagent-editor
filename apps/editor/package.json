@@ -6,6 +6,7 @@
   "private": true,
   "exports": {
     ".": "./src/index.ts",
+    "./agent": "./src/agent/agent-panel.ts",
     "./permissions": "./src/permissions/permission-dialog.ts"
   },
   "dependencies": {
