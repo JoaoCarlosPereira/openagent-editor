@@ -205,3 +205,26 @@ export {
   parseMcpHttpServerEndpoint,
   type McpHttpServerEndpoint,
 } from "./mcp/mcp-http-config.js";
+
+export {
+  executeMcpTool,
+  type ExecuteMcpHttpToolInput,
+  type ExecuteMcpStdioToolInput,
+  type ExecuteMcpToolInput,
+} from "./mcp/execute-mcp-tool.js";
+
+export {
+  mapCallToolResultToInvocation,
+  primaryTextFromMcpToolInvocation,
+  type McpToolContentBlock,
+  type McpToolInvocationResult,
+} from "./mcp/mcp-tool-invocation-result.js";
+
+export {
+  executePolicyMcpToolInvoke,
+  formatAgentMcpToolResult,
+  preparePolicyMcpToolInvoke,
+  type AgentMcpToolInvocationResult,
+  type PolicyMcpToolContext,
+  type PreparePolicyMcpToolInvokeInput,
+} from "./mcp/policy-mcp-tools.js";
