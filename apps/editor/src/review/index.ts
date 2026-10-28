@@ -12,6 +12,15 @@ export {
 } from "./agent-run-review.js";
 
 export {
+  ApplyConflictController,
+  APPLY_CONFLICT_DEFAULT_MESSAGE,
+  buildApplyConflictView,
+  parseApplyConflictFromProtocolError,
+  type ApplyConflictEntry,
+  type ApplyConflictViewSnapshot,
+} from "./apply-conflict.js";
+
+export {
   ReadOnlyExecutionBlockController,
   evaluateReadOnlyExecutionBlock,
   type ReadOnlyBlockAttemptResult,

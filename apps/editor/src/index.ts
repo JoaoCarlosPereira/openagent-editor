@@ -19,3 +19,10 @@ export {
   type AgentRunReviewViewSnapshot,
   type AgentToolResultRow,
 } from "./review/agent-run-review.js";
+export {
+  ApplyConflictController,
+  buildApplyConflictView,
+  parseApplyConflictFromProtocolError,
+  type ApplyConflictEntry,
+  type ApplyConflictViewSnapshot,
+} from "./review/apply-conflict.js";
