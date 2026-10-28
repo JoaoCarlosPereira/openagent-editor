@@ -8,6 +8,17 @@ export {
   type AgentPanelViewSnapshot,
 } from "./agent/agent-panel.js";
 export {
+  RunQueuePanelController,
+  buildRunQueuePanelView,
+  previewTextFromUserInput,
+  type RunQueueEnqueueRequestResult,
+  type RunQueueItemRow,
+  type RunQueueItemUiState,
+  type RunQueueLifecycle,
+  type RunQueuePanelViewSnapshot,
+  type RunQueueRemoveRequestResult,
+} from "./agent/run-queue-panel.js";
+export {
   PermissionDialogController,
   buildPermissionDialogView,
   type PermissionDialogViewSnapshot,
