@@ -56,3 +56,14 @@ export {
   type WorkspaceTransportHello,
   type WorkspaceTransportValidationResult,
 } from "./workspace-transport.js";
+
+export {
+  LOCAL_USER_ONLY_MESSAGE,
+  assertLocalPeerAuth,
+  peerCredentialFromProcess,
+  resolveLocalDaemonPrincipal,
+  validateLocalPeerAuth,
+  type LocalAuthValidationResult,
+  type LocalDaemonPrincipal,
+  type LocalPeerCredential,
+} from "./local-auth.js";
