@@ -1,0 +1,130 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "schemaVersion": 1,
+  "module": "research/provenance/cursor-3-24-18",
+  "strategy": "behavioral-reimplementation",
+  "sources": [
+    {
+      "artifactSha256": "dc95a2cca3cba2a1d296f425cb12d4cb31213dd20b54e774b29fdefac5badb0e",
+      "artifactPath": "research/reverse-engineering/cursor-3.24.18/README.md",
+      "cursorVersion": "3.24.18",
+      "origin": {
+        "bundle": "research/reverse-engineering/cursor-3.24.18/README.md"
+      },
+      "recoveryMethod": "ghidra-pseudocode"
+    },
+    {
+      "artifactSha256": "45753604da89b1bc9589b24fde8fc97946f26136e3b4515891e0de1747e7791d",
+      "artifactPath": "research/reverse-engineering/cursor-3.24.18/pseudocode/functions.c",
+      "cursorVersion": "3.24.18",
+      "origin": {
+        "bundle": "research/reverse-engineering/cursor-3.24.18/pseudocode/functions.c"
+      },
+      "recoveryMethod": "ghidra-pseudocode"
+    },
+    {
+      "artifactSha256": "ddf2b92b498d997ba9ff8bcb6064a65da3bd217adb54950adf0277840c47d433",
+      "artifactPath": "research/reverse-engineering/cursor-3.24.18/pseudocode/manifest.tsv",
+      "cursorVersion": "3.24.18",
+      "origin": {
+        "bundle": "research/reverse-engineering/cursor-3.24.18/pseudocode/manifest.tsv"
+      },
+      "recoveryMethod": "ghidra-pseudocode"
+    },
+    {
+      "artifactSha256": "189f8520ff1e7e86745fd8536c88168ba7edcf2860f6d09ae39de4642548cf30",
+      "artifactPath": "research/reverse-engineering/cursor-3.24.18/pseudocode/failures.tsv",
+      "cursorVersion": "3.24.18",
+      "origin": {
+        "bundle": "research/reverse-engineering/cursor-3.24.18/pseudocode/failures.tsv"
+      },
+      "recoveryMethod": "ghidra-pseudocode"
+    },
+    {
+      "artifactSha256": "c2005790730d687592c7fa51fa0f4a97edbc13d5330315fa0a626ce2c159a740",
+      "artifactPath": "research/reverse-engineering/cursor-3.24.18/pseudocode/summary.txt",
+      "cursorVersion": "3.24.18",
+      "origin": {
+        "bundle": "research/reverse-engineering/cursor-3.24.18/pseudocode/summary.txt"
+      },
+      "recoveryMethod": "ghidra-pseudocode"
+    },
+    {
+      "artifactSha256": "881c6dc8d6e16c6afc6c844e1d0008f128a9d3a08c755a7bf1b47bed24495bd6",
+      "artifactPath": "sources/cursor/manifest.json",
+      "cursorVersion": "3.24.18",
+      "origin": {
+        "bundle": "sources/cursor/manifest.json"
+      },
+      "recoveryMethod": "public-documentation"
+    },
+    {
+      "artifactSha256": "2b474c20c095efbc1280b9d6d6f8d7670da88a35e82ff66560282f97a90bbc91",
+      "artifactPath": "sources/cursor/docs/agent/overview.md",
+      "cursorVersion": "3.24.18",
+      "origin": {
+        "bundle": "sources/cursor/docs/agent/overview.md"
+      },
+      "recoveryMethod": "public-documentation"
+    },
+    {
+      "artifactSha256": "c0d81d9373fbe024d7e554550d0548dbc38b552af6df6214070551bc1770c22a",
+      "artifactPath": "sources/cursor/docs/agent/plan-mode.md",
+      "cursorVersion": "3.24.18",
+      "origin": {
+        "bundle": "sources/cursor/docs/agent/plan-mode.md"
+      },
+      "recoveryMethod": "public-documentation"
+    },
+    {
+      "artifactSha256": "e034de33e0c42c44da09d0c4464a2dfe378378687f362b5b99b2b9f62c75ce82",
+      "artifactPath": "sources/cursor/docs/agent/debug-mode.md",
+      "cursorVersion": "3.24.18",
+      "origin": {
+        "bundle": "sources/cursor/docs/agent/debug-mode.md"
+      },
+      "recoveryMethod": "public-documentation"
+    },
+    {
+      "artifactSha256": "b0589b5b5c7bd1e001777c0e64f03192b3c730ed5a56338d430f5bd9cb5b135d",
+      "artifactPath": "sources/cursor/docs.md",
+      "cursorVersion": "3.24.18",
+      "origin": {
+        "bundle": "sources/cursor/docs.md"
+      },
+      "recoveryMethod": "public-documentation"
+    },
+    {
+      "artifactSha256": "be663f3f66d8f493fce0fd7e3ab1e79d3ef33fd306def86ee8487eee5378c4c2",
+      "artifactPath": "sources/cursor/changelog.html",
+      "cursorVersion": "3.24.18",
+      "origin": {
+        "bundle": "sources/cursor/changelog.html"
+      },
+      "recoveryMethod": "public-documentation"
+    },
+    {
+      "artifactSha256": "ed6922a7a86c8c448a46aa39af0c931580da162770fe406a0d41737290e637d9",
+      "artifactPath": "resources/app/out/vs/workbench/workbench.desktop.main.js",
+      "cursorVersion": "3.24.18",
+      "origin": {
+        "bundle": "resources/app/out/vs/workbench/workbench.desktop.main.js"
+      },
+      "recoveryMethod": "js-bundle-recovery"
+    },
+    {
+      "artifactSha256": "bfd9c46359253e0a4ec6c03bae57cfb837af746699a715df8e7fafe978e48cdf",
+      "artifactPath": "resources/app/extensions/cursor-agent-exec/dist/main.js",
+      "cursorVersion": "3.24.18",
+      "origin": {
+        "bundle": "resources/app/extensions/cursor-agent-exec/dist/main.js"
+      },
+      "recoveryMethod": "js-bundle-recovery"
+    }
+  ],
+  "license": {
+    "spdx": "MIT"
+  },
+  "containsCursorBrandAssets": false,
+  "notes": "Inventário agregado de metadados das fontes do Cursor 3.24.18 (ADR-002/ADR-007). Artefatos proprietários não são redistribuídos; hashes só são emitidos quando a fonte completa está disponível. Formato alinhado ao provenance.schema.json da task_01."
+}

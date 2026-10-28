@@ -1,0 +1,197 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "provenance.json do OpenAgent Editor",
+  "description": "Registro de proveniencia de um modulo reconstruido a partir de artefatos do Cursor 3.24.18. Regras em docs/provenance-policy.md (ADR-002).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "module",
+    "strategy",
+    "sources",
+    "license",
+    "containsCursorBrandAssets"
+  ],
+  "properties": {
+    "$schema": {
+      "const": "https://json-schema.org/draft/2020-12/schema",
+      "description": "URI exata do JSON Schema draft 2020-12."
+    },
+    "schemaVersion": {
+      "const": 1,
+      "description": "Versao deste formato."
+    },
+    "module": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^(?!/)(?!.*(?:^|/)\\.?(?:/|$))(?!.*(?:^|/)\\.\\.(?:/|$))[A-Za-z0-9_-]+(?:/[A-Za-z0-9_-]+)*$",
+      "description": "Caminho do modulo no repositorio, relativo a raiz, com separador '/'."
+    },
+    "strategy": {
+      "enum": [
+        "direct-authorized",
+        "behavioral-reimplementation"
+      ],
+      "description": "direct-authorized: incorpora trecho extraido com autorizacao referenciada. behavioral-reimplementation: codigo proprio escrito a partir do comportamento observado."
+    },
+    "sources": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/source"
+      },
+      "description": "Artefatos do Cursor usados como origem ou evidencia do modulo."
+    },
+    "license": {
+      "$ref": "#/$defs/license"
+    },
+    "authorization": {
+      "$ref": "#/$defs/authorization"
+    },
+    "containsCursorBrandAssets": {
+      "const": false,
+      "description": "Marca, icones e textos do Cursor sao proibidos em qualquer estrategia; o valor so pode ser false."
+    },
+    "notes": {
+      "type": "string",
+      "description": "Observacoes livres, sem trechos de codigo proprietario."
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "strategy": {
+            "const": "direct-authorized"
+          }
+        },
+        "required": [
+          "strategy"
+        ]
+      },
+      "then": {
+        "required": [
+          "authorization"
+        ]
+      }
+    }
+  ],
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$",
+      "description": "SHA-256 em hexadecimal minusculo."
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "artifactSha256",
+        "artifactPath",
+        "cursorVersion",
+        "origin",
+        "recoveryMethod"
+      ],
+      "properties": {
+        "artifactSha256": {
+          "$ref": "#/$defs/sha256",
+          "description": "Hash do artefato de origem (arquivo de bundle, binario ou export)."
+        },
+        "artifactPath": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Caminho do artefato dentro da instalacao do Cursor ou do export local (por exemplo, research/reverse-engineering/cursor-3.24.18/...)."
+        },
+        "cursorVersion": {
+          "const": "3.24.18",
+          "description": "Versao congelada do Cursor usada como oraculo (ADR-007)."
+        },
+        "origin": {
+          "type": "object",
+          "additionalProperties": false,
+          "minProperties": 1,
+          "properties": {
+            "bundle": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Bundle JavaScript, modulo ou recurso de origem."
+            },
+            "address": {
+              "type": "string",
+              "pattern": "^0x[0-9a-fA-F]+$",
+              "description": "Endereco da funcao nativa no export (por exemplo, Ghidra)."
+            },
+            "symbol": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Nome atribuido pela ferramenta de analise, quando houver."
+            }
+          },
+          "anyOf": [
+            {
+              "required": [
+                "bundle"
+              ]
+            },
+            {
+              "required": [
+                "address"
+              ]
+            }
+          ],
+          "description": "Localizacao exata dentro do artefato: bundle e/ou endereco."
+        },
+        "recoveryMethod": {
+          "enum": [
+            "js-bundle-recovery",
+            "ghidra-pseudocode",
+            "runtime-observation",
+            "differential-test",
+            "public-documentation"
+          ],
+          "description": "Metodo usado para recuperar a informacao."
+        }
+      }
+    },
+    "license": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "spdx"
+      ],
+      "properties": {
+        "spdx": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Licenca aplicavel ao codigo do modulo (identificador SPDX ou LicenseRef-*)."
+        }
+      }
+    },
+    "authorization": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "documentRef",
+        "documentSha256",
+        "scope"
+      ],
+      "properties": {
+        "documentRef": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_-]+(?:\\.[A-Za-z0-9_-]+)*(?:/[A-Za-z0-9_-]+(?:\\.[A-Za-z0-9_-]+)*)*$",
+          "description": "Caminho relativo a raiz do repositorio para o documento de autorizacao/licenca."
+        },
+        "documentSha256": {
+          "$ref": "#/$defs/sha256",
+          "description": "Hash do documento de autorizacao, para detectar troca ou edicao."
+        },
+        "scope": {
+          "type": "string",
+          "minLength": 1,
+          "description": "O que o documento autoriza, nos termos dele."
+        }
+      }
+    }
+  }
+}
