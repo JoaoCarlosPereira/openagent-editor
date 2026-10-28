@@ -34,3 +34,11 @@ export {
   type PlanProgressStep,
   type PlanProgressPhase,
 } from "./review/plan-progress.js";
+export {
+  DebugEvidenceController,
+  buildDebugEvidenceView,
+  type DebugEvidencePushInput,
+  type DebugEvidenceViewSnapshot,
+  type DebugEvidencePhase,
+  type DebugVerificationOutcome,
+} from "./review/debug-evidence.js";
