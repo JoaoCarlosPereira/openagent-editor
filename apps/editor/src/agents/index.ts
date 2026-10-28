@@ -30,6 +30,15 @@ export {
 } from "./session-discovery.js";
 
 export {
+  IsolatedWorktreeController,
+  localIsolatedWorktreePort,
+  buildIsolatedWorkView,
+  type IsolatedWorktreePort,
+  type IsolatedWorkPhase,
+  type IsolatedWorkViewSnapshot,
+} from "./isolated-worktree.js";
+
+export {
   AgentsWindowController,
   buildAgentsWindowView,
   type AgentExecutionStatus,
