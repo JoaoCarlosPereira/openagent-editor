@@ -5,7 +5,6 @@ import { validateHarnessEvent } from "./harness-event.js";
 import { PROTOCOL_ERROR_CODES, ProtocolError } from "./errors.js";
 import { OPENAGENT_DAEMON_PROTOCOL_VERSION } from "./protocol-version.js";
 import {
-  buildProtocolTransportErrorFrame,
   buildWorkspaceTransportAck,
   validateWorkspaceTransportHello,
   type WorkspaceTransportAck,
@@ -264,48 +263,47 @@ class TransportHarnessClient implements HarnessClient {
   }
 
   startRun(input: StartRun): AsyncIterable<HarnessEvent> {
-    const self = this;
-    return {
-      async *[Symbol.asyncIterator]() {
-        const requestId = randomUUID();
-        await self.sendRpcEnvelope(
-          RPC_METHOD.RUN_START,
-          { mode: input.mode, input: input.input },
-          {
-            requestId,
-            sessionId: input.sessionId,
-            runId: input.runId,
-            expectedVersion: input.expectedVersion ?? self.expectedVersion,
-          },
-        );
+    return this.iterateRunStart(input);
+  }
 
-        while (!self.closed) {
-          const frame = await readWireFrame(self.socket);
-          if (frame.type === "protocol.error") {
-            throwProtocolErrorFromFrame(frame);
-          }
-          if (frame.type === "harness.event") {
-            const validation = validateHarnessEvent(frame.event);
-            if (!validation.valid) {
-              throw new ProtocolError(
-                validation.code,
-                validation.errors.join(" "),
-                validation.errors,
-              );
-            }
-            yield validation.value;
-            continue;
-          }
-          if (frame.type === "rpc.stream.end" && frame.requestId === requestId) {
-            return;
-          }
+  private async *iterateRunStart(input: StartRun): AsyncGenerator<HarnessEvent> {
+    const requestId = randomUUID();
+    await this.sendRpcEnvelope(
+      RPC_METHOD.RUN_START,
+      { mode: input.mode, input: input.input },
+      {
+        requestId,
+        sessionId: input.sessionId,
+        runId: input.runId,
+        expectedVersion: input.expectedVersion ?? this.expectedVersion,
+      },
+    );
+
+    while (!this.closed) {
+      const frame = await readWireFrame(this.socket);
+      if (frame.type === "protocol.error") {
+        throwProtocolErrorFromFrame(frame);
+      }
+      if (frame.type === "harness.event") {
+        const validation = validateHarnessEvent(frame.event);
+        if (!validation.valid) {
           throw new ProtocolError(
-            PROTOCOL_ERROR_CODES.INVALID_STATE,
-            `Frame inesperado durante run.start: ${String((frame as { type?: string }).type)}`,
+            validation.code,
+            validation.errors.join(" "),
+            validation.errors,
           );
         }
-      },
-    };
+        yield validation.value;
+        continue;
+      }
+      if (frame.type === "rpc.stream.end" && frame.requestId === requestId) {
+        return;
+      }
+      throw new ProtocolError(
+        PROTOCOL_ERROR_CODES.INVALID_STATE,
+        `Frame inesperado durante run.start: ${String((frame as { type?: string }).type)}`,
+      );
+    }
   }
 
   async enqueue(runId: string, input: UserInput): Promise<QueueItem> {
