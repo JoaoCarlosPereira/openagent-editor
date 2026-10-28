@@ -104,8 +104,11 @@ export {
 
 export {
   createStoredSession,
+  forkStoredSession,
   listStoredSessionsByWorkspace,
   type CreateStoredSessionInput,
+  type ForkStoredSessionInput,
+  type ForkStoredSessionResult,
   type StoredSession,
   type StoredSessionWithResume,
 } from "./sessions/index.js";
