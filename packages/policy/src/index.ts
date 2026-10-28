@@ -115,6 +115,17 @@ export {
   type LoadedCustomizationRule,
   type SessionRulesLoadedEmission,
 } from "./hooks/customization-rules.js";
+export {
+  applyLocalCustomizationInvocation,
+  mergeLocalCustomizationAssetsByPrecedence,
+  parseLocalCustomizationInvokeRef,
+  type LoadedLocalCustomizationAsset,
+  type LocalCustomizationAssetKind,
+  type LocalCustomizationAssetLayer,
+  type LocalCustomizationAssetManifest,
+  type LocalCustomizationInvokeDisplay,
+  type LocalCustomizationInvokeResult,
+} from "./hooks/local-customization-assets.js";
 export type {
   HookDenialDisplay,
   LocalHookAction,

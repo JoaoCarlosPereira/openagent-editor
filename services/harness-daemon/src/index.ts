@@ -75,3 +75,10 @@ export {
   type BeginSessionCustomizationInput,
   type SessionCustomizationRulesSnapshot,
 } from "./customization/session-rules-loader.js";
+
+export {
+  WorkspaceLocalCustomizationAssets,
+  createWorkspaceLocalCustomizationAssets,
+  loadWorkspaceLocalCustomizationAssets,
+  type LoadWorkspaceLocalCustomizationInput,
+} from "./customization/local-customization-loader.js";

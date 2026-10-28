@@ -228,3 +228,8 @@ export {
   type CustomizationRuleFileReader,
   type LoadCustomizationRulesFromPathsInput,
 } from "./mcp/load-customization-rules.js";
+
+export {
+  loadLocalCustomizationAssetsFromPaths,
+  type LoadLocalCustomizationAssetsInput,
+} from "./mcp/load-local-customization-assets.js";
