@@ -25,6 +25,14 @@ import {
   type AgentHistoryMessage,
 } from "./agent-history.js";
 import {
+  AGENT_PANEL_FOCUS_TARGETS,
+  assertAgentPanelFocusTarget,
+  resolveAgentPanelFocusNeighbor,
+  resolveAgentPanelKeyboardDirection,
+  type AgentPanelFocusTarget,
+  type AgentPanelKeyboardEvent,
+} from "./agent-panel-keyboard.js";
+import {
   DEFAULT_AGENT_PANEL_MODELS,
   assertAgentPanelMode,
   assertAgentPanelModelId,
@@ -33,6 +41,12 @@ import {
 
 export type { AgentHistoryMessage, AgentHistoryRole } from "./agent-history.js";
 export { buildAgentPanelView, type AgentPanelViewSnapshot } from "./agent-panel-view.js";
+export {
+  AGENT_PANEL_FOCUS_TARGETS,
+  assertAgentPanelFocusTarget,
+  type AgentPanelFocusTarget,
+  type AgentPanelKeyboardEvent,
+} from "./agent-panel-keyboard.js";
 export {
   AGENT_PANEL_MODES,
   DEFAULT_AGENT_PANEL_MODELS,
@@ -82,7 +96,7 @@ function emptyContextPreview(workspaceContextLimitTokens: number | null) {
 
 /**
  * UI-01 / VAL-01 / CTX-01 / API-03: painel com seletores, prévia de contexto,
- * composer, histórico e recusa de envio vazio com texto exato.
+ * composer, histórico, navegação por teclado e recusa de envio vazio.
  */
 export class AgentPanelController {
   private sessionId = "";
@@ -95,6 +109,7 @@ export class AgentPanelController {
   private mode: AgentMode = "agent";
   private modelId = firstAvailableModelId(DEFAULT_AGENT_PANEL_MODELS);
   private availableModels: readonly AgentPanelModelOption[] = DEFAULT_AGENT_PANEL_MODELS;
+  private focusedControl: AgentPanelFocusTarget = AGENT_PANEL_FOCUS_TARGETS[0];
   private view: AgentPanelViewSnapshot = buildAgentPanelView({
     sessionId: "",
     history: [],
@@ -104,6 +119,7 @@ export class AgentPanelController {
     modelId: firstAvailableModelId(DEFAULT_AGENT_PANEL_MODELS),
     availableModels: DEFAULT_AGENT_PANEL_MODELS,
     contextPreview: emptyContextPreview(null),
+    focusedControl: AGENT_PANEL_FOCUS_TARGETS[0],
   });
 
   get snapshot(): AgentPanelViewSnapshot {
@@ -116,6 +132,7 @@ export class AgentPanelController {
     this.composerText = "";
     this.composerDisabled = false;
     this.composerValidationMessage = undefined;
+    this.focusedControl = AGENT_PANEL_FOCUS_TARGETS[0];
     this.workspaceContextLimitTokens =
       input.workspaceContextLimitTokens === undefined
         ? null
@@ -134,6 +151,44 @@ export class AgentPanelController {
       input.modelId !== undefined
         ? assertAgentPanelModelId(input.modelId, this.availableModels)
         : firstAvailableModelId(this.availableModels);
+    this.refreshView();
+    return this.view;
+  }
+
+  /** UI-01: move o foco de teclado para um controle nomeado do painel. */
+  setFocusedControl(control: unknown): AgentPanelViewSnapshot {
+    this.focusedControl = assertAgentPanelFocusTarget(control);
+    this.refreshView();
+    return this.view;
+  }
+
+  /** UI-01: avança o foco na ordem declarada (Tab / seta). */
+  focusNext(): AgentPanelViewSnapshot {
+    this.focusedControl = resolveAgentPanelFocusNeighbor(this.focusedControl, "next");
+    this.refreshView();
+    return this.view;
+  }
+
+  /** UI-01: recua o foco na ordem declarada (Shift+Tab / seta). */
+  focusPrevious(): AgentPanelViewSnapshot {
+    this.focusedControl = resolveAgentPanelFocusNeighbor(
+      this.focusedControl,
+      "previous",
+    );
+    this.refreshView();
+    return this.view;
+  }
+
+  /**
+   * UI-01: interpreta Tab/Shift+Tab/setas. Tecla inválida → INVALID_STATE
+   * sem alterar o foco atual.
+   */
+  handleKeyboard(event: AgentPanelKeyboardEvent): AgentPanelViewSnapshot {
+    const direction = resolveAgentPanelKeyboardDirection(event);
+    this.focusedControl = resolveAgentPanelFocusNeighbor(
+      this.focusedControl,
+      direction,
+    );
     this.refreshView();
     return this.view;
   }
@@ -241,6 +296,7 @@ export class AgentPanelController {
       modelId: this.modelId,
       availableModels: this.availableModels,
       contextPreview: preview,
+      focusedControl: this.focusedControl,
       ...(this.composerValidationMessage !== undefined
         ? { composerValidationMessage: this.composerValidationMessage }
         : {}),

@@ -1,6 +1,10 @@
 import type { AgentMode } from "@openagent/protocol";
 
 import type { ContextSendPreviewViewSnapshot } from "../context/context-send-preview-view.js";
+import {
+  AGENT_PANEL_FOCUS_TARGETS,
+  type AgentPanelFocusTarget,
+} from "./agent-panel-keyboard.js";
 import { formatAgentHistoryRoleLabel, type AgentHistoryMessage } from "./agent-history.js";
 import {
   AGENT_PANEL_MODE_LABELS,
@@ -20,6 +24,8 @@ export interface AgentPanelViewInput {
   composerValidationMessage?: string;
   /** CTX-01 / API-03: prévia de fontes, tokens e teto. */
   contextPreview: ContextSendPreviewViewSnapshot;
+  /** UI-01: controle com foco de teclado. */
+  focusedControl: AgentPanelFocusTarget;
 }
 
 export interface AgentPanelViewSnapshot {
@@ -31,6 +37,7 @@ export interface AgentPanelViewSnapshot {
     mode: AgentMode;
     modelId: string;
     focusOrder: readonly string[];
+    focusedControl: AgentPanelFocusTarget;
     composerValidationMessage: string | null;
     contextPreview: ContextSendPreviewViewSnapshot["accessible"];
   };
@@ -44,6 +51,13 @@ function escapeHtml(text: string): string {
     .replaceAll('"', "&quot;");
 }
 
+function focusAttrs(testId: AgentPanelFocusTarget, focused: AgentPanelFocusTarget): string {
+  const isFocused = testId === focused;
+  const tab = isFocused ? ' tabindex="0"' : ' tabindex="-1"';
+  const focusedAttr = isFocused ? ' data-focused="true"' : "";
+  return `${tab}${focusedAttr}`;
+}
+
 function renderHistoryMessage(message: AgentHistoryMessage): string {
   const roleLabel = formatAgentHistoryRoleLabel(message.role);
   return [
@@ -54,14 +68,17 @@ function renderHistoryMessage(message: AgentHistoryMessage): string {
   ].join("");
 }
 
-function renderModeSelect(selectedMode: AgentMode): string {
+function renderModeSelect(
+  selectedMode: AgentMode,
+  focusedControl: AgentPanelFocusTarget,
+): string {
   const options = AGENT_PANEL_MODES.map((mode) => {
     const selected = mode === selectedMode ? " selected" : "";
     return `<option value="${mode}"${selected}>${AGENT_PANEL_MODE_LABELS[mode]}</option>`;
   }).join("");
   return [
     `<select id="agent-mode-selector" data-testid="agent-mode-selector"`,
-    ` aria-label="Modo do agente" tabindex="0">`,
+    ` aria-label="Modo do agente"${focusAttrs("agent-mode-selector", focusedControl)}>`,
     options,
     `</select>`,
   ].join("");
@@ -70,6 +87,7 @@ function renderModeSelect(selectedMode: AgentMode): string {
 function renderModelSelect(
   selectedModelId: string,
   availableModels: readonly AgentPanelModelOption[],
+  focusedControl: AgentPanelFocusTarget,
 ): string {
   const options = availableModels
     .map((model) => {
@@ -79,7 +97,7 @@ function renderModelSelect(
     .join("");
   return [
     `<select id="agent-model-selector" data-testid="agent-model-selector"`,
-    ` aria-label="Modelo" tabindex="0">`,
+    ` aria-label="Modelo"${focusAttrs("agent-model-selector", focusedControl)}>`,
     options,
     `</select>`,
   ].join("");
@@ -108,34 +126,33 @@ export function buildAgentPanelView(input: AgentPanelViewInput): AgentPanelViewS
   const hasValidation =
     validationMessage !== undefined && validationMessage.length > 0;
   const invalidAttr = hasValidation ? ` aria-invalid="true"` : "";
-  const focusOrder = [
-    "agent-mode-selector",
-    "agent-model-selector",
-    "agent-context-slot",
-    "agent-history",
-    "agent-composer-input",
-    "agent-composer-send",
-    "agent-review-slot",
-  ] as const;
+  const focusOrder = AGENT_PANEL_FOCUS_TARGETS;
+  const focused = input.focusedControl;
 
   const html = [
-    `<section role="region" aria-labelledby="agent-panel-title" data-testid="agent-panel">`,
+    `<section role="region" aria-labelledby="agent-panel-title" data-testid="agent-panel"`,
+    ` data-focused-control="${focused}">`,
     `<h2 id="agent-panel-title">Painel do agente</h2>`,
-    renderModeSelect(input.mode),
-    renderModelSelect(input.modelId, input.availableModels),
-    `<div data-testid="agent-context-slot" role="group" aria-label="Contexto anexado" tabindex="0">`,
+    renderModeSelect(input.mode, focused),
+    renderModelSelect(input.modelId, input.availableModels, focused),
+    `<div data-testid="agent-context-slot" role="group" aria-label="Contexto anexado"`,
+    `${focusAttrs("agent-context-slot", focused)}>`,
     input.contextPreview.html,
     `</div>`,
-    `<ol data-testid="agent-history" aria-live="polite" tabindex="0">${historyItems}</ol>`,
+    `<ol data-testid="agent-history" aria-live="polite"`,
+    `${focusAttrs("agent-history", focused)}>${historyItems}</ol>`,
     `<form data-testid="agent-composer">`,
     `<label for="agent-composer-input">Mensagem</label>`,
     `<textarea id="agent-composer-input" data-testid="agent-composer-input" name="composer"`,
-    ` aria-label="Composer do agente" tabindex="0"${composerDisabledAttr}${invalidAttr}>`,
+    ` aria-label="Composer do agente"${focusAttrs("agent-composer-input", focused)}`,
+    `${composerDisabledAttr}${invalidAttr}>`,
     `${escapeHtml(input.composerText)}</textarea>`,
     renderComposerValidation(validationMessage),
-    `<button type="button" data-testid="agent-composer-send" tabindex="0"${composerDisabledAttr}>Enviar</button>`,
+    `<button type="button" data-testid="agent-composer-send"`,
+    `${focusAttrs("agent-composer-send", focused)}${composerDisabledAttr}>Enviar</button>`,
     `</form>`,
-    `<div data-testid="agent-review-slot" role="group" aria-label="Revisão de alterações" tabindex="0"></div>`,
+    `<div data-testid="agent-review-slot" role="group" aria-label="Revisão de alterações"`,
+    `${focusAttrs("agent-review-slot", focused)}></div>`,
     `</section>`,
   ].join("");
 
@@ -148,6 +165,7 @@ export function buildAgentPanelView(input: AgentPanelViewInput): AgentPanelViewS
       mode: input.mode,
       modelId: input.modelId,
       focusOrder,
+      focusedControl: focused,
       composerValidationMessage:
         validationMessage !== undefined && validationMessage.length > 0
           ? validationMessage
