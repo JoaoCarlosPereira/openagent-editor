@@ -35,6 +35,10 @@ import {
   type ApplyContext,
   type RebuildProjectionsFromEventLogResult,
 } from "./event-log-projections.js";
+import {
+  recoverWorkspaceStorageAfterCrash,
+  type RecoverWorkspaceStorageResult,
+} from "./storage-recovery.js";
 import { assertValidWorkspaceId } from "./workspace-id.js";
 
 export { STORAGE_SCHEMA_VERSION };
@@ -78,6 +82,7 @@ export type WorkspaceDatabase = {
   deleteSession(sessionId: string): DeleteSessionStorageResult;
   applyHarnessEventToProjections(event: HarnessEvent): void;
   rebuildProjectionsFromEventLog(sessionId: string): RebuildProjectionsFromEventLogResult;
+  recoverFromCommittedEventLog(): RecoverWorkspaceStorageResult;
   close(): void;
 };
 
@@ -133,6 +138,7 @@ export function openWorkspaceDatabase(
   database.exec("PRAGMA journal_mode = WAL");
   const journalMode = readJournalMode(database);
   runStorageMigrations(database, STORAGE_MIGRATIONS);
+  const recoveryResult = recoverWorkspaceStorageAfterCrash(database, casRoot);
 
   const upsert = database.prepare(`
     INSERT INTO session_resume(
@@ -149,6 +155,18 @@ export function openWorkspaceDatabase(
     mode: "ask",
     attachments: [],
   };
+
+  if (recoveryResult.recoveredSessionIds.length > 0) {
+    const primarySessionId = recoveryResult.recoveredSessionIds[0];
+    if (primarySessionId) {
+      const modeRow = database
+        .prepare("SELECT mode FROM session WHERE id = ?")
+        .get(primarySessionId) as { mode?: string } | undefined;
+      if (modeRow?.mode) {
+        projectionContext = { mode: modeRow.mode, attachments: [] };
+      }
+    }
+  }
 
   const selectAll = database.prepare(`
     SELECT
@@ -235,6 +253,19 @@ export function openWorkspaceDatabase(
         mode: result.mode,
         attachments: [],
       };
+      return result;
+    },
+    recoverFromCommittedEventLog() {
+      const result = recoverWorkspaceStorageAfterCrash(database, casRoot);
+      const primarySessionId = result.recoveredSessionIds[0];
+      if (primarySessionId) {
+        const modeRow = database
+          .prepare("SELECT mode FROM session WHERE id = ?")
+          .get(primarySessionId) as { mode?: string } | undefined;
+        if (modeRow?.mode) {
+          projectionContext = { mode: modeRow.mode, attachments: [] };
+        }
+      }
       return result;
     },
     close() {

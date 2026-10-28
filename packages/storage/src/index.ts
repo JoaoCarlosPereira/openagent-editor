@@ -50,6 +50,12 @@ export {
 } from "./event-log-projections.js";
 
 export {
+  listSessionIdsWithCommittedEventLog,
+  recoverWorkspaceStorageAfterCrash,
+  type RecoverWorkspaceStorageResult,
+} from "./storage-recovery.js";
+
+export {
   insertStoredAgentNode,
   insertStoredMessage,
   insertStoredQueueItem,
