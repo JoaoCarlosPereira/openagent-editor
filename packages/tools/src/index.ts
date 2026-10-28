@@ -29,6 +29,27 @@ export {
 } from "./sandbox/tool-sandbox-dispatch.js";
 
 export {
+  executePolicyFileRead,
+  executePolicyFileSearch,
+  preparePolicyFileRead,
+  preparePolicyFileSearch,
+  type PolicyFileToolContext,
+  type PreparePolicyFileReadInput,
+  type PreparePolicyFileSearchInput,
+} from "./files/policy-file-tools.js";
+
+export {
+  readWorkspaceFile,
+  type ReadWorkspaceFileResult,
+} from "./files/read-workspace-file.js";
+
+export {
+  searchWorkspaceFiles,
+  type SearchWorkspaceFilesResult,
+  type WorkspaceSearchHit,
+} from "./files/search-workspace-files.js";
+
+export {
   createTypedToolDispatchRegistry,
   TypedToolDispatchRegistry,
 } from "./worker/dispatch-registry.js";
