@@ -45,6 +45,14 @@ export {
   type StartCliProxySidecarSupervisorOptions,
 } from "./cliproxy-sidecar-supervisor.js";
 export {
+  createEmptyCliProxySidecarMetrics,
+  recordCliProxySidecarProcessCrash,
+  restartCliProxySidecarAfterCrash,
+  startCliProxySidecarCrashRecoverySession,
+  type CliProxySidecarCrashRecoverySession,
+  type CliProxySidecarMetrics,
+} from "./cliproxy-sidecar-crash-restart.js";
+export {
   inferCliProxyProviderFailureReason,
   mapCliProxyChatCompletionHttpFailure,
   mapCliProxyFetchNetworkError,
