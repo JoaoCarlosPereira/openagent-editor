@@ -62,3 +62,22 @@ export {
   type ReadOnlyBlockAttemptResult,
   type ReadOnlyBlockViewSnapshot,
 } from "./permissions/read-only-block.js";
+export {
+  SessionExportController,
+  SessionDeleteController,
+  SessionExportDeleteController,
+  buildSessionExportView,
+  buildSessionDeleteView,
+  buildSessionExportDeleteView,
+  type SessionExportPort,
+  type SessionDeletePort,
+  type SessionExportRequestResult,
+  type SessionDeleteRequestResult,
+  type SessionExportOptions,
+  type SessionDeleteOptions,
+  type SessionExportUiPhase,
+  type SessionDeleteUiPhase,
+  type SessionExportViewSnapshot,
+  type SessionDeleteViewSnapshot,
+  type SessionExportDeleteViewSnapshot,
+} from "./agents/index.js";
