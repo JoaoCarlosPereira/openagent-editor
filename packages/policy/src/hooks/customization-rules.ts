@@ -76,3 +76,30 @@ export function formatCustomizationRulesForDisplay(
     precedence: rule.precedence,
   }));
 }
+
+/** Tipo de evento observável ao carregar regras no início da sessão (CUS-01). */
+export const SESSION_RULES_LOADED_EVENT_TYPE = "session.rules.loaded" as const;
+
+export type SessionRulesLoadedEmission = {
+  type: typeof SESSION_RULES_LOADED_EVENT_TYPE;
+  sessionId: string;
+  rulesRef: string;
+  loadedRules: CustomizationRuleDisplayEntry[];
+  emittedAt: number;
+};
+
+/** Monta emissão estruturada de regras carregadas com origem (CUS-01). */
+export function buildSessionRulesLoadedEmission(input: {
+  sessionId: string;
+  rulesRef: string;
+  loadedRules: readonly CustomizationRuleDisplayEntry[];
+  emittedAt?: number;
+}): SessionRulesLoadedEmission {
+  return {
+    type: SESSION_RULES_LOADED_EVENT_TYPE,
+    sessionId: input.sessionId,
+    rulesRef: input.rulesRef.trim(),
+    loadedRules: [...input.loadedRules],
+    emittedAt: input.emittedAt ?? Date.now(),
+  };
+}

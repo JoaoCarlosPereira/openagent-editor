@@ -98,6 +98,15 @@ export type SessionLoadedCustomizationRule = {
   precedence: number;
 };
 
+/** Emissão observável ao carregar regras no início da sessão (CUS-01). */
+export type SessionRulesLoadedEmission = {
+  type: "session.rules.loaded";
+  sessionId: string;
+  rulesRef: string;
+  loadedRules: SessionLoadedCustomizationRule[];
+  emittedAt: number;
+};
+
 export interface RunStartParams {
   mode?: AgentMode;
   input: UserInput;
@@ -241,6 +250,7 @@ export interface RpcResultMap {
     workspaceId: string;
     mode: AgentMode;
     loadedRules: SessionLoadedCustomizationRule[];
+    rulesLoaded: SessionRulesLoadedEmission;
   };
   [RPC_METHOD.SESSION_LIST]: { sessions: SessionListItem[] };
   [RPC_METHOD.SESSION_SEARCH]: { sessions: Array<{ sessionId: string; mode: AgentMode }> };

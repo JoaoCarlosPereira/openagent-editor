@@ -26,6 +26,8 @@ import {
   type RpcMethod,
   type RpcParamsMap,
   type RpcResultMap,
+  type SessionLoadedCustomizationRule,
+  type SessionRulesLoadedEmission,
 } from "./rpc-methods.js";
 import { validateRpcRequest, type RpcRequestEnvelope } from "./rpc-validator.js";
 import type { UserInput } from "./user-input.js";
@@ -46,6 +48,8 @@ export interface Session {
   rulesRef: string;
   mcpServerIds: readonly string[];
   sessionIds: readonly string[];
+  loadedRules: readonly SessionLoadedCustomizationRule[];
+  rulesLoaded: SessionRulesLoadedEmission;
 }
 
 export interface StartRun {
@@ -141,6 +145,8 @@ function sessionFromCreateResult(
     rulesRef: binding.rulesRef,
     mcpServerIds: binding.mcpServerIds,
     sessionIds: binding.sessionIds,
+    loadedRules: result.loadedRules,
+    rulesLoaded: result.rulesLoaded,
   };
 }
 

@@ -105,12 +105,15 @@ export {
 export type { LocalHookEngineOptions } from "./hooks/engine.js";
 export { formatHookDenialForDisplay } from "./hooks/display.js";
 export {
+  SESSION_RULES_LOADED_EVENT_TYPE,
+  buildSessionRulesLoadedEmission,
   formatCustomizationRulesForDisplay,
   mergeCustomizationRulesByPrecedence,
   validateSessionRulesLoadInput,
   type CustomizationRuleDisplayEntry,
   type CustomizationRuleLayer,
   type LoadedCustomizationRule,
+  type SessionRulesLoadedEmission,
 } from "./hooks/customization-rules.js";
 export type {
   HookDenialDisplay,

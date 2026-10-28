@@ -12,6 +12,7 @@ import {
   type RpcRequestEnvelope,
   type RpcResultMap,
 } from "@openagent/protocol";
+import { buildSessionRulesLoadedEmission } from "@openagent/policy";
 import {
   createStoredSession,
   exportSessionTextFile,
@@ -145,6 +146,12 @@ function handleSessionCreate(
   const mode = params.mode ?? (isAgentMode(context.binding.mode) ? context.binding.mode : "agent");
   const sessionId = `ses-${randomUUID()}`;
 
+  const rulesSnapshot = context.customizationRules.beginSession({
+    workspaceRoot: context.binding.workspaceRoot,
+    sessionId,
+    rulesRef: context.binding.rulesRef,
+  });
+
   withSqlite(db, (sqlite) => {
     ensureWorkspaceRow(sqlite, context.binding.workspaceId, context.binding.workspaceRoot);
     createStoredSession(sqlite, {
@@ -158,10 +165,10 @@ function handleSessionCreate(
     context.binding.sessionIds.push(sessionId);
   }
 
-  const rulesSnapshot = context.customizationRules.beginSession({
-    workspaceRoot: context.binding.workspaceRoot,
+  const rulesLoaded = buildSessionRulesLoadedEmission({
     sessionId,
-    rulesRef: context.binding.rulesRef,
+    rulesRef: rulesSnapshot.rulesRef,
+    loadedRules: rulesSnapshot.display,
   });
 
   return {
@@ -169,6 +176,7 @@ function handleSessionCreate(
     workspaceId: context.binding.workspaceId,
     mode,
     loadedRules: rulesSnapshot.display,
+    rulesLoaded,
   };
 }
 

@@ -4,6 +4,8 @@ import test from "node:test";
 import { PROTOCOL_ERROR_CODES, ProtocolError } from "@openagent/protocol";
 
 import {
+  SESSION_RULES_LOADED_EVENT_TYPE,
+  buildSessionRulesLoadedEmission,
   formatCustomizationRulesForDisplay,
   mergeCustomizationRulesByPrecedence,
   validateSessionRulesLoadInput,
@@ -64,6 +66,27 @@ test("[CUS-01] exibe origem de cada regra carregada", () => {
       precedence: 2,
     },
   ]);
+});
+
+test("[CUS-01] emissão session.rules.loaded inclui origem de cada regra", () => {
+  const display = formatCustomizationRulesForDisplay([
+    {
+      id: "global",
+      layer: "user",
+      origin: "~/.cursor/rules/global.mdc",
+      content: "x",
+      precedence: 1,
+    },
+  ]);
+  const emission = buildSessionRulesLoadedEmission({
+    sessionId: "ses-emit",
+    rulesRef: "rules:project/default",
+    loadedRules: display,
+    emittedAt: 1_700_000_000_000,
+  });
+  assert.equal(emission.type, SESSION_RULES_LOADED_EVENT_TYPE);
+  assert.equal(emission.sessionId, "ses-emit");
+  assert.deepEqual(emission.loadedRules, display);
 });
 
 test("[CUS-01] caminho de erro: rulesRef inválido retorna INVALID_STATE", () => {

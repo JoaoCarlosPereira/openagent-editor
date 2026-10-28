@@ -161,6 +161,14 @@ test("[CLI-01] HarnessClient tipado reutiliza provedor, modo, regras, MCP e sess
         sessionId: "ses-created-01",
         workspaceId: SAMPLE_WORKSPACE_HELLO.workspaceId,
         mode: "agent",
+        loadedRules: [],
+        rulesLoaded: {
+          type: "session.rules.loaded",
+          sessionId: "ses-created-01",
+          rulesRef: SAMPLE_WORKSPACE_HELLO.rulesRef,
+          loadedRules: [],
+          emittedAt: 1,
+        },
       },
     };
   });
