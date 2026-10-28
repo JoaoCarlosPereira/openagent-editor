@@ -8,6 +8,7 @@ import {
   type RpcResultMap,
 } from "@openagent/protocol";
 import type { DaemonRpcContext } from "../runs/run-rpc-handler.js";
+import { handleAgentCancel } from "./agent-cancel.js";
 import { handleAgentSpawn } from "./agent-spawn.js";
 
 function mapProtocolError(error: unknown): ProtocolError {
@@ -29,7 +30,7 @@ function assertAgentWorkspace(context: DaemonRpcContext, request: RpcRequestEnve
   if (typeof request.runId !== "string" || request.runId.trim().length === 0) {
     throw new ProtocolError(
       PROTOCOL_ERROR_CODES.INVALID_STATE,
-      "runId obrigatório para agent.spawn.",
+      "runId obrigatório para RPC de agente.",
     );
   }
 }
@@ -44,6 +45,10 @@ export function handleAgentRpc(
     case RPC_METHOD.AGENT_SPAWN: {
       const params = (request.payload ?? {}) as RpcParamsMap[typeof RPC_METHOD.AGENT_SPAWN];
       return handleAgentSpawn(context, request.runId, params);
+    }
+    case RPC_METHOD.AGENT_CANCEL: {
+      const params = (request.payload ?? {}) as RpcParamsMap[typeof RPC_METHOD.AGENT_CANCEL];
+      return handleAgentCancel(context, request.runId, params);
     }
     default:
       throw new ProtocolError(

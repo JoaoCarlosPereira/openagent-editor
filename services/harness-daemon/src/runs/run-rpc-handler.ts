@@ -26,6 +26,7 @@ import {
   enqueueRunMessage,
   removePendingRunMessage,
 } from "../queue/run-queue-coordinator.js";
+import type { SubagentRuntimeRegistry } from "../agents/agent-subagent-runtime.js";
 import { RunStateMachine } from "../state/run-state-machine.js";
 import type { RunLifecycleState } from "../state/run-state.js";
 import type { SessionRpcContext } from "../sessions/session-rpc-handler.js";
@@ -35,6 +36,8 @@ export type DaemonRpcContext = SessionRpcContext & {
   runMachines: Map<string, RunStateMachine>;
   /** Filas em memória por runId (AGT-06), sincronizadas com SQLite. */
   runQueues: Map<string, RunMessageQueue>;
+  /** Subagentes em execução por runId (AGT-07). */
+  subagentRuns?: SubagentRuntimeRegistry;
 };
 
 export { consumePendingRunQueueAtRunEnd };

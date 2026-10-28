@@ -1,5 +1,4 @@
 import { randomUUID } from "node:crypto";
-import { DatabaseSync } from "node:sqlite";
 import {
   PROTOCOL_ERROR_CODES,
   ProtocolError,
@@ -8,46 +7,24 @@ import {
   RPC_METHOD,
 } from "@openagent/protocol";
 import { persistHarnessEventWithPayload } from "@openagent/policy";
-import { openWorkspaceDatabase, type WorkspaceDatabase } from "@openagent/storage";
-import type { RunLifecycleState } from "../state/run-state.js";
+import { openWorkspaceDatabase } from "@openagent/storage";
+import {
+  loadAgentNodeRow,
+  loadRunLifecycleState,
+  updateAgentNodeState,
+} from "./agent-node-db.js";
+import {
+  parseSubagentObjectiveDelay,
+  registerSubagentRun,
+  unregisterSubagentRun,
+  waitAbortableMs,
+} from "./agent-subagent-runtime.js";
 import type { DaemonRpcContext } from "../runs/run-rpc-handler.js";
 
 export const AGENT_SPAWNED_EVENT = "agent.spawned";
 export const AGENT_COMPLETED_EVENT = "agent.completed";
 
 const AGENT_NAME_MAX = 200;
-
-function withSqlite<T>(db: WorkspaceDatabase, run: (sqlite: DatabaseSync) => T): T {
-  const sqlite = new DatabaseSync(db.databasePath);
-  try {
-    return run(sqlite);
-  } finally {
-    sqlite.close();
-  }
-}
-
-function loadRunLifecycleState(db: WorkspaceDatabase, runId: string): RunLifecycleState | null {
-  return withSqlite(db, (sqlite) => {
-    const row = sqlite
-      .prepare("SELECT state FROM run WHERE id = ?")
-      .get(runId) as { state?: string } | undefined;
-    if (!row?.state) {
-      return null;
-    }
-    if (
-      row.state === "idle" ||
-      row.state === "running" ||
-      row.state === "completed" ||
-      row.state === "cancelled"
-    ) {
-      return row.state;
-    }
-    throw new ProtocolError(
-      PROTOCOL_ERROR_CODES.INVALID_STATE,
-      `Estado de run persistido inválido: ${row.state}`,
-    );
-  });
-}
 
 function agentDisplayName(objective: string): string {
   const trimmed = objective.trim();
@@ -57,30 +34,10 @@ function agentDisplayName(objective: string): string {
   return `${trimmed.slice(0, AGENT_NAME_MAX - 1)}…`;
 }
 
-function updateAgentNodeState(
-  db: WorkspaceDatabase,
-  agentId: string,
-  state: string,
-  resultRef: string | null,
-): void {
-  withSqlite(db, (sqlite) => {
-    const updated = sqlite
-      .prepare("UPDATE agent_node SET state = ?, result_ref = ? WHERE id = ?")
-      .run(state, resultRef, agentId);
-    if (updated.changes !== 1) {
-      throw new ProtocolError(
-        PROTOCOL_ERROR_CODES.INVALID_STATE,
-        "agent_node inexistente para atualização.",
-        [agentId],
-      );
-    }
-  });
-}
-
 function assertSpawnPreconditions(
   context: DaemonRpcContext,
   runId: string,
-  db: WorkspaceDatabase,
+  db: ReturnType<typeof openWorkspaceDatabase>,
 ): void {
   const lifecycle = loadRunLifecycleState(db, runId);
   if (lifecycle === null) {
@@ -102,6 +59,52 @@ function assertSpawnPreconditions(
   }
 }
 
+async function runSubagentToCompletion(
+  context: DaemonRpcContext,
+  runId: string,
+  agentId: string,
+  objective: string,
+  signal: AbortSignal,
+): Promise<void> {
+  const { delayMs, objectiveText } = parseSubagentObjectiveDelay(objective);
+  try {
+    await waitAbortableMs(delayMs, signal);
+  } catch (error) {
+    if (error instanceof ProtocolError && error.code === PROTOCOL_ERROR_CODES.CANCELLED) {
+      return;
+    }
+    throw error;
+  }
+
+  const db = openWorkspaceDatabase({
+    dataRoot: context.dataRoot,
+    workspaceId: context.binding.workspaceId,
+  });
+  try {
+    const node = loadAgentNodeRow(db, agentId);
+    if (!node || node.state !== "running") {
+      return;
+    }
+
+    const name = node.name;
+    const resultBody = JSON.stringify({
+      agentId,
+      objective: objectiveText,
+      summary: `Subagente "${name}" concluiu o objetivo local.`,
+    });
+    const resultCas = db.putCasBlob(Buffer.from(resultBody, "utf8"));
+    updateAgentNodeState(db, agentId, "complete", resultCas.contentRef);
+    persistHarnessEventWithPayload(db, runId, AGENT_COMPLETED_EVENT, {
+      agentId,
+      name,
+      resultRef: resultCas.contentRef,
+    });
+  } finally {
+    db.close();
+    unregisterSubagentRun(context, runId, agentId);
+  }
+}
+
 /**
  * AGT-05: cria subagente local com AgentNode próprio (nome, estado, resultado) no run pai.
  */
@@ -118,7 +121,8 @@ export function spawnSubagentFromObjective(
     assertSpawnPreconditions(context, runId, db);
 
     const agentId = randomUUID();
-    const name = agentDisplayName(objective);
+    const { objectiveText } = parseSubagentObjectiveDelay(objective);
+    const name = agentDisplayName(objectiveText.length > 0 ? objectiveText : objective);
 
     db.insertAgentNode({
       id: agentId,
@@ -132,22 +136,18 @@ export function spawnSubagentFromObjective(
     persistHarnessEventWithPayload(db, runId, AGENT_SPAWNED_EVENT, {
       agentId,
       name,
-      objective: objective.trim(),
+      objective: objectiveText.length > 0 ? objectiveText : objective.trim(),
     });
 
-    const resultBody = JSON.stringify({
+    const abortController = registerSubagentRun(context, runId, agentId);
+    void runSubagentToCompletion(
+      context,
+      runId,
       agentId,
-      objective: objective.trim(),
-      summary: `Subagente "${name}" concluiu o objetivo local.`,
-    });
-    const resultCas = db.putCasBlob(Buffer.from(resultBody, "utf8"));
-
-    updateAgentNodeState(db, agentId, "complete", resultCas.contentRef);
-
-    persistHarnessEventWithPayload(db, runId, AGENT_COMPLETED_EVENT, {
-      agentId,
-      name,
-      resultRef: resultCas.contentRef,
+      objective,
+      abortController.signal,
+    ).catch(() => {
+      unregisterSubagentRun(context, runId, agentId);
     });
 
     return { agentId };

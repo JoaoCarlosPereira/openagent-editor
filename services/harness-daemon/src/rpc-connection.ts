@@ -40,7 +40,10 @@ const CHECKPOINT_RPC_METHODS = new Set<string>([
 
 const CONTEXT_RPC_METHODS = new Set<string>([RPC_METHOD.CONTEXT_ATTACH]);
 
-const AGENT_RPC_METHODS = new Set<string>([RPC_METHOD.AGENT_SPAWN]);
+const AGENT_RPC_METHODS = new Set<string>([
+  RPC_METHOD.AGENT_SPAWN,
+  RPC_METHOD.AGENT_CANCEL,
+]);
 
 function writeProtocolError(socket: net.Socket, code: ProtocolErrorCode, message: string): void {
   writeProtocolFrame(

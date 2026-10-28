@@ -117,6 +117,30 @@ async function callDaemonRpc<M extends RpcMethod>(
   return response.result as RpcResultMap[M];
 }
 
+async function waitForAgentNodeState(
+  dataRoot: string,
+  workspaceId: string,
+  runId: string,
+  agentId: string,
+  expectedState: string,
+  timeoutMs = 5000,
+): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const db = openWorkspaceDatabase({ dataRoot, workspaceId });
+    try {
+      const node = db.listAgentNodes(runId).find((entry) => entry.id === agentId);
+      if (node?.state === expectedState) {
+        return;
+      }
+    } finally {
+      db.close();
+    }
+    await new Promise((resolve) => setTimeout(resolve, 25));
+  }
+  assert.fail(`timeout aguardando agent ${agentId} em estado ${expectedState}`);
+}
+
 async function callDaemonRpcExpectError(
   socket: net.Socket,
   method: RpcMethod,
@@ -185,6 +209,13 @@ test.describe("agent.spawn RPC (AGT-05)", { concurrency: 1 }, () => {
     }
 
     assert.ok(agentId);
+    await waitForAgentNodeState(
+      dataRoot,
+      WORKSPACE_HELLO.workspaceId,
+      runId,
+      agentId,
+      "complete",
+    );
 
     const db = openWorkspaceDatabase({
       dataRoot,
