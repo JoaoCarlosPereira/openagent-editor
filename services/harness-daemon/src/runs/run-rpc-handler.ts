@@ -14,6 +14,11 @@ import { executeAgentRunLoop } from "../agent/agent-run-loop.js";
 import { tryExtractAgentLoopPlanFromUserText } from "../agent/agent-loop-plan.js";
 import { executeAskRunLoop } from "../agent/ask-run-loop.js";
 import { tryExtractAskLoopPlanFromUserText } from "../agent/ask-loop-plan.js";
+import {
+  tryExtractPlanAcceptBundleFromUserText,
+  tryExtractPlanDraftFromUserText,
+} from "../agent/plan-mode-input.js";
+import { executePlanAcceptedRun, presentPlanDraftRun } from "../agent/plan-run-loop.js";
 import { RunMessageQueue } from "../queue/run-message-queue.js";
 import {
   consumePendingRunQueueAtRunEnd,
@@ -227,6 +232,32 @@ export function handleRunStart(
         plan: askLoopPlan,
         machine,
       });
+    }
+
+    const planDraft = tryExtractPlanDraftFromUserText(inputResult.value.text);
+    if (runMode === "plan" && planDraft) {
+      presentPlanDraftRun({
+        context,
+        db,
+        sessionId: request.sessionId,
+        runId: request.runId,
+        draft: planDraft,
+        machine,
+      });
+    } else if (runMode === "plan") {
+      const planAcceptBundle = tryExtractPlanAcceptBundleFromUserText(inputResult.value.text);
+      if (planAcceptBundle) {
+        executePlanAcceptedRun({
+          context,
+          db,
+          sessionId: request.sessionId,
+          runId: request.runId,
+          workspaceRoot: context.binding.workspaceRoot,
+          accept: planAcceptBundle.accept,
+          agentLoop: planAcceptBundle.agentLoop,
+          machine,
+        });
+      }
     }
 
     return startedEvent;

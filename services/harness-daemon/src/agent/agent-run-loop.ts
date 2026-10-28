@@ -35,6 +35,8 @@ export type AgentRunLoopInput = {
   workspaceRoot: string;
   plan: AgentLoopPlan;
   machine: RunStateMachine;
+  /** Quando true, não encerra o run ao fim do loop (modo Plan multi-turno). */
+  deferRunCompletion?: boolean;
 };
 
 export type AgentRunLoopResult = {
@@ -180,7 +182,9 @@ export function executeAgentRunLoop(input: AgentRunLoopInput): AgentRunLoopResul
     }
   }
 
-  completeRunningRunLifecycle(input.context, input.runId);
+  if (!input.deferRunCompletion) {
+    completeRunningRunLifecycle(input.context, input.runId);
+  }
 
   return { events };
 }
