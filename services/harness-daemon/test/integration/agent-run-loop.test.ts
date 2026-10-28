@@ -105,9 +105,7 @@ async function callDaemonRpc<M extends RpcMethod>(
     rpcVersion: RPC_PROTOCOL_VERSION,
   };
   const validation = validateRpcRequest(envelope);
-  if (!validation.valid) {
-    throw new Error("Requisição RPC inválida para teste.");
-  }
+  assert.equal(validation.valid, true);
   writeProtocolFrame(socket, Buffer.from(JSON.stringify(validation.value), "utf8"));
 
   const response = await readJsonFrame(socket);
@@ -170,7 +168,7 @@ function makeAgentLoopInputText(
   });
 }
 
-test.describe("loop do agente no daemon (AGT-03)", { concurrency: 1 }, () => {
+test.describe("Modo Agent: multiarquivo, teste autorizado e diff agrupado (AGT-03)", { concurrency: 1 }, () => {
   test("[AGT-03] run.start com agentLoop edita múltiplos arquivos, executa shell e persiste diff agrupado", async () => {
     const workspaceRoot = mkdtempSync(path.join(os.tmpdir(), "openagent-agent-loop-ws-"));
     const fileA = "src/a.ts";
@@ -228,10 +226,32 @@ test.describe("loop do agente no daemon (AGT-03)", { concurrency: 1 }, () => {
       const streamCheck = validateHarnessEventStream(events);
       assert.equal(streamCheck.valid, true);
 
-      const runRow = db
-        .listHarnessEvents(runId)
-        .length;
-      assert.ok(runRow >= 4);
+      const toolResults = events.filter((event) => event.type === "tool.result");
+      assert.ok(toolResults.length >= 2);
+
+      const diffEvent = events.find((event) => event.type === "diff.grouped");
+      assert.ok(diffEvent?.payloadRef);
+      const diffPayload = JSON.parse(
+        Buffer.from(db.readCasBlob(diffEvent.payloadRef)).toString("utf8"),
+      ) as { groupedDiff?: string };
+      assert.ok(diffPayload.groupedDiff?.includes(fileA));
+      assert.ok(diffPayload.groupedDiff?.includes(fileB));
+
+      const shellResult = toolResults.find((event) => {
+        const body = JSON.parse(
+          Buffer.from(db.readCasBlob(event.payloadRef)).toString("utf8"),
+        ) as { invocation?: { tool?: string } };
+        return body.invocation?.tool === "shell.exec";
+      });
+      assert.ok(shellResult?.payloadRef);
+      const shellEnvelope = JSON.parse(
+        Buffer.from(db.readCasBlob(shellResult.payloadRef)).toString("utf8"),
+      ) as { invocation?: { resultRef?: string } };
+      assert.ok(shellEnvelope.invocation?.resultRef);
+      const shellPayload = JSON.parse(
+        Buffer.from(db.readCasBlob(shellEnvelope.invocation.resultRef)).toString("utf8"),
+      ) as { result?: { stdout?: string } };
+      assert.match(String(shellPayload.result?.stdout ?? ""), /AGT03_LOOP_SHELL/);
     } finally {
       db.close();
       await rm(dataRoot, { recursive: true, force: true });

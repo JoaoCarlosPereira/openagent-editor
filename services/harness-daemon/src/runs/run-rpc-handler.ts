@@ -10,8 +10,7 @@ import {
   type RpcResultMap,
 } from "@openagent/protocol";
 import { openWorkspaceDatabase, type WorkspaceDatabase } from "@openagent/storage";
-import { executeAgentRunLoop } from "../agent/agent-run-loop.js";
-import { tryExtractAgentLoopPlanFromUserText } from "../agent/agent-loop-plan.js";
+import { runAgentModeIfRequested } from "../agent/agent-mode-run.js";
 import { executeAskRunLoop } from "../agent/ask-run-loop.js";
 import { tryExtractAskLoopPlanFromUserText } from "../agent/ask-loop-plan.js";
 import {
@@ -207,19 +206,16 @@ export function handleRunStart(
     });
 
     const runMode = params.mode ?? context.binding.mode;
-    const agentLoopPlan = tryExtractAgentLoopPlanFromUserText(inputResult.value.text);
-    if (runMode === "agent" && agentLoopPlan) {
-      executeAgentRunLoop({
-        context,
-        db,
-        sessionId: request.sessionId,
-        runId: request.runId,
-        agentMode: "agent",
-        workspaceRoot: context.binding.workspaceRoot,
-        plan: agentLoopPlan,
-        machine,
-      });
-    }
+    runAgentModeIfRequested({
+      context,
+      db,
+      sessionId: request.sessionId,
+      runId: request.runId,
+      runMode,
+      workspaceRoot: context.binding.workspaceRoot,
+      userInputText: inputResult.value.text,
+      machine,
+    });
 
     const askLoopPlan = tryExtractAskLoopPlanFromUserText(inputResult.value.text);
     if (runMode === "ask" && askLoopPlan) {
