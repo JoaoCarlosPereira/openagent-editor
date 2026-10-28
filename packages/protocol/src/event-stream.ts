@@ -57,7 +57,11 @@ export class HarnessEventStreamController {
         }
       }
       this.delivered.push(...validation.events);
-      this.nextSequence = validation.events.at(-1)!.sequence + 1;
+      const lastPersisted = validation.events.at(-1);
+      if (!lastPersisted) {
+        throw incompleteStreamError();
+      }
+      this.nextSequence = lastPersisted.sequence + 1;
     } else {
       this.nextSequence = 1;
     }

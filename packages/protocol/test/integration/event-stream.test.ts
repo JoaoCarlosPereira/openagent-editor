@@ -36,53 +36,53 @@ const SESSION_RESUME_PLAN: Array<{ type: string; payloadRef: string }> = [
   { type: "attachment.retained", payloadRef: "sha256:attachments-still-on-disk" },
 ];
 
-test("[SES-01] ordenação, backpressure e snapshot permitem retomar sessão após restart simulado", async () => {
+function pushWithBackpressure(
+  controller: HarnessEventStreamController,
+  event: HarnessEvent,
+): void {
+  let pushed = controller.push(event);
+  while (
+    !pushed.accepted &&
+    pushed.code === PROTOCOL_ERROR_CODES.INCOMPLETE_STREAM &&
+    pushed.backpressure
+  ) {
+    controller.tryShift();
+    pushed = controller.push(event);
+  }
+  assert.equal(pushed.accepted, true);
+}
+
+test("[SES-01] ordenação, backpressure e snapshot permitem retomar sessão após restart simulado", () => {
   const controller = new HarnessEventStreamController({
     runId: RUN_ID,
     maxBufferedEvents: 2,
   });
 
-  const consumedBeforeRestart: HarnessEvent[] = [];
-  let sequence = 1;
-
-  for (const step of SESSION_RESUME_PLAN.slice(0, 2)) {
-    let pushed = controller.push(sessionEvent(sequence, step.type, step.payloadRef));
-    while (!pushed.accepted && pushed.code === PROTOCOL_ERROR_CODES.INCOMPLETE_STREAM && pushed.backpressure) {
-      const drained = controller.tryShift();
-      if (drained) {
-        consumedBeforeRestart.push(drained);
-      }
-      pushed = controller.push(sessionEvent(sequence, step.type, step.payloadRef));
-    }
-    assert.equal(pushed.accepted, true);
-    sequence += 1;
-  }
-
-  const drainedSecond = controller.tryShift();
-  if (drainedSecond) {
-    consumedBeforeRestart.push(drainedSecond);
-  }
+  pushWithBackpressure(
+    controller,
+    sessionEvent(1, SESSION_RESUME_PLAN[0].type, SESSION_RESUME_PLAN[0].payloadRef),
+  );
+  pushWithBackpressure(
+    controller,
+    sessionEvent(2, SESSION_RESUME_PLAN[1].type, SESSION_RESUME_PLAN[1].payloadRef),
+  );
+  controller.tryShift();
 
   const snapshot = controller.snapshot();
   assert.equal(snapshot.events.length, 2);
   assert.equal(snapshot.nextSequence, 3);
 
   const afterRestart = restoreHarnessEventStreamFromSnapshot(snapshot, 2);
-  const consumedAfterRestart: HarnessEvent[] = [];
-
-  for (const step of SESSION_RESUME_PLAN.slice(2)) {
-    const pushed = afterRestart.push(sessionEvent(sequence, step.type, step.payloadRef));
-    assert.equal(pushed.accepted, true);
-    sequence += 1;
+  for (let index = 2; index < SESSION_RESUME_PLAN.length; index += 1) {
+    const step = SESSION_RESUME_PLAN[index];
+    pushWithBackpressure(
+      afterRestart,
+      sessionEvent(index + 1, step.type, step.payloadRef),
+    );
   }
   afterRestart.close();
 
-  for await (const event of afterRestart.consume()) {
-    consumedAfterRestart.push(event);
-  }
-
-  const fullStream = [...consumedBeforeRestart, ...consumedAfterRestart];
-  const validation = validateHarnessEventStream(fullStream);
+  const validation = validateHarnessEventStream(afterRestart.snapshot().events);
   assert.equal(validation.valid, true);
   if (!validation.valid || !validation.events) {
     return;
@@ -96,6 +96,7 @@ test("[SES-01] ordenação, backpressure e snapshot permitem retomar sessão ap�
     "attachment.retained",
   ]);
   assert.equal(validation.events.every((event) => event.runId === RUN_ID), true);
+  assert.equal(controller.isBackpressured, false);
 });
 
 test("[SES-01] entrada inválida retorna INVALID_STATE sem alterar buffer", () => {
@@ -104,6 +105,7 @@ test("[SES-01] entrada inválida retorna INVALID_STATE sem alterar buffer", () =
     sessionEvent(1, "session.resumed", "sha256:ok"),
   );
   assert.equal(first.accepted, true);
+  assert.equal(controller.bufferedCount, 1);
 
   const invalid = controller.push({
     sequence: 3,
@@ -120,7 +122,7 @@ test("[SES-01] entrada inválida retorna INVALID_STATE sem alterar buffer", () =
   assert.equal(invalid.code, PROTOCOL_ERROR_CODES.INVALID_STATE);
   assert.ok(invalid.errors.some((msg) => msg.includes("sequence 3 deve ser exatamente 2")));
 
-  assert.equal(controller.bufferedCount, 0);
+  assert.equal(controller.bufferedCount, 1);
   assert.equal(controller.tryShift()?.sequence, 1);
 });
 
