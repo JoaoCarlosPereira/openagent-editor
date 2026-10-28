@@ -31,7 +31,10 @@ const RUN_RPC_METHODS = new Set<string>([
   RPC_METHOD.RUN_QUEUE_REMOVE,
 ]);
 
-const CHECKPOINT_RPC_METHODS = new Set<string>([RPC_METHOD.CHECKPOINT_CREATE]);
+const CHECKPOINT_RPC_METHODS = new Set<string>([
+  RPC_METHOD.CHECKPOINT_CREATE,
+  RPC_METHOD.CHECKPOINT_RESTORE,
+]);
 
 function writeProtocolError(socket: net.Socket, code: ProtocolErrorCode, message: string): void {
   writeProtocolFrame(

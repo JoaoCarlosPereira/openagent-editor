@@ -101,6 +101,7 @@ export {
 
 export {
   restoreCheckpointOnWorkspace,
+  type CheckpointRestoreConflictEntry,
   type CheckpointRestoreInput,
   type CheckpointRestoreResult,
 } from "./git/checkpoint-restore.js";

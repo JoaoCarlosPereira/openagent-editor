@@ -22,6 +22,7 @@ import {
   getRpcMethodSpec,
   type AgentMode,
   type PermissionDecision,
+  type CheckpointRestoreConflictEntry,
   type RpcMethod,
   type RpcParamsMap,
   type RpcResultMap,
@@ -61,7 +62,9 @@ export interface QueueItem {
   runId: string;
 }
 
-export type RestoreResult = { restored: true } | { conflict: true };
+export type RestoreResult =
+  | { restored: true }
+  | { conflict: true; conflicts: CheckpointRestoreConflictEntry[] };
 
 export interface HarnessWorkspaceBinding {
   workspaceId: string;
@@ -340,7 +343,7 @@ class TransportHarnessClient implements HarnessClient {
       checkpointId,
     });
     if ("conflict" in result && result.conflict) {
-      return { conflict: true };
+      return { conflict: true, conflicts: result.conflicts };
     }
     return { restored: true };
   }

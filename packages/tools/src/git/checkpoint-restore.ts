@@ -4,9 +4,18 @@ import { sha256HexUtf8 } from "../files/file-content-hash.js";
 import {
   applyWorkspaceFileWrite,
   snapshotWorkspaceFileForWrite,
+  type FileWriteConflictResult,
 } from "../files/write-workspace-file.js";
 import { invalidToolInputError } from "../worker/tool-run-coordinator.js";
 import { parseCheckpointPatchText } from "./checkpoint-patch.js";
+
+export type CheckpointRestoreConflictEntry = {
+  relativePath: string;
+  expectedContentHashHex: string;
+  currentContentHashHex: string;
+  currentContent: string;
+  proposedContent: string;
+};
 
 export type CheckpointRestoreInput = {
   baseHashes: Record<string, string>;
@@ -16,7 +25,7 @@ export type CheckpointRestoreInput = {
 
 export type CheckpointRestoreResult =
   | { restored: true }
-  | { conflict: true };
+  | { conflict: true; conflicts: CheckpointRestoreConflictEntry[] };
 
 function checkpointInvalid(message: string, details?: string[]): never {
   throw new ProtocolError(PROTOCOL_ERROR_CODES.INVALID_STATE, message, details);
@@ -51,8 +60,36 @@ function assertHashMapsAlign(
   }
 }
 
+function conflictEntryFromWriteConflict(
+  conflict: FileWriteConflictResult,
+): CheckpointRestoreConflictEntry {
+  return {
+    relativePath: conflict.relativePath,
+    expectedContentHashHex: conflict.expectedContentHashHex,
+    currentContentHashHex: conflict.currentContentHashHex,
+    currentContent: conflict.currentContent,
+    proposedContent: conflict.proposedContent,
+  };
+}
+
+function conflictEntryFromDrift(input: {
+  relativePath: string;
+  expectedContentHashHex: string;
+  currentContent: string;
+  currentContentHashHex: string;
+  proposedContent: string;
+}): CheckpointRestoreConflictEntry {
+  return {
+    relativePath: input.relativePath,
+    expectedContentHashHex: input.expectedContentHashHex,
+    currentContentHashHex: input.currentContentHashHex,
+    currentContent: input.currentContent,
+    proposedContent: input.proposedContent,
+  };
+}
+
 /**
- * SES-03: reverte somente arquivos marcados no checkpoint, sem sobrescrever edição manual divergente.
+ * SES-03 / ERR-01: reverte só arquivos do run; conflito expõe as duas versões sem gravar por cima.
  */
 export function restoreCheckpointOnWorkspace(
   workspaceRoot: string,
@@ -87,9 +124,6 @@ export function restoreCheckpointOnWorkspace(
         relativePath,
       ]);
     }
-    if (!entry) {
-      continue;
-    }
     const baseHash = baseHashes[relativePath];
     const resultHash = resultHashes[relativePath];
     if (sha256HexUtf8(entry.baseContent) !== baseHash) {
@@ -100,6 +134,7 @@ export function restoreCheckpointOnWorkspace(
     }
   }
 
+  const conflicts: CheckpointRestoreConflictEntry[] = [];
   const pendingWrites: Array<{
     relativePath: string;
     expectedContentHashHex: string;
@@ -112,13 +147,26 @@ export function restoreCheckpointOnWorkspace(
       continue;
     }
     const resultHash = resultHashes[relativePath] ?? "";
+    const baseHash = baseHashes[relativePath] ?? "";
     const current = snapshotWorkspaceFileForWrite(workspaceRoot, relativePath);
+
     if (current.contentHashHex !== resultHash) {
-      return { conflict: true };
-    }
-    if (current.contentHashHex === baseHashes[relativePath]) {
+      conflicts.push(
+        conflictEntryFromDrift({
+          relativePath,
+          expectedContentHashHex: resultHash,
+          currentContent: current.content,
+          currentContentHashHex: current.contentHashHex,
+          proposedContent: entry.baseContent,
+        }),
+      );
       continue;
     }
+
+    if (current.contentHashHex === baseHash) {
+      continue;
+    }
+
     pendingWrites.push({
       relativePath,
       expectedContentHashHex: resultHash,
@@ -126,10 +174,35 @@ export function restoreCheckpointOnWorkspace(
     });
   }
 
+  if (conflicts.length > 0) {
+    return { conflict: true, conflicts };
+  }
+
+  for (const write of pendingWrites) {
+    const snap = snapshotWorkspaceFileForWrite(workspaceRoot, write.relativePath);
+    if (snap.contentHashHex !== write.expectedContentHashHex) {
+      const entry = parsedByPath.get(write.relativePath);
+      conflicts.push(
+        conflictEntryFromDrift({
+          relativePath: write.relativePath,
+          expectedContentHashHex: write.expectedContentHashHex,
+          currentContent: snap.content,
+          currentContentHashHex: snap.contentHashHex,
+          proposedContent: entry?.baseContent ?? write.newContent,
+        }),
+      );
+    }
+  }
+
+  if (conflicts.length > 0) {
+    return { conflict: true, conflicts };
+  }
+
   for (const write of pendingWrites) {
     const outcome = applyWorkspaceFileWrite(workspaceRoot, write);
     if (outcome.status === "conflict") {
-      return { conflict: true };
+      conflicts.push(conflictEntryFromWriteConflict(outcome));
+      return { conflict: true, conflicts };
     }
   }
 

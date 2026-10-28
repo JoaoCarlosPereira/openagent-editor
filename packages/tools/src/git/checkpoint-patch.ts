@@ -4,10 +4,6 @@ export type CheckpointPatchFileChange = {
   resultContent: string;
 };
 
-function escapePathForDiffHeader(relativePath: string): string {
-  return relativePath.replace(/\s/g, "_");
-}
-
 /**
  * Gera patch textual agrupado (estilo unified diff simplificado) para persistência em patchRef.
  */
@@ -23,7 +19,7 @@ export function buildCheckpointPatchFromFileChanges(
     if (typeof change.relativePath !== "string" || !change.relativePath.trim()) {
       throw new Error("Alterações de checkpoint inválidas.");
     }
-    const pathLabel = escapePathForDiffHeader(change.relativePath.trim());
+    const pathLabel = change.relativePath.trim();
     const baseLines = change.baseContent.split("\n");
     const resultLines = change.resultContent.split("\n");
     sections.push(

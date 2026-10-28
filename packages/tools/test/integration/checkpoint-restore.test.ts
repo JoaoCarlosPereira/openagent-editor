@@ -140,7 +140,13 @@ test("[SES-03] checkpoint.restore retorna conflito sem gravar quando arquivo do 
       patchText: loaded.patchText,
     });
 
-    assert.deepEqual(outcome, { conflict: true });
+    if (!("conflict" in outcome) || !outcome.conflict) {
+      assert.fail("esperado conflito de restore");
+    }
+    assert.equal(outcome.conflicts.length, 1);
+    assert.equal(outcome.conflicts[0]?.currentContent, manualEdit);
+    assert.equal(outcome.conflicts[0]?.proposedContent, agentBase);
+    assert.notEqual(outcome.conflicts[0]?.currentContent, outcome.conflicts[0]?.proposedContent);
     assert.equal(readFileSync(path.join(workspaceRoot, agentPath), "utf8"), manualEdit);
 
     sqlite.close();

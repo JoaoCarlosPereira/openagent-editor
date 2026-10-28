@@ -136,6 +136,18 @@ export interface CheckpointRestoreParams {
   checkpointId: string;
 }
 
+export interface CheckpointRestoreConflictEntry {
+  relativePath: string;
+  expectedContentHashHex: string;
+  currentContentHashHex: string;
+  currentContent: string;
+  proposedContent: string;
+}
+
+export type CheckpointRestoreRpcResult =
+  | { restored: true }
+  | { conflict: true; conflicts: CheckpointRestoreConflictEntry[] };
+
 export interface AgentSpawnParams {
   objective: string;
 }
@@ -230,7 +242,7 @@ export interface RpcResultMap {
   [RPC_METHOD.PERMISSION_DECIDE]: { persisted: boolean };
   [RPC_METHOD.TOOL_INVOKE]: { resultRef: string };
   [RPC_METHOD.CHECKPOINT_CREATE]: { checkpointId: string };
-  [RPC_METHOD.CHECKPOINT_RESTORE]: { restored: true } | { conflict: true };
+  [RPC_METHOD.CHECKPOINT_RESTORE]: CheckpointRestoreRpcResult;
   [RPC_METHOD.AGENT_SPAWN]: { agentId: string };
   [RPC_METHOD.AGENT_CANCEL]: { cancelled: true };
   [RPC_METHOD.PROJECT_CREATE]: { projectId: string };

@@ -44,51 +44,18 @@ function assertCheckpointWorkspace(context: DaemonRpcContext, request: RpcReques
   if (!isNonEmptyString(request.runId)) {
     throw new ProtocolError(
       PROTOCOL_ERROR_CODES.INVALID_STATE,
-      "runId obrigatório para checkpoint.create.",
+      "runId obrigatório para checkpoint RPC.",
     );
   }
 }
 
-export function handleCheckpointRestore(
-  context: DaemonRpcContext,
-  request: RpcRequestEnvelope<typeof RPC_METHOD.CHECKPOINT_RESTORE>,
+function mapRestoreResult(
+  result: ReturnType<typeof restoreCheckpointOnWorkspace>,
 ): RpcResultMap[typeof RPC_METHOD.CHECKPOINT_RESTORE] {
-  if (request.workspaceId !== context.binding.workspaceId) {
-    throw new ProtocolError(
-      PROTOCOL_ERROR_CODES.INVALID_STATE,
-      "workspaceId da requisição não corresponde ao workspace da conexão.",
-      [request.workspaceId, context.binding.workspaceId],
-    );
+  if ("restored" in result) {
+    return { restored: true };
   }
-
-  const params = (request.payload ?? {}) as RpcParamsMap[typeof RPC_METHOD.CHECKPOINT_RESTORE];
-  const db = openWorkspaceDatabase({
-    dataRoot: context.dataRoot,
-    workspaceId: context.binding.workspaceId,
-  });
-  try {
-    const sqlite = new DatabaseSync(db.databasePath);
-    try {
-      const loaded = loadCheckpointRestorePayload(
-        sqlite,
-        resolveCasRoot(db.databasePath),
-        params.checkpointId,
-      );
-      const outcome = restoreCheckpointOnWorkspace(context.binding.workspaceRoot, {
-        baseHashes: loaded.baseHashes,
-        resultHashes: loaded.resultHashes,
-        patchText: loaded.patchText,
-      });
-      if ("conflict" in outcome) {
-        return { conflict: true };
-      }
-      return { restored: true };
-    } finally {
-      sqlite.close();
-    }
-  } finally {
-    db.close();
-  }
+  return { conflict: true, conflicts: result.conflicts };
 }
 
 export function handleCheckpointCreate(
@@ -113,6 +80,46 @@ export function handleCheckpointCreate(
         patchText: params.patchText,
       });
       return { checkpointId: created.checkpointId };
+    } finally {
+      sqlite.close();
+    }
+  } finally {
+    db.close();
+  }
+}
+
+export function handleCheckpointRestore(
+  context: DaemonRpcContext,
+  request: RpcRequestEnvelope<typeof RPC_METHOD.CHECKPOINT_RESTORE>,
+): RpcResultMap[typeof RPC_METHOD.CHECKPOINT_RESTORE] {
+  assertCheckpointWorkspace(context, request);
+
+  const params = (request.payload ?? {}) as RpcParamsMap[typeof RPC_METHOD.CHECKPOINT_RESTORE];
+  const db = openWorkspaceDatabase({
+    dataRoot: context.dataRoot,
+    workspaceId: context.binding.workspaceId,
+  });
+  try {
+    const sqlite = new DatabaseSync(db.databasePath);
+    try {
+      const payload = loadCheckpointRestorePayload(
+        sqlite,
+        resolveCasRoot(db.databasePath),
+        params.checkpointId,
+      );
+      if (payload.runId !== request.runId) {
+        throw new ProtocolError(
+          PROTOCOL_ERROR_CODES.INVALID_STATE,
+          "Checkpoint não pertence à execução informada.",
+          [payload.runId, request.runId],
+        );
+      }
+      const outcome = restoreCheckpointOnWorkspace(context.binding.workspaceRoot, {
+        baseHashes: payload.baseHashes,
+        resultHashes: payload.resultHashes,
+        patchText: payload.patchText,
+      });
+      return mapRestoreResult(outcome);
     } finally {
       sqlite.close();
     }
