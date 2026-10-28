@@ -46,6 +46,16 @@ export interface AgentPanelSubmitResult {
   view: AgentPanelViewSnapshot;
 }
 
+function firstAvailableModelId(
+  models: readonly AgentPanelModelOption[],
+): string {
+  const first = models.at(0);
+  if (first === undefined) {
+    return "default";
+  }
+  return first.id;
+}
+
 /**
  * UI-01 (127/128): painel com seletores de modo/modelo, composer e histórico; envio validado (VAL-01).
  */
@@ -55,7 +65,7 @@ export class AgentPanelController {
   private composerText = "";
   private composerDisabled = false;
   private mode: AgentMode = "agent";
-  private modelId = DEFAULT_AGENT_PANEL_MODELS[0]!.id;
+  private modelId = firstAvailableModelId(DEFAULT_AGENT_PANEL_MODELS);
   private availableModels: readonly AgentPanelModelOption[] = DEFAULT_AGENT_PANEL_MODELS;
   private view: AgentPanelViewSnapshot = buildAgentPanelView({
     sessionId: "",
@@ -63,7 +73,7 @@ export class AgentPanelController {
     composerText: "",
     composerDisabled: false,
     mode: "agent",
-    modelId: DEFAULT_AGENT_PANEL_MODELS[0]!.id,
+    modelId: firstAvailableModelId(DEFAULT_AGENT_PANEL_MODELS),
     availableModels: DEFAULT_AGENT_PANEL_MODELS,
   });
 
@@ -84,7 +94,7 @@ export class AgentPanelController {
     this.modelId =
       input.modelId !== undefined
         ? assertAgentPanelModelId(input.modelId, this.availableModels)
-        : this.availableModels[0]!.id;
+        : firstAvailableModelId(this.availableModels);
     this.refreshView();
     return this.view;
   }
