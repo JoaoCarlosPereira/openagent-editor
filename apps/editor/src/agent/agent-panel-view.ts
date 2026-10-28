@@ -2,6 +2,10 @@ import type { AgentMode } from "@openagent/protocol";
 
 import type { ContextSendPreviewViewSnapshot } from "../context/context-send-preview-view.js";
 import {
+  themeTokensCssVariables,
+  type AgentPanelTheme,
+} from "./agent-panel-appearance.js";
+import {
   AGENT_PANEL_FOCUS_TARGETS,
   type AgentPanelFocusTarget,
 } from "./agent-panel-keyboard.js";
@@ -26,6 +30,10 @@ export interface AgentPanelViewInput {
   contextPreview: ContextSendPreviewViewSnapshot;
   /** UI-01: controle com foco de teclado. */
   focusedControl: AgentPanelFocusTarget;
+  /** UI-02: tema claro/escuro. */
+  theme: AgentPanelTheme;
+  /** UI-02: largura do painel em px. */
+  panelWidthPx: number;
 }
 
 export interface AgentPanelViewSnapshot {
@@ -40,6 +48,9 @@ export interface AgentPanelViewSnapshot {
     focusedControl: AgentPanelFocusTarget;
     composerValidationMessage: string | null;
     contextPreview: ContextSendPreviewViewSnapshot["accessible"];
+    theme: AgentPanelTheme;
+    panelWidthPx: number;
+    historyMessageIds: readonly string[];
   };
 }
 
@@ -78,7 +89,9 @@ function renderModeSelect(
   }).join("");
   return [
     `<select id="agent-mode-selector" data-testid="agent-mode-selector"`,
-    ` aria-label="Modo do agente"${focusAttrs("agent-mode-selector", focusedControl)}>`,
+    ` aria-label="Modo do agente"`,
+    ` style="background:var(--agent-panel-control-bg);color:var(--agent-panel-control-fg);border-color:var(--agent-panel-border)"`,
+    `${focusAttrs("agent-mode-selector", focusedControl)}>`,
     options,
     `</select>`,
   ].join("");
@@ -97,7 +110,9 @@ function renderModelSelect(
     .join("");
   return [
     `<select id="agent-model-selector" data-testid="agent-model-selector"`,
-    ` aria-label="Modelo"${focusAttrs("agent-model-selector", focusedControl)}>`,
+    ` aria-label="Modelo"`,
+    ` style="background:var(--agent-panel-control-bg);color:var(--agent-panel-control-fg);border-color:var(--agent-panel-border)"`,
+    `${focusAttrs("agent-model-selector", focusedControl)}>`,
     options,
     `</select>`,
   ].join("");
@@ -114,7 +129,7 @@ function renderComposerValidation(message: string | undefined): string {
   ].join("");
 }
 
-/** UI-01 + CTX-01/API-03: painel com seletores, prévia de contexto, composer e histórico. */
+/** UI-01 + UI-02 + CTX-01/API-03: painel com tema/largura, seletores, prévia, composer e histórico. */
 export function buildAgentPanelView(input: AgentPanelViewInput): AgentPanelViewSnapshot {
   const historyItems =
     input.history.length > 0
@@ -128,10 +143,21 @@ export function buildAgentPanelView(input: AgentPanelViewInput): AgentPanelViewS
   const invalidAttr = hasValidation ? ` aria-invalid="true"` : "";
   const focusOrder = AGENT_PANEL_FOCUS_TARGETS;
   const focused = input.focusedControl;
+  const theme = input.theme;
+  const panelWidthPx = input.panelWidthPx;
+  const styleVars = [
+    `width:${panelWidthPx}px`,
+    `max-width:${panelWidthPx}px`,
+    themeTokensCssVariables(theme),
+    `background:var(--agent-panel-bg)`,
+    `color:var(--agent-panel-fg)`,
+    `border-color:var(--agent-panel-border)`,
+  ].join(";");
 
   const html = [
     `<section role="region" aria-labelledby="agent-panel-title" data-testid="agent-panel"`,
-    ` data-focused-control="${focused}">`,
+    ` data-theme="${theme}" data-panel-width="${panelWidthPx}"`,
+    ` data-focused-control="${focused}" style="${styleVars}">`,
     `<h2 id="agent-panel-title">Painel do agente</h2>`,
     renderModeSelect(input.mode, focused),
     renderModelSelect(input.modelId, input.availableModels, focused),
@@ -171,6 +197,9 @@ export function buildAgentPanelView(input: AgentPanelViewInput): AgentPanelViewS
           ? validationMessage
           : null,
       contextPreview: input.contextPreview.accessible,
+      theme,
+      panelWidthPx,
+      historyMessageIds: input.history.map((message) => message.id),
     },
   };
 }

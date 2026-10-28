@@ -17,6 +17,13 @@ import {
   type AgentPanelContextAttachment,
 } from "../context/panel-context-slot.js";
 import {
+  AGENT_PANEL_THEME_DEFAULT,
+  AGENT_PANEL_WIDTH_DEFAULT_PX,
+  assertAgentPanelTheme,
+  assertAgentPanelWidthPx,
+  type AgentPanelTheme,
+} from "./agent-panel-appearance.js";
+import {
   buildAgentPanelView,
   type AgentPanelViewSnapshot,
 } from "./agent-panel-view.js";
@@ -52,6 +59,18 @@ export {
   DEFAULT_AGENT_PANEL_MODELS,
   type AgentPanelModelOption,
 } from "./agent-panel-selectors.js";
+export {
+  AGENT_PANEL_THEMES,
+  AGENT_PANEL_THEME_DEFAULT,
+  AGENT_PANEL_THEME_TOKENS,
+  AGENT_PANEL_WIDTH_DEFAULT_PX,
+  AGENT_PANEL_WIDTH_MAX_PX,
+  AGENT_PANEL_WIDTH_MIN_PX,
+  assertAgentPanelTheme,
+  assertAgentPanelWidthPx,
+  type AgentPanelTheme,
+  type AgentPanelThemeTokens,
+} from "./agent-panel-appearance.js";
 export type { AgentPanelContextAttachment } from "../context/panel-context-slot.js";
 export { buildContextSendPreviewView } from "../context/context-send-preview-view.js";
 
@@ -64,6 +83,10 @@ export interface AgentPanelOpenInput {
   initialAttachments?: readonly AgentPanelContextAttachment[];
   /** null/undefined = API-03 default 200000. */
   workspaceContextLimitTokens?: number | null;
+  /** UI-02: tema inicial (padrão light). */
+  theme?: AgentPanelTheme;
+  /** UI-02: largura inicial em px. */
+  panelWidthPx?: number;
 }
 
 export interface AgentPanelSubmitResult {
@@ -95,8 +118,8 @@ function emptyContextPreview(workspaceContextLimitTokens: number | null) {
 }
 
 /**
- * UI-01 / VAL-01 / CTX-01 / API-03: painel com seletores, prévia de contexto,
- * composer, histórico, navegação por teclado e recusa de envio vazio.
+ * UI-01 / UI-02 / VAL-01 / CTX-01 / API-03: painel com seletores, tema/largura,
+ * prévia de contexto, composer, histórico, teclado e recusa de envio vazio.
  */
 export class AgentPanelController {
   private sessionId = "";
@@ -110,6 +133,8 @@ export class AgentPanelController {
   private modelId = firstAvailableModelId(DEFAULT_AGENT_PANEL_MODELS);
   private availableModels: readonly AgentPanelModelOption[] = DEFAULT_AGENT_PANEL_MODELS;
   private focusedControl: AgentPanelFocusTarget = AGENT_PANEL_FOCUS_TARGETS[0];
+  private theme: AgentPanelTheme = AGENT_PANEL_THEME_DEFAULT;
+  private panelWidthPx = AGENT_PANEL_WIDTH_DEFAULT_PX;
   private view: AgentPanelViewSnapshot = buildAgentPanelView({
     sessionId: "",
     history: [],
@@ -120,6 +145,8 @@ export class AgentPanelController {
     availableModels: DEFAULT_AGENT_PANEL_MODELS,
     contextPreview: emptyContextPreview(null),
     focusedControl: AGENT_PANEL_FOCUS_TARGETS[0],
+    theme: AGENT_PANEL_THEME_DEFAULT,
+    panelWidthPx: AGENT_PANEL_WIDTH_DEFAULT_PX,
   });
 
   get snapshot(): AgentPanelViewSnapshot {
@@ -151,6 +178,14 @@ export class AgentPanelController {
       input.modelId !== undefined
         ? assertAgentPanelModelId(input.modelId, this.availableModels)
         : firstAvailableModelId(this.availableModels);
+    this.theme =
+      input.theme !== undefined
+        ? assertAgentPanelTheme(input.theme)
+        : AGENT_PANEL_THEME_DEFAULT;
+    this.panelWidthPx =
+      input.panelWidthPx !== undefined
+        ? assertAgentPanelWidthPx(input.panelWidthPx)
+        : AGENT_PANEL_WIDTH_DEFAULT_PX;
     this.refreshView();
     return this.view;
   }
@@ -201,6 +236,26 @@ export class AgentPanelController {
 
   setModel(modelId: unknown): AgentPanelViewSnapshot {
     this.modelId = assertAgentPanelModelId(modelId, this.availableModels);
+    this.refreshView();
+    return this.view;
+  }
+
+  /**
+   * UI-02: alterna tema claro/escuro sem alterar o histórico da conversa.
+   * Tema inválido → INVALID_STATE sem efeito colateral.
+   */
+  setTheme(theme: unknown): AgentPanelViewSnapshot {
+    this.theme = assertAgentPanelTheme(theme);
+    this.refreshView();
+    return this.view;
+  }
+
+  /**
+   * UI-02: altera a largura do painel sem alterar o histórico da conversa.
+   * Largura inválida → INVALID_STATE sem efeito colateral.
+   */
+  setPanelWidth(panelWidthPx: unknown): AgentPanelViewSnapshot {
+    this.panelWidthPx = assertAgentPanelWidthPx(panelWidthPx);
     this.refreshView();
     return this.view;
   }
@@ -297,6 +352,8 @@ export class AgentPanelController {
       availableModels: this.availableModels,
       contextPreview: preview,
       focusedControl: this.focusedControl,
+      theme: this.theme,
+      panelWidthPx: this.panelWidthPx,
       ...(this.composerValidationMessage !== undefined
         ? { composerValidationMessage: this.composerValidationMessage }
         : {}),
