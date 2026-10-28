@@ -212,4 +212,43 @@ describe("PER-02 e2e — Cancelar run e ver Cancelada em até 2 s", () => {
     assert.equal(panel.snapshot.accessible.runState, "cancelled");
     assert.equal(panel.snapshot.accessible.appliedChangeCount, 1);
   });
+
+  it("[PER-02] eco atrasado (>2s) ainda marca Cancelada; prazo ≤2s só no caminho feliz", () => {
+    let clock = 2_000_000;
+    const panel = new RunCancelPanelController(RUN_ID, { now: () => clock });
+
+    panel.beginRunning();
+    panel.recordAppliedChange({
+      changeId: "chg-late",
+      path: "late.ts",
+      summary: "já aplicada",
+    });
+    panel.requestCancel();
+
+    // Eco além do prazo PER-02: controller NÃO deve lançar após consumir sequence.
+    clock += RUN_CANCEL_DEADLINE_MS + 1;
+    const cancelled = panel.push({
+      event: harnessEvent(1, RUN_CANCELLED_EVENT, "sha256:run-cancelled-late"),
+      payload: { type: RUN_CANCELLED_EVENT, runId: RUN_ID, endedAt: "2026-10-28T10:00:02.001Z" },
+    });
+
+    assert.equal(cancelled.accessible.runState, "cancelled");
+    assert.equal(cancelled.accessible.statusLabel, "Cancelada");
+    assert.equal(cancelled.accessible.cancelLatencyMs, RUN_CANCEL_DEADLINE_MS + 1);
+    assert.match(cancelled.html, />Cancelada</);
+    assert.match(cancelled.html, /data-cancel-latency-ms="2001"/);
+    assert.equal(cancelled.accessible.appliedChangeCount, 1);
+    assert.deepEqual([...cancelled.accessible.appliedChangeIds], ["chg-late"]);
+
+    // Ainda bloqueia nova ferramenta; sequence já consumida sem travar UI.
+    assert.throws(
+      () => panel.beginToolInvocation("shell"),
+      (error: unknown) => {
+        assert.ok(error instanceof ProtocolError);
+        assert.equal(error.code, "INVALID_STATE");
+        return true;
+      },
+    );
+    assert.equal(panel.snapshot.accessible.runState, "cancelled");
+  });
 });
