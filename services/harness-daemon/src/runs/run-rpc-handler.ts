@@ -17,6 +17,8 @@ import {
   tryExtractPlanAcceptBundleFromUserText,
   tryExtractPlanDraftFromUserText,
 } from "../agent/plan-mode-input.js";
+import { tryExtractDebugSessionFromUserText } from "../agent/debug-mode-input.js";
+import { executeDebugRun } from "../agent/debug-run-loop.js";
 import { executePlanAcceptedRun, presentPlanDraftRun } from "../agent/plan-run-loop.js";
 import { RunMessageQueue } from "../queue/run-message-queue.js";
 import {
@@ -254,6 +256,25 @@ export function handleRunStart(
           machine,
         });
       }
+    }
+
+    if (runMode === "debug") {
+      const debugSession = tryExtractDebugSessionFromUserText(inputResult.value.text);
+      if (!debugSession) {
+        throw new ProtocolError(
+          PROTOCOL_ERROR_CODES.INVALID_STATE,
+          "Modo Debug exige debugSession no input.",
+        );
+      }
+      executeDebugRun({
+        context,
+        db,
+        sessionId: request.sessionId,
+        runId: request.runId,
+        workspaceRoot: context.binding.workspaceRoot,
+        session: debugSession,
+        machine,
+      });
     }
 
     return startedEvent;
