@@ -76,7 +76,8 @@
     "check": "node --check extension/index.js && node --check extension/client.js && node --check extension/html.js && node --check extension/context.js && node --check extension/inline.js && node --check extension/agent.js && node --check extension/paths.js",
     "test:unit": "node scripts/run-unit-tests.mjs",
     "typecheck": "tsc -p tsconfig.json",
-    "lint": "eslint --max-warnings 0 ."
+    "lint": "eslint --max-warnings 0 .",
+    "parity:report": "node scripts/parity-report.mjs"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",
