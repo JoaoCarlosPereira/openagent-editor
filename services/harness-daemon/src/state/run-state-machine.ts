@@ -1,13 +1,9 @@
-import {
-  PROTOCOL_ERROR_CODES,
-  ProtocolError,
-  refuseToolInTerminalRunError,
-  type TerminalRunState,
-} from "@openagent/protocol";
+import { PROTOCOL_ERROR_CODES, ProtocolError } from "@openagent/protocol";
 import {
   isTerminalRunLifecycleState,
   type RunLifecycleState,
 } from "./run-state.js";
+import { assertMayDispatchToolForLifecycle } from "./terminal-run-tool-guard.js";
 
 function invalidRunTransitionError(
   message: string,
@@ -85,17 +81,7 @@ export class RunStateMachine {
   }
 
   assertMayDispatchTool(): void {
-    if (this.lifecycleState !== "running") {
-      if (isTerminalRunLifecycleState(this.lifecycleState)) {
-        throw refuseToolInTerminalRunError(
-          this.lifecycleState satisfies TerminalRunState,
-        );
-      }
-      throw invalidRunTransitionError(
-        "Ferramenta só pode ser despachada com execução em andamento.",
-        this.lifecycleState,
-      );
-    }
+    assertMayDispatchToolForLifecycle(this.lifecycleState);
   }
 
   private transitionFromRunning(

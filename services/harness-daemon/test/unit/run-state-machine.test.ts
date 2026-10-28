@@ -58,6 +58,7 @@ test("[STA-01] execução cancelada recusa nova ferramenta com INVALID_STATE at�
     assert.ok(isProtocolError(error));
     assert.equal(error.code, PROTOCOL_ERROR_CODES.INVALID_STATE);
     assert.equal(error.hints?.runState, "cancelled");
+    assert.equal(error.hints?.requiresNewUserMessage, true);
   }
 });
 
