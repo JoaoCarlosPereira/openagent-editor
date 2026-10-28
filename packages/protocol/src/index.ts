@@ -16,3 +16,12 @@ export {
   validateCommandEnvelope,
   validateMutableCommandEnvelope,
 } from "./validator.js";
+
+export {
+  HARNESS_EVENT_SCHEMA_VERSION,
+  assertHarnessEvent,
+  validateHarnessEvent,
+  validateHarnessEventStream,
+  type HarnessEvent,
+  type HarnessEventValidationResult,
+} from "./harness-event.js";

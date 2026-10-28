@@ -1,6 +1,12 @@
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
+import type { HarnessEvent } from "@openagent/protocol";
+import {
+  appendHarnessEvent,
+  listHarnessEvents,
+  type AppendHarnessEventInput,
+} from "./event-log.js";
 import { runStorageMigrations } from "./migration-runner.js";
 import { STORAGE_MIGRATIONS } from "./migrations/index.js";
 import { STORAGE_SCHEMA_VERSION } from "./schema-version.js";
@@ -28,6 +34,8 @@ export type WorkspaceDatabase = {
   readonly journalMode: "wal";
   putSessionResume(record: SessionResumeRecord): void;
   listSessionResumes(): SessionResumeRecord[];
+  appendHarnessEvent(input: AppendHarnessEventInput): HarnessEvent;
+  listHarnessEvents(runId?: string): HarnessEvent[];
   close(): void;
 };
 
@@ -120,6 +128,12 @@ export function openWorkspaceDatabase(
     listSessionResumes(): SessionResumeRecord[] {
       const rows = selectAll.all() as SessionResumeRow[];
       return rows.map(sessionResumeFromRow);
+    },
+    appendHarnessEvent(input: AppendHarnessEventInput) {
+      return appendHarnessEvent(database, input);
+    },
+    listHarnessEvents(runId?: string) {
+      return listHarnessEvents(database, runId);
     },
     close() {
       database.close();

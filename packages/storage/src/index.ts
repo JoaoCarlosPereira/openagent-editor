@@ -16,3 +16,9 @@ export {
 } from "./migration-runner.js";
 
 export { STORAGE_MIGRATIONS } from "./migrations/index.js";
+
+export {
+  appendHarnessEvent,
+  listHarnessEvents,
+  type AppendHarnessEventInput,
+} from "./event-log.js";
