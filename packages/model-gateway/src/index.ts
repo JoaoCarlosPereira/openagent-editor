@@ -54,6 +54,17 @@ export {
   parseOpenAiCompatibleErrorBody,
   providerFailurePreservationHints,
 } from "./cliproxy-provider-errors.js";
+export {
+  assertProviderFailureEditorStateUnchanged,
+  resolveCliProxyProviderFailurePreservation,
+  type ProviderFailureEditorState,
+  type ProviderFailurePreservationOutcome,
+} from "./cliproxy-provider-failure-preservation.js";
+export {
+  loadCliProxyProviderErrorFixtures,
+  type CliProxyProviderErrorFixtureSample,
+  type CliProxyProviderErrorFixtures,
+} from "./load-cliproxy-provider-error-fixtures.js";
 export { probeCliProxyOpenAiCompatibleProvider } from "./cliproxy-provider-probe.js";
 export {
   CLI_PROXY_STREAM_HARNESS_EVENT_TYPES,

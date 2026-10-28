@@ -1,5 +1,5 @@
 {
-  "description": "Respostas OpenAI-compatible de erro usadas nos testes de normalização PROVIDER_* (API-02).",
+  "description": "Respostas OpenAI-compatible de erro usadas nos testes de normalização PROVIDER_* e preservação de prompt/diff (API-02).",
   "pinVersion": "8.0.45",
   "gitCommitShort": "ad8bdd3",
   "samples": {
