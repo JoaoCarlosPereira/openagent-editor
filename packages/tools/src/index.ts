@@ -88,6 +88,24 @@ export {
 } from "./shell/policy-shell-tools.js";
 
 export {
+  executePolicyGitDiffInWorker,
+  executePolicyGitStatusInWorker,
+  formatAgentGitDiffToolResult,
+  formatAgentGitStatusToolResult,
+  GIT_WORKER_TOOL_NAMES,
+  preparePolicyGitDiff,
+  preparePolicyGitStatus,
+  type AgentGitDiffToolInvocationResult,
+  type AgentGitStatusToolInvocationResult,
+  type GitCliCaptureResult,
+  type GitDiffWorkerResult,
+  type GitWorkerToolName,
+  type PolicyGitToolContext,
+  type PreparePolicyGitDiffInput,
+  type PreparePolicyGitStatusInput,
+} from "./git/policy-git-tools.js";
+
+export {
   createTypedToolDispatchRegistry,
   TypedToolDispatchRegistry,
 } from "./worker/dispatch-registry.js";

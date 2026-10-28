@@ -7,6 +7,8 @@ const CAPABILITY_ACTION_LABELS: Record<string, string> = {
   "file.write": "Gravar arquivo",
   "file.search": "Buscar em arquivos",
   "shell.exec": "Executar comando",
+  "git.status": "Consultar status Git",
+  "git.diff": "Consultar diff Git",
   "tool.invoke": "Executar ferramenta",
   "run.write": "Controlar execução",
   "run.queue": "Alterar fila da execução",

@@ -1,5 +1,7 @@
 import { parentPort } from "node:worker_threads";
 
+import { gitDiffInWorkspace, gitStatusInWorkspace } from "../git/git-workspace-cli.mjs";
+
 /** @typedef {{ kind: 'invoke', requestId: string, tool: string, input: unknown }} WorkerInvokeRequest */
 /** @typedef {{ kind: 'bootstrap', tools: string[] }} WorkerBootstrapMessage */
 
@@ -12,6 +14,8 @@ function registerBuiltinWorkerTools() {
     await new Promise((resolve) => setTimeout(resolve, 150));
     return input;
   });
+  handlers.set("gitStatus", (input) => gitStatusInWorkspace(input));
+  handlers.set("gitDiff", (input) => gitDiffInWorkspace(input));
 }
 
 registerBuiltinWorkerTools();
