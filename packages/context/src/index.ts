@@ -27,3 +27,21 @@ export {
   executeContextAttachRpc,
   type ExecuteContextAttachRpcOptions,
 } from "./rpc/context-attach.js";
+export {
+  buildContextExclusionRules,
+  evaluateContextPathExclusion,
+  filterIncludedContextPaths,
+  loadProjectGitignorePatterns,
+  parseWorkspaceExclusionPatterns,
+  type BuildContextExclusionRulesInput,
+  type EvaluateContextPathExclusionInput,
+  type WorkspaceExclusionParseResult,
+} from "./exclusions/rules.js";
+export { parseGitignoreLines } from "./exclusions/gitignore.js";
+export {
+  CONTEXT_EXCLUSION_SOURCES,
+  type ContextExclusionCheckResult,
+  type ContextExclusionPattern,
+  type ContextExclusionRuleset,
+  type ContextExclusionSource,
+} from "./exclusions/types.js";

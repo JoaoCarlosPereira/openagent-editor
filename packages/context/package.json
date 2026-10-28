@@ -10,6 +10,7 @@
     ".": "./src/index.ts"
   },
   "dependencies": {
+    "@openagent/policy": "0.1.0",
     "@openagent/protocol": "0.1.0"
   }
 }
