@@ -9,6 +9,12 @@ export {
 export { assertMayDispatchToolForLifecycle } from "./state/terminal-run-tool-guard.js";
 
 export {
+  RunMessageQueue,
+  type RunQueueItem,
+  type RunQueueItemState,
+} from "./queue/run-message-queue.js";
+
+export {
   resolveHarnessDataRoot,
   resolveHarnessRuntimeDirectory,
   resolveHarnessDaemonAddress,
