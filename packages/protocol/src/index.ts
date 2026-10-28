@@ -1,7 +1,21 @@
 export {
   PROTOCOL_ERROR_CODES,
   ProtocolError,
+  cancelledError,
+  conflictError,
+  incompleteStreamError,
+  isProtocolError,
+  isProviderErrorCode,
+  isStableProtocolErrorCode,
+  outOfScopePathError,
+  permissionDeniedError,
+  providerFailureError,
+  refuseToolInTerminalRunError,
+  type BaseProtocolErrorCode,
   type ProtocolErrorCode,
+  type ProtocolErrorHints,
+  type ProviderFailureReason,
+  type TerminalRunState,
 } from "./errors.js";
 
 export {
