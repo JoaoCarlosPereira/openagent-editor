@@ -12,6 +12,7 @@ import {
   type ProtocolErrorCode,
   type RpcRequestEnvelope,
 } from "@openagent/protocol";
+import { dispatchPermissionDecide } from "./permissions/permission-rpc-handler.js";
 import { dispatchRunRpc, type DaemonRpcContext } from "./runs/run-rpc-handler.js";
 import { dispatchSessionRpc } from "./sessions/session-rpc-handler.js";
 
@@ -29,6 +30,8 @@ const RUN_RPC_METHODS = new Set<string>([
   RPC_METHOD.RUN_QUEUE_ADD,
   RPC_METHOD.RUN_QUEUE_REMOVE,
 ]);
+
+const PERMISSION_RPC_METHODS = new Set<string>([RPC_METHOD.PERMISSION_DECIDE]);
 
 function writeProtocolError(socket: net.Socket, code: ProtocolErrorCode, message: string): void {
   writeProtocolFrame(
@@ -79,7 +82,8 @@ export async function serveRpcOnConnection(
 
     const isSession = SESSION_RPC_METHODS.has(request.method);
     const isRun = RUN_RPC_METHODS.has(request.method);
-    if (!isSession && !isRun) {
+    const isPermission = PERMISSION_RPC_METHODS.has(request.method);
+    if (!isSession && !isRun && !isPermission) {
       writeProtocolError(
         socket,
         PROTOCOL_ERROR_CODES.INVALID_STATE,
@@ -89,9 +93,11 @@ export async function serveRpcOnConnection(
     }
 
     try {
-      const result = isRun
-        ? dispatchRunRpc(context, request)
-        : dispatchSessionRpc(context, request);
+      const result = isPermission
+        ? dispatchPermissionDecide(context, request as RpcRequestEnvelope)
+        : isRun
+          ? dispatchRunRpc(context, request)
+          : dispatchSessionRpc(context, request);
       writeProtocolFrame(
         socket,
         Buffer.from(
