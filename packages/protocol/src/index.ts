@@ -1,7 +1,21 @@
 export {
   PROTOCOL_ERROR_CODES,
   ProtocolError,
+  cancelledError,
+  conflictError,
+  incompleteStreamError,
+  isProtocolError,
+  isProviderErrorCode,
+  isStableProtocolErrorCode,
+  outOfScopePathError,
+  permissionDeniedError,
+  providerFailureError,
+  refuseToolInTerminalRunError,
+  type BaseProtocolErrorCode,
   type ProtocolErrorCode,
+  type ProtocolErrorHints,
+  type ProviderFailureReason,
+  type TerminalRunState,
 } from "./errors.js";
 
 export {
@@ -81,3 +95,29 @@ export {
   type RpcRequestEnvelope,
   type RpcRequestValidationResult,
 } from "./rpc-validator.js";
+
+export {
+  PROTOCOL_FRAME_LENGTH_BYTES,
+  PROTOCOL_MAX_FRAME_BYTES,
+  ProtocolFrameDecoder,
+  encodeProtocolFrame,
+} from "./transport-framing.js";
+
+export {
+  connectLocalTransport,
+  listenLocalTransport,
+  readProtocolFrame,
+  resolveLocalTransportAddress,
+  writeProtocolFrame,
+  type LocalTransportServer,
+} from "./transport-local.js";
+
+export {
+  buildProtocolTransportErrorFrame,
+  buildWorkspaceTransportAck,
+  validateWorkspaceTransportHello,
+  type ProtocolTransportErrorFrame,
+  type WorkspaceTransportAck,
+  type WorkspaceTransportHello,
+  type WorkspaceTransportValidationResult,
+} from "./workspace-transport.js";
