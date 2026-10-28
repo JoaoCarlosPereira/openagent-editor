@@ -81,3 +81,13 @@ export {
   type SessionDeleteViewSnapshot,
   type SessionExportDeleteViewSnapshot,
 } from "./agents/index.js";
+export {
+  SessionDiscoveryController,
+  buildSessionDiscoveryView,
+  type HeadlessSessionItem,
+  type SessionDiscoveryListPort,
+  type SessionListRequestResult,
+  type SessionListViaPortResult,
+  type SessionDiscoveryUiPhase,
+  type SessionDiscoveryViewSnapshot,
+} from "./agents/index.js";

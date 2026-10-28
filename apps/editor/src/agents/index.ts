@@ -17,3 +17,14 @@ export {
   type SessionDeleteViewSnapshot,
   type SessionExportDeleteViewSnapshot,
 } from "./session-export-delete.js";
+
+export {
+  SessionDiscoveryController,
+  buildSessionDiscoveryView,
+  type HeadlessSessionItem,
+  type SessionDiscoveryListPort,
+  type SessionListRequestResult,
+  type SessionListViaPortResult,
+  type SessionDiscoveryUiPhase,
+  type SessionDiscoveryViewSnapshot,
+} from "./session-discovery.js";
