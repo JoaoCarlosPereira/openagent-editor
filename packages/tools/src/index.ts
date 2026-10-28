@@ -183,3 +183,14 @@ export type {
   ToolHandler,
   ToolHandlerMap,
 } from "./worker/types.js";
+
+export {
+  discoverMcpStdioTools,
+  type DiscoveredMcpStdioTool,
+  type McpStdioToolDiscoveryResult,
+} from "./mcp/discover-mcp-stdio-tools.js";
+
+export {
+  parseMcpStdioServerLaunch,
+  type McpStdioServerLaunch,
+} from "./mcp/mcp-stdio-config.js";
