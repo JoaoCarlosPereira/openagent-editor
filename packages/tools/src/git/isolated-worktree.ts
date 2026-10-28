@@ -30,7 +30,7 @@ function isolatedWorkInvalid(message: string, details?: string[]): never {
   throw new ProtocolError(PROTOCOL_ERROR_CODES.INVALID_STATE, message, details);
 }
 
-function listWorkspaceFileContents(
+export function collectWorkspaceFileContents(
   workspaceRoot: string,
   relativeDir = "",
 ): Record<string, string> {
@@ -45,7 +45,7 @@ function listWorkspaceFileContents(
     const relativePath = relativeDir ? `${relativeDir}/${entry.name}` : entry.name;
     const absolutePath = path.join(workspaceRoot, relativePath);
     if (entry.isDirectory()) {
-      Object.assign(snapshot, listWorkspaceFileContents(workspaceRoot, relativePath));
+      Object.assign(snapshot, collectWorkspaceFileContents(workspaceRoot, relativePath));
       continue;
     }
     if (!entry.isFile()) {
@@ -122,7 +122,7 @@ export function createIsolatedGitWork(
 
   mkdirSync(worktreesRoot, { recursive: true });
 
-  const snapshotBefore = listWorkspaceFileContents(canonicalWorkspaceRoot);
+  const snapshotBefore = collectWorkspaceFileContents(canonicalWorkspaceRoot);
 
   try {
     createIsolatedWorktreeInWorkspace({
@@ -136,7 +136,7 @@ export function createIsolatedGitWork(
     isolatedWorkInvalid(message);
   }
 
-  const snapshotAfter = listWorkspaceFileContents(canonicalWorkspaceRoot);
+  const snapshotAfter = collectWorkspaceFileContents(canonicalWorkspaceRoot);
   assertSnapshotsEqual(snapshotBefore, snapshotAfter);
 
   return {

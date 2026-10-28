@@ -24,3 +24,9 @@ export {
   getStoredIsolatedWorkById,
   type CreateStoredIsolatedWorkInput,
 } from "./isolated-work-create.js";
+
+export {
+  finalizeStoredIsolatedWork,
+  getStoredIsolatedWorkRecordById,
+  type FinalizeStoredIsolatedWorkDecision,
+} from "./isolated-work-finalize.js";

@@ -109,9 +109,20 @@ export {
 export {
   createIsolatedGitWork,
   removeIsolatedGitWork,
+  collectWorkspaceFileContents,
   type CreateIsolatedGitWorkInput,
   type CreateIsolatedGitWorkResult,
 } from "./git/isolated-worktree.js";
+
+export {
+  applyIsolatedGitWork,
+  discardIsolatedGitWork,
+  finalizeIsolatedGitWork,
+  type ApplyIsolatedGitWorkResult,
+  type FinalizeIsolatedGitWorkResult,
+  type IsolatedWorkApplyConflictEntry,
+  type IsolatedWorkDecision,
+} from "./git/isolated-work-resolve.js";
 
 export {
   executePolicyGitDiffInWorker,
