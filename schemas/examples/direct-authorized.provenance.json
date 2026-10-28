@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "schemaVersion": 1,
+  "module": "packages/extension-api/src/shims",
+  "strategy": "direct-authorized",
+  "sources": [
+    {
+      "artifactSha256": "6d39ababf803ad073ade9c2fbdaadc9dbbfc3745f2751856599b64fea673053e",
+      "artifactPath": "resources/app/out/vs/workbench/workbench.desktop.main.js",
+      "cursorVersion": "3.24.18",
+      "origin": {
+        "bundle": "workbench.desktop.main.js"
+      },
+      "recoveryMethod": "js-bundle-recovery"
+    }
+  ],
+  "license": {
+    "spdx": "LicenseRef-OpenAgent-Cursor-Authorization"
+  },
+  "authorization": {
+    "documentRef": "legal/authorizations/cursor-3.24.18.md",
+    "documentSha256": "95ceeb979e0c725624c3945cd4136dbdc9a7871818be64b17e9bcf3d9937c202",
+    "scope": "Reutilizacao de implementacao extraida dos bundles JavaScript do Cursor 3.24.18, excluindo marca, icones e textos."
+  },
+  "containsCursorBrandAssets": false,
+  "notes": "Exemplo ilustrativo: hashes e documento de autorizacao sao ficticios. Nenhum documento real de autorizacao foi registrado ate esta data."
+}
