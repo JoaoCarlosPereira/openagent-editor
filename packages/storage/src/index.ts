@@ -125,6 +125,16 @@ export {
 } from "./sessions/index.js";
 
 export {
+  createStoredCheckpoint,
+  getStoredCheckpointById,
+  readCheckpointHashesFromRef,
+  readCheckpointPatchFromRef,
+  type CheckpointFileHashes,
+  type CreateCheckpointInput,
+  type StoredCheckpointRecord,
+} from "./checkpoints/index.js";
+
+export {
   insertStoredAgentNode,
   insertStoredMessage,
   insertStoredQueueItem,

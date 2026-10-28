@@ -126,6 +126,9 @@ export interface ToolInvokeParams {
 }
 
 export interface CheckpointCreateParams {
+  baseHashes: Record<string, string>;
+  resultHashes: Record<string, string>;
+  patchText: string;
   label?: string;
 }
 

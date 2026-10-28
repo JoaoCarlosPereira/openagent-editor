@@ -66,7 +66,7 @@ test("[SES-01] migração 005 cria projeções message, tool_invocation, queue_i
       ["agent_node", "message", "queue_item", "tool_invocation"],
     );
     assert.equal(schemaVersion.value, String(STORAGE_SCHEMA_VERSION));
-    assert.equal(STORAGE_SCHEMA_VERSION, 7);
+    assert.equal(STORAGE_SCHEMA_VERSION, 8);
   });
 });
 

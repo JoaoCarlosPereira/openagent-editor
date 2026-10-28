@@ -88,6 +88,16 @@ export {
 } from "./shell/policy-shell-tools.js";
 
 export {
+  buildCheckpointHashesFromAgentWriteBatch,
+  type CheckpointWriteBatchHashes,
+} from "./git/checkpoint-from-write-batch.js";
+
+export {
+  buildCheckpointPatchFromFileChanges,
+  type CheckpointPatchFileChange,
+} from "./git/checkpoint-patch.js";
+
+export {
   executePolicyGitDiffInWorker,
   executePolicyGitStatusInWorker,
   formatAgentGitDiffToolResult,

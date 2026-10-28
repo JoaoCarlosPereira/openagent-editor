@@ -159,6 +159,15 @@ function validateParamsForMethod(method: RpcMethod, params: unknown): string[] {
       }
       break;
     case RPC_METHOD.CHECKPOINT_CREATE:
+      if (!isRecord(params["baseHashes"])) {
+        errors.push("Campo obrigatório 'baseHashes' deve ser um objeto.");
+      }
+      if (!isRecord(params["resultHashes"])) {
+        errors.push("Campo obrigatório 'resultHashes' deve ser um objeto.");
+      }
+      if (typeof params["patchText"] !== "string" || params["patchText"].trim().length === 0) {
+        errors.push("Campo obrigatório 'patchText' ausente ou inválido.");
+      }
       if (params["label"] !== undefined && typeof params["label"] !== "string") {
         errors.push("Campo 'label' deve ser string quando presente.");
       }
