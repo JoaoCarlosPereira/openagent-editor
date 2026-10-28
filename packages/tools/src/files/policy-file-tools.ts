@@ -16,6 +16,13 @@ import {
   searchWorkspaceFiles,
   type SearchWorkspaceFilesResult,
 } from "./search-workspace-files.js";
+import {
+  applyWorkspaceFileWrite,
+  snapshotWorkspaceFileForWrite,
+  type ApplyWorkspaceFileWriteInput,
+  type WriteWorkspaceFileResult,
+  type WorkspaceFileSnapshot,
+} from "./write-workspace-file.js";
 
 export interface PolicyFileToolContext {
   workspaceRoot: string;
@@ -35,6 +42,13 @@ export interface PreparePolicyFileSearchInput {
   sessionId: string;
   requestId: string;
   query: unknown;
+}
+
+export interface PreparePolicyFileWriteInput {
+  runId: string;
+  sessionId: string;
+  requestId: string;
+  relativePath: unknown;
 }
 
 function normalizeRelativePath(raw: unknown): string {
@@ -117,4 +131,43 @@ export function executePolicyFileSearch(
   query: unknown,
 ): SearchWorkspaceFilesResult {
   return searchWorkspaceFiles(workspaceRoot, query);
+}
+
+/**
+ * AGT-03 + PER-01/PER-03: prepara escrita com policy e sandbox.
+ */
+export function preparePolicyFileWrite(
+  flow: RunToolPermissionFlow,
+  context: PolicyFileToolContext,
+  input: PreparePolicyFileWriteInput,
+  sandboxOptions?: DescribeSandboxCapabilityOptions,
+): SandboxToolDispatchPrepareResult {
+  assertCapabilityAllowedForAgentMode(context.agentMode, "file.write");
+  const relativePath = normalizeRelativePath(input.relativePath);
+  return prepareSandboxToolDispatch(
+    flow,
+    {
+      runId: input.runId,
+      sessionId: input.sessionId,
+      executionMode: context.executionMode,
+      capability: "file.write",
+      target: { kind: "path", path: relativePath },
+      requestId: input.requestId,
+    },
+    sandboxOptions,
+  );
+}
+
+export function snapshotPolicyFileWriteBase(
+  workspaceRoot: string,
+  relativePath: unknown,
+): WorkspaceFileSnapshot {
+  return snapshotWorkspaceFileForWrite(workspaceRoot, relativePath);
+}
+
+export function executePolicyFileWrite(
+  workspaceRoot: string,
+  input: ApplyWorkspaceFileWriteInput,
+): WriteWorkspaceFileResult {
+  return applyWorkspaceFileWrite(workspaceRoot, input);
 }

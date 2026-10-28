@@ -31,12 +31,36 @@ export {
 export {
   executePolicyFileRead,
   executePolicyFileSearch,
+  executePolicyFileWrite,
   preparePolicyFileRead,
   preparePolicyFileSearch,
+  preparePolicyFileWrite,
+  snapshotPolicyFileWriteBase,
   type PolicyFileToolContext,
   type PreparePolicyFileReadInput,
   type PreparePolicyFileSearchInput,
+  type PreparePolicyFileWriteInput,
 } from "./files/policy-file-tools.js";
+
+export {
+  executeAgentFileWriteBatch,
+  summarizeAgentFileWriteBatch,
+  type AgentFileWriteBatchResult,
+  type AgentFileWriteOperation,
+} from "./files/agent-file-write-batch.js";
+
+export {
+  applyWorkspaceFileWrite,
+  fileWriteConflictProtocolError,
+  snapshotWorkspaceFileForWrite,
+  FILE_WRITE_CONFLICT_MESSAGE,
+  type FileWriteAppliedResult,
+  type FileWriteConflictResult,
+  type WriteWorkspaceFileResult,
+  type WorkspaceFileSnapshot,
+} from "./files/write-workspace-file.js";
+
+export { sha256HexUtf8, isSha256Hex } from "./files/file-content-hash.js";
 
 export {
   readWorkspaceFile,
