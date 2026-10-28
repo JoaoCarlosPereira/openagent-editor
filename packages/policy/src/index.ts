@@ -33,6 +33,14 @@ export {
   validateOfferedScopes,
 } from "./scope.js";
 export { formatPolicyTargetDisplay, validatePolicyTarget } from "./target.js";
+export {
+  formatOutOfScopePathLog,
+  isAbsolutePathInsideRoot,
+  OUT_OF_SCOPE_PATH_LOG_MESSAGE,
+  resolveCanonicalWorkspacePath,
+  validateWorkspacePathInputs,
+  type WorkspacePathResolution,
+} from "./paths.js";
 export type {
   GrantScopeKind,
   PermissionDecision,
