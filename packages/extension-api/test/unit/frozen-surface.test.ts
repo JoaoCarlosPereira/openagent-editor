@@ -153,8 +153,8 @@ test("[VALIDATOR] deve rejeitar superfície com versão incorreta", function () 
   const result: ValidationResult = validateFrozenSurface(surface);
 
   assert.strictEqual(result.valid, false, "superfície com versão errada deve ser inválida");
-  assert.ok(result.issues.length >= 1, "deve haver pelo menos 1 issue");
   const firstIssue = result.issues[0];
+  assert.ok(firstIssue !== undefined, "deve haver pelo menos 1 issue");
   assert.strictEqual(firstIssue.code, ValidationError.VERSION_MISMATCH, "code deve ser VERSION_MISMATCH");
 });
 
