@@ -9,7 +9,8 @@
     "./agent": "./src/agent/agent-panel.ts",
     "./agents": "./src/agents/index.ts",
     "./onboarding": "./src/onboarding/index.ts",
-    "./permissions": "./src/permissions/permission-dialog.ts"
+    "./permissions": "./src/permissions/permission-dialog.ts",
+    "./settings": "./src/settings/index.ts"
   },
   "dependencies": {
     "@openagent/context": "0.1.0",

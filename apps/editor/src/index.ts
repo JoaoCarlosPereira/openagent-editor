@@ -114,3 +114,14 @@ export {
   type OnboardingListener,
   type OnboardingViewSnapshot,
 } from "./onboarding/index.js";
+export {
+  SettingsController,
+  buildSettingsView,
+  type SettingsListener,
+  type SettingsProviderInput,
+  type SettingsProviderPort,
+  type SettingsProviderResult,
+  type SettingsState,
+  type SettingsViewInput,
+  type SettingsViewSnapshot,
+} from "./settings/index.js";
