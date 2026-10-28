@@ -67,3 +67,12 @@ export {
   type LocalDaemonPrincipal,
   type LocalPeerCredential,
 } from "./local-auth.js";
+
+export {
+  OPENAGENT_DAEMON_PROTOCOL_VERSION,
+  buildProtocolVersionAck,
+  validateProtocolVersionHello,
+  type ProtocolVersionAck,
+  type ProtocolVersionHello,
+  type ProtocolVersionValidationResult,
+} from "./protocol-version.js";
