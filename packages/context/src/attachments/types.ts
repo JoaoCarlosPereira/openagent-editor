@@ -34,10 +34,22 @@ export interface ContextAttachmentSource {
 /** Prévia agregada exibida antes do envio (CTX-01). */
 export interface ContextSendPreview {
   sources: ContextAttachmentSource[];
+  /** Tokens estimados do rascunho da mensagem (API-03), zero quando ausente. */
+  messageTokenCount: number;
   totalTokenCount: number;
   contextLimitTokens: number;
   withinLimit: boolean;
 }
+
+export type ContextTokenLimitInvalidResult = {
+  valid: false;
+  code: "INVALID_STATE";
+  errors: string[];
+};
+
+export type ContextTokenLimitValidationResult =
+  | { valid: true; value: number }
+  | ContextTokenLimitInvalidResult;
 
 export type ContextAttachmentInvalidResult = {
   valid: false;

@@ -7,7 +7,9 @@ import {
   estimateContextTokens,
   parseContextAttachmentDrafts,
   resolveContextTokenLimit,
+  resolveStoredWorkspaceContextLimit,
   validateContextAttachmentDraft,
+  validateContextTokenLimitInput,
 } from "../../src/index.js";
 
 test("[CTX-01] buildContextSendPreview lista seleção, arquivo, pasta e símbolo com tokens e teto", () => {
@@ -60,11 +62,78 @@ test("[CTX-01] buildContextSendPreview lista seleção, arquivo, pasta e símbol
   assert.match(preview.sources[0]?.label ?? "", /seleção/);
   assert.match(preview.sources[3]?.label ?? "", /foo/);
   assert.equal(typeof preview.withinLimit, "boolean");
+  assert.equal(preview.messageTokenCount, 0);
+});
+
+test("[API-03] buildContextSendPreview exibe teto 200000 sem valor gravado no workspace", () => {
+  const preview = buildContextSendPreview({
+    attachments: [],
+    messageText: "Olá, agente",
+    workspaceContextLimitTokens: null,
+  });
+  assert.equal(preview.contextLimitTokens, DEFAULT_CONTEXT_TOKEN_LIMIT);
+  assert.ok(preview.messageTokenCount > 0);
+  assert.equal(preview.totalTokenCount, preview.messageTokenCount);
+});
+
+test("[API-03] buildContextSendPreview usa teto gravado no workspace quando configurado", () => {
+  const preview = buildContextSendPreview({
+    attachments: [],
+    workspaceContextLimitTokens: 128_000,
+  });
+  assert.equal(preview.contextLimitTokens, 128_000);
+});
+
+test("[CTX-01] buildContextSendPreview soma tokens de anexos, mensagem e teto antes do envio", () => {
+  const parsed = parseContextAttachmentDrafts([
+    {
+      id: "file-1",
+      kind: "file",
+      path: "/proj/a.ts",
+      previewText: "abcd",
+    },
+  ]);
+  assert.equal(parsed.valid, true);
+  if (!parsed.valid) {
+    return;
+  }
+  const preview = buildContextSendPreview({
+    attachments: parsed.value,
+    messageText: "pergunta",
+    workspaceContextLimitTokens: null,
+  });
+  assert.equal(preview.sources.length, 1);
+  assert.ok(preview.messageTokenCount > 0);
+  const firstSource = preview.sources[0];
+  assert.ok(firstSource);
+  assert.equal(
+    preview.totalTokenCount,
+    firstSource.tokenCount + preview.messageTokenCount,
+  );
+  assert.equal(preview.contextLimitTokens, DEFAULT_CONTEXT_TOKEN_LIMIT);
 });
 
 test("[CTX-01] resolveContextTokenLimit usa 200000 quando não configurado (API-03)", () => {
   assert.equal(resolveContextTokenLimit(undefined), DEFAULT_CONTEXT_TOKEN_LIMIT);
   assert.equal(resolveContextTokenLimit(8192), 8192);
+  assert.equal(resolveStoredWorkspaceContextLimit(undefined), DEFAULT_CONTEXT_TOKEN_LIMIT);
+  assert.equal(resolveStoredWorkspaceContextLimit(null), DEFAULT_CONTEXT_TOKEN_LIMIT);
+});
+
+test("[API-03] validateContextTokenLimitInput rejeita teto inválido com INVALID_STATE", () => {
+  for (const bad of [0, -1, 1.5, "200000", null, {}]) {
+    const result = validateContextTokenLimitInput(bad);
+    assert.equal(result.valid, false);
+    if (!result.valid) {
+      assert.equal(result.code, "INVALID_STATE");
+      assert.ok(result.errors.length > 0);
+    }
+  }
+  const ok = validateContextTokenLimitInput(200_000);
+  assert.equal(ok.valid, true);
+  if (ok.valid) {
+    assert.equal(ok.value, 200_000);
+  }
 });
 
 test("[CTX-01] estimateContextTokens é conservadora e não-zero para texto não-vazio", () => {

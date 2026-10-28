@@ -1,6 +1,7 @@
 import {
   estimateContextTokens,
   resolveContextTokenLimit,
+  resolveStoredWorkspaceContextLimit,
 } from "./tokens.js";
 import type {
   ContextAttachmentDraft,
@@ -60,7 +61,19 @@ function sourceFromDraft(draft: ContextAttachmentDraft): ContextAttachmentSource
 
 export interface BuildContextSendPreviewInput {
   attachments: ContextAttachmentDraft[];
+  /** Rascunho da mensagem do usuário (tokenizado em API-03). */
+  messageText?: string;
+  /** Valor de workspace.context_limit quando persistido; null usa o default API-03. */
+  workspaceContextLimitTokens?: number | null;
+  /** Override explícito para a prévia (ex.: rascunho de configuração). */
   contextLimitTokens?: number;
+}
+
+function resolvePreviewContextLimit(input: BuildContextSendPreviewInput): number {
+  if (input.contextLimitTokens !== undefined) {
+    return resolveContextTokenLimit(input.contextLimitTokens);
+  }
+  return resolveStoredWorkspaceContextLimit(input.workspaceContextLimitTokens);
 }
 
 /**
@@ -69,12 +82,15 @@ export interface BuildContextSendPreviewInput {
 export function buildContextSendPreview(
   input: BuildContextSendPreviewInput,
 ): ContextSendPreview {
-  const contextLimitTokens = resolveContextTokenLimit(input.contextLimitTokens);
+  const contextLimitTokens = resolvePreviewContextLimit(input);
   const sources = input.attachments.map(sourceFromDraft);
-  const totalTokenCount = sources.reduce((sum, row) => sum + row.tokenCount, 0);
+  const attachmentTokenCount = sources.reduce((sum, row) => sum + row.tokenCount, 0);
+  const messageTokenCount = estimateContextTokens(input.messageText ?? "");
+  const totalTokenCount = attachmentTokenCount + messageTokenCount;
 
   return {
     sources,
+    messageTokenCount,
     totalTokenCount,
     contextLimitTokens,
     withinLimit: totalTokenCount <= contextLimitTokens,
