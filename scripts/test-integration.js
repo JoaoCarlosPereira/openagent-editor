@@ -18,7 +18,7 @@ function collectTestFiles(directory) {
 
 function discoverIntegrationTests(root = path.resolve(__dirname, "..")) {
   const testFiles = [];
-  for (const layer of ["packages", "services"]) {
+  for (const layer of ["packages", "services", "apps"]) {
     const layerDirectory = path.join(root, layer);
     if (!statSync(layerDirectory, { throwIfNoEntry: false })?.isDirectory()) continue;
     for (const packageEntry of readdirSync(layerDirectory, { withFileTypes: true })) {
@@ -32,7 +32,7 @@ function discoverIntegrationTests(root = path.resolve(__dirname, "..")) {
 function main(root = path.resolve(__dirname, "..")) {
   const testFiles = discoverIntegrationTests(root);
   if (testFiles.length === 0) {
-    console.error("Nenhum teste de integração encontrado nos diretórios packages/*/test/integration/** ou services/*/test/integration/**.");
+    console.error("Nenhum teste de integração encontrado nos diretórios packages/*/test/integration/**, services/*/test/integration/** ou apps/*/test/integration/**.");
     return 1;
   }
 
