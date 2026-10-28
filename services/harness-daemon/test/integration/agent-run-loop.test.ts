@@ -106,9 +106,6 @@ async function callDaemonRpc<M extends RpcMethod>(
   };
   const validation = validateRpcRequest(envelope);
   assert.equal(validation.valid, true);
-  if (!validation.valid) {
-    throw new Error(validation.errors.join(" "));
-  }
   writeProtocolFrame(socket, Buffer.from(JSON.stringify(validation.value), "utf8"));
 
   const response = await readJsonFrame(socket);
