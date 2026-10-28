@@ -30,6 +30,16 @@ export {
   type RunCancelUiState,
 } from "./agent/run-cancel-panel.js";
 export {
+  ConversationSearchController,
+  buildConversationSearchView,
+  type ConversationMessageSearchPort,
+  type ConversationSearchHitRow,
+  type ConversationSearchMessagesResult,
+  type ConversationSearchRequestResult,
+  type ConversationSearchUiPhase,
+  type ConversationSearchViewSnapshot,
+} from "./agent/conversation-search.js";
+export {
   PermissionDialogController,
   buildPermissionDialogView,
   type PermissionDialogViewSnapshot,
