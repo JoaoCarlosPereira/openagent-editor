@@ -218,9 +218,33 @@ export class SubagentsPanelController {
       });
     } else if (event.type === AGENT_CANCELLED_EVENT) {
       const payload = parseCancelledPayload(input.payload, this.runId);
-      this.assertCancellable(payload.agentId);
+      const existing = this.agents.get(payload.agentId);
+      if (!existing) {
+        throw new ProtocolError(
+          "INVALID_STATE",
+          "agent.cancelled exige subagente previamente spawnado.",
+          [payload.agentId],
+        );
+      }
+      if (existing.state === "complete") {
+        throw new ProtocolError(
+          "INVALID_STATE",
+          "Subagente já concluído; cancelamento não aplicável.",
+          [payload.agentId],
+        );
+      }
+      if (existing.state !== "running" && existing.state !== "cancelled") {
+        throw new ProtocolError(
+          "INVALID_STATE",
+          `Estado de subagente inválido para cancelamento: ${existing.state}`,
+          [payload.agentId],
+        );
+      }
+      // Idempotente: eco após cancel UI (ou duplicata) ainda avança a sequence do stream.
       this.acceptStreamEvent(event, AGENT_CANCELLED_EVENT);
-      this.markCancelled(payload.agentId, payload.name);
+      if (existing.state === "running") {
+        this.markCancelled(payload.agentId, payload.name);
+      }
     } else {
       throw new ProtocolError(
         "INVALID_STATE",
@@ -234,17 +258,17 @@ export class SubagentsPanelController {
   }
 
   /**
-   * Ação de UI: cancela só o subagente indicado (AGT-07) e devolve params RPC agent.cancel.
-   * Os demais agents no mapa permanecem intactos.
+   * Ação de UI: valida e devolve RPC agent.cancel só para o agentId indicado (AGT-07).
+   * Não muta o mapa de forma otimista — o estado `cancelled` vem do eco
+   * `agent.cancelled` via `push`/`acceptStreamEvent`, alinhado à sequence do daemon.
+   * Os demais agents permanecem intactos.
    */
   cancelSubagent(agentIdRaw: unknown): SubagentCancelResult {
     if (typeof agentIdRaw !== "string" || agentIdRaw.trim().length === 0) {
       throw new ProtocolError("INVALID_STATE", "agentId inválido para cancelamento.", ["agentId"]);
     }
     const agentId = agentIdRaw.trim();
-    const existing = this.assertCancellable(agentId);
-    this.markCancelled(agentId, existing.name);
-    this.view = this.buildCurrentView();
+    this.assertCancellable(agentId);
     return {
       rpc: {
         method: RPC_METHOD.AGENT_CANCEL,

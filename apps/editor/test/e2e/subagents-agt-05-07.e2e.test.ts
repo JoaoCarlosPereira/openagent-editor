@@ -118,34 +118,48 @@ describe("AGT-05/AGT-07 e2e — subagentes visíveis e cancelamento isolado", ()
     const beforeB = panel.listAgents().find((a) => a.agentId === AGENT_B);
     assert.equal(beforeB?.state, "running");
 
-    const cancelled = panel.cancelSubagent(AGENT_A);
+    // cancelSubagent só emite RPC — estado atualiza no eco agent.cancelled (sequence).
+    const pending = panel.cancelSubagent(AGENT_A);
 
-    assert.equal(cancelled.rpc.method, RPC_METHOD.AGENT_CANCEL);
-    assert.deepEqual(cancelled.rpc.params, { agentId: AGENT_A });
+    assert.equal(pending.rpc.method, RPC_METHOD.AGENT_CANCEL);
+    assert.deepEqual(pending.rpc.params, { agentId: AGENT_A });
+    assert.equal(
+      pending.view.accessible.agents.find((a) => a.agentId === AGENT_A)?.state,
+      "running",
+    );
+    assert.equal(
+      pending.view.accessible.agents.find((a) => a.agentId === AGENT_B)?.state,
+      "running",
+    );
 
-    const afterA = cancelled.view.accessible.agents.find((a) => a.agentId === AGENT_A);
-    const afterB = cancelled.view.accessible.agents.find((a) => a.agentId === AGENT_B);
+    const cancelled = panel.push({
+      event: harnessEvent(3, AGENT_CANCELLED_EVENT, "sha256:cancel-a"),
+      payload: { agentId: AGENT_A, name: "Pesquisar API" },
+    });
+
+    const afterA = cancelled.accessible.agents.find((a) => a.agentId === AGENT_A);
+    const afterB = cancelled.accessible.agents.find((a) => a.agentId === AGENT_B);
     assert.equal(afterA?.state, "cancelled");
     assert.equal(afterA?.resultRef, null);
     assert.equal(afterB?.state, "running");
     assert.equal(afterB?.name, "Implementar patch");
-    assert.equal(cancelled.view.accessible.cancelledCount, 1);
-    assert.equal(cancelled.view.accessible.runningCount, 1);
-    assert.match(cancelled.view.html, /data-agent-id="agent-a-research"[^>]*data-state="cancelled"/);
-    assert.match(cancelled.view.html, /data-agent-id="agent-b-implement"[^>]*data-state="running"/);
-    assert.match(cancelled.view.html, /data-testid="subagent-cancelled-notice"/);
+    assert.equal(cancelled.accessible.cancelledCount, 1);
+    assert.equal(cancelled.accessible.runningCount, 1);
+    assert.match(cancelled.html, /data-agent-id="agent-a-research"[^>]*data-state="cancelled"/);
+    assert.match(cancelled.html, /data-agent-id="agent-b-implement"[^>]*data-state="running"/);
+    assert.match(cancelled.html, /data-testid="subagent-cancelled-notice"/);
     assert.doesNotMatch(
-      cancelled.view.html,
+      cancelled.html,
       /data-testid="subagent-cancel" data-agent-id="agent-a-research"/,
     );
     assert.match(
-      cancelled.view.html,
+      cancelled.html,
       /data-testid="subagent-cancel" data-agent-id="agent-b-implement"/,
     );
 
-    // Evento agent.cancelled espelha o mesmo isolamento (conserva B).
+    // Cancelar o irmão via evento também isola sem afetar A já cancelled.
     const viaEvent = panel.push({
-      event: harnessEvent(3, AGENT_CANCELLED_EVENT, "sha256:cancel-b"),
+      event: harnessEvent(4, AGENT_CANCELLED_EVENT, "sha256:cancel-b"),
       payload: { agentId: AGENT_B, name: "Implementar patch" },
     });
     assert.equal(viaEvent.accessible.cancelledCount, 2);
@@ -154,6 +168,66 @@ describe("AGT-05/AGT-07 e2e — subagentes visíveis e cancelamento isolado", ()
     const aFinal = viaEvent.accessible.agents.find((a) => a.agentId === AGENT_A);
     assert.equal(bFinal?.state, "cancelled");
     assert.equal(aFinal?.state, "cancelled");
+  });
+
+  it("[AGT-07] eco agent.cancelled após cancelSubagent aceita sequence e irmão ainda recebe eventos", () => {
+    const panel = new SubagentsPanelController(RUN_ID);
+
+    panel.push({
+      event: harnessEvent(1, AGENT_SPAWNED_EVENT, "sha256:spawn-a"),
+      payload: { agentId: AGENT_A, name: "Pesquisar API" },
+    });
+    panel.push({
+      event: harnessEvent(2, AGENT_SPAWNED_EVENT, "sha256:spawn-b"),
+      payload: { agentId: AGENT_B, name: "Implementar patch" },
+    });
+
+    const pending = panel.cancelSubagent(AGENT_A);
+    assert.equal(pending.rpc.params.agentId, AGENT_A);
+    assert.equal(panel.listAgents().find((a) => a.agentId === AGENT_A)?.state, "running");
+    assert.equal(panel.listAgents().find((a) => a.agentId === AGENT_B)?.state, "running");
+
+    // Eco do daemon para A — deve aceitar sequence (não rejeitar "já cancelado").
+    const echo = panel.push({
+      event: harnessEvent(3, AGENT_CANCELLED_EVENT, "sha256:echo-cancel-a"),
+      payload: { agentId: AGENT_A, name: "Pesquisar API" },
+    });
+    assert.equal(echo.accessible.agents.find((a) => a.agentId === AGENT_A)?.state, "cancelled");
+    assert.equal(echo.accessible.agents.find((a) => a.agentId === AGENT_B)?.state, "running");
+
+    // Irmão B ainda recebe completed na sequence seguinte.
+    const siblingDone = panel.push({
+      event: harnessEvent(4, AGENT_COMPLETED_EVENT, "sha256:complete-b"),
+      payload: {
+        agentId: AGENT_B,
+        name: "Implementar patch",
+        resultRef: "sha256:result-b",
+        resultSummary: "Patch aplicado.",
+      },
+    });
+    assert.equal(
+      siblingDone.accessible.agents.find((a) => a.agentId === AGENT_B)?.state,
+      "complete",
+    );
+    assert.equal(
+      siblingDone.accessible.agents.find((a) => a.agentId === AGENT_B)?.resultRef,
+      "sha256:result-b",
+    );
+    assert.equal(
+      siblingDone.accessible.agents.find((a) => a.agentId === AGENT_A)?.state,
+      "cancelled",
+    );
+    assert.equal(siblingDone.accessible.completeCount, 1);
+    assert.equal(siblingDone.accessible.cancelledCount, 1);
+    assert.equal(siblingDone.accessible.runningCount, 0);
+
+    // Eco duplicado de cancelado ainda é idempotente e avança sequence.
+    const dupEcho = panel.push({
+      event: harnessEvent(5, AGENT_CANCELLED_EVENT, "sha256:dup-cancel-a"),
+      payload: { agentId: AGENT_A, name: "Pesquisar API" },
+    });
+    assert.equal(dupEcho.accessible.cancelledCount, 1);
+    assert.equal(dupEcho.accessible.agents.find((a) => a.agentId === AGENT_A)?.state, "cancelled");
   });
 
   it("[AGT-05] caminho de erro: entrada inválida retorna INVALID_STATE sem efeito colateral", () => {
