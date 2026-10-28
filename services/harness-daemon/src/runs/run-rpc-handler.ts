@@ -12,6 +12,8 @@ import {
 import { openWorkspaceDatabase, type WorkspaceDatabase } from "@openagent/storage";
 import { executeAgentRunLoop } from "../agent/agent-run-loop.js";
 import { tryExtractAgentLoopPlanFromUserText } from "../agent/agent-loop-plan.js";
+import { executeAskRunLoop } from "../agent/ask-run-loop.js";
+import { tryExtractAskLoopPlanFromUserText } from "../agent/ask-loop-plan.js";
 import { RunMessageQueue } from "../queue/run-message-queue.js";
 import {
   consumePendingRunQueueAtRunEnd,
@@ -210,6 +212,19 @@ export function handleRunStart(
         agentMode: "agent",
         workspaceRoot: context.binding.workspaceRoot,
         plan: agentLoopPlan,
+        machine,
+      });
+    }
+
+    const askLoopPlan = tryExtractAskLoopPlanFromUserText(inputResult.value.text);
+    if (runMode === "ask" && askLoopPlan) {
+      executeAskRunLoop({
+        context,
+        db,
+        sessionId: request.sessionId,
+        runId: request.runId,
+        workspaceRoot: context.binding.workspaceRoot,
+        plan: askLoopPlan,
         machine,
       });
     }

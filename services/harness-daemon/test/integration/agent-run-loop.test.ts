@@ -105,9 +105,8 @@ async function callDaemonRpc<M extends RpcMethod>(
     rpcVersion: RPC_PROTOCOL_VERSION,
   };
   const validation = validateRpcRequest(envelope);
-  assert.equal(validation.valid, true);
   if (!validation.valid) {
-    throw new Error(validation.errors.join(" "));
+    throw new Error("Requisição RPC inválida para teste.");
   }
   writeProtocolFrame(socket, Buffer.from(JSON.stringify(validation.value), "utf8"));
 
