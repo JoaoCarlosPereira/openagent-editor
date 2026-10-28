@@ -56,6 +56,16 @@ export {
 } from "./storage-recovery.js";
 
 export {
+  createWorkspaceStorageBackup,
+  restoreWorkspaceStorageBackup,
+  type CreateWorkspaceStorageBackupInput,
+  type CreateWorkspaceStorageBackupResult,
+  type RestoreWorkspaceStorageBackupInput,
+  type RestoreWorkspaceStorageBackupResult,
+  type WorkspaceStorageBackupManifest,
+} from "./storage-backup.js";
+
+export {
   insertStoredAgentNode,
   insertStoredMessage,
   insertStoredQueueItem,
