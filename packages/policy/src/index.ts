@@ -104,6 +104,14 @@ export {
 } from "./hooks/engine.js";
 export type { LocalHookEngineOptions } from "./hooks/engine.js";
 export { formatHookDenialForDisplay } from "./hooks/display.js";
+export {
+  formatCustomizationRulesForDisplay,
+  mergeCustomizationRulesByPrecedence,
+  validateSessionRulesLoadInput,
+  type CustomizationRuleDisplayEntry,
+  type CustomizationRuleLayer,
+  type LoadedCustomizationRule,
+} from "./hooks/customization-rules.js";
 export type {
   HookDenialDisplay,
   LocalHookAction,

@@ -90,6 +90,14 @@ export type SessionListItem = {
   attachmentsJson: string;
 };
 
+/** Regra carregada ao iniciar sessão com origem exibível (CUS-01). */
+export type SessionLoadedCustomizationRule = {
+  ruleId: string;
+  layer: "user" | "project";
+  origin: string;
+  precedence: number;
+};
+
 export interface RunStartParams {
   mode?: AgentMode;
   input: UserInput;
@@ -228,7 +236,12 @@ export interface RpcParamsMap {
 }
 
 export interface RpcResultMap {
-  [RPC_METHOD.SESSION_CREATE]: { sessionId: string; workspaceId: string; mode: AgentMode };
+  [RPC_METHOD.SESSION_CREATE]: {
+    sessionId: string;
+    workspaceId: string;
+    mode: AgentMode;
+    loadedRules: SessionLoadedCustomizationRule[];
+  };
   [RPC_METHOD.SESSION_LIST]: { sessions: SessionListItem[] };
   [RPC_METHOD.SESSION_SEARCH]: { sessions: Array<{ sessionId: string; mode: AgentMode }> };
   [RPC_METHOD.SESSION_EXPORT]: { exportRef: string };

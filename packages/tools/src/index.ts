@@ -221,3 +221,10 @@ export {
   assertLocalHooksAllowMcpToolInvoke,
   type McpToolHookGateInput,
 } from "./mcp/local-hook-gate.js";
+
+export {
+  createNodeCustomizationRuleFileReader,
+  loadCustomizationRulesFromPaths,
+  type CustomizationRuleFileReader,
+  type LoadCustomizationRulesFromPathsInput,
+} from "./mcp/load-customization-rules.js";

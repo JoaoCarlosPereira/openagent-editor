@@ -21,12 +21,14 @@ import {
   searchSessionMessages,
   type WorkspaceDatabase,
 } from "@openagent/storage";
+import type { WorkspaceCustomizationRules } from "../customization/session-rules-loader.js";
 import type { WorkspaceBindingState } from "../workspace-state.js";
 import { mapStoredSessionToListEntry } from "./session-resume.js";
 
 export type SessionRpcContext = {
   dataRoot: string;
   binding: WorkspaceBindingState;
+  customizationRules: WorkspaceCustomizationRules;
 };
 
 function isAgentMode(value: string): value is AgentMode {
@@ -156,10 +158,17 @@ function handleSessionCreate(
     context.binding.sessionIds.push(sessionId);
   }
 
+  const rulesSnapshot = context.customizationRules.beginSession({
+    workspaceRoot: context.binding.workspaceRoot,
+    sessionId,
+    rulesRef: context.binding.rulesRef,
+  });
+
   return {
     sessionId,
     workspaceId: context.binding.workspaceId,
     mode,
+    loadedRules: rulesSnapshot.display,
   };
 }
 

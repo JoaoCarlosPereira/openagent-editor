@@ -15,6 +15,7 @@ import { readPeerCredentialFromSocket } from "./peer-credential.js";
 import { RunMessageQueue } from "./queue/run-message-queue.js";
 import { RunStateMachine } from "./state/run-state-machine.js";
 import { serveRpcOnConnection } from "./rpc-connection.js";
+import { createWorkspaceCustomizationRules } from "./customization/session-rules-loader.js";
 import type { DaemonRpcContext } from "./runs/run-rpc-handler.js";
 
 export async function performServerTransportHandshake(
@@ -94,6 +95,7 @@ export async function performServerTransportHandshake(
   const rpcContext: DaemonRpcContext = {
     dataRoot: options.dataRoot,
     binding,
+    customizationRules: createWorkspaceCustomizationRules(),
     runMachines: new Map<string, RunStateMachine>(),
     runQueues: new Map<string, RunMessageQueue>(),
   };

@@ -67,3 +67,11 @@ export {
   WorkspaceCustomizationHooks,
   createWorkspaceCustomizationHooks,
 } from "./customization/local-hook-engine.js";
+
+export {
+  WorkspaceCustomizationRules,
+  createWorkspaceCustomizationRules,
+  loadSessionCustomizationRules,
+  type BeginSessionCustomizationInput,
+  type SessionCustomizationRulesSnapshot,
+} from "./customization/session-rules-loader.js";

@@ -26,7 +26,7 @@ import { openWorkspaceDatabase } from "@openagent/storage";
 import { RunStateMachine } from "../../src/state/run-state-machine.js";
 import { RunMessageQueue } from "../../src/queue/run-message-queue.js";
 import { completeRunningRunLifecycle } from "../../src/runs/run-rpc-handler.js";
-import { startHarnessDaemon } from "../../src/index.js";
+import { createWorkspaceCustomizationRules, startHarnessDaemon } from "../../src/index.js";
 
 const WORKSPACE: WorkspaceTransportHello = {
   type: "workspace.hello",
@@ -192,6 +192,7 @@ test.describe("run.queue.add/remove persistido", { concurrency: 1 }, () => {
           mcpServerIds: WORKSPACE.mcpServerIds,
           sessionIds: WORKSPACE.sessionIds,
         },
+        customizationRules: createWorkspaceCustomizationRules(),
         runMachines: new Map<string, RunStateMachine>(),
         runQueues: new Map<string, RunMessageQueue>(),
       };
