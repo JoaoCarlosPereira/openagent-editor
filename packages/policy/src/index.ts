@@ -1,4 +1,18 @@
 export {
+  buildTargetPattern,
+  computeGrantExpiresAtMs,
+  consumeOnceGrant,
+  grantMatchesRequest,
+  InMemoryGrantRegistry,
+  isGrantExpired,
+  issuePermissionGrant,
+  issuePermissionGrantFromGate,
+  validatePermissionGrantContext,
+  type IssuePermissionGrantInput,
+  type PermissionGrant,
+  type PermissionGrantContext,
+} from "./grants.js";
+export {
   describeCapabilityAction,
   validatePolicyCapability,
 } from "./capability.js";
