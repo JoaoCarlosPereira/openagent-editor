@@ -65,6 +65,8 @@ export {
   type ContextAttachResult,
   type ContextAttachSource,
   type ContextClearParams,
+  type ContextClearIndexSize,
+  type ContextClearResult,
   type ContextIndexParams,
   type ContextSearchParams,
   type ExtensionDisableParams,

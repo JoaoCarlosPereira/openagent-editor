@@ -225,6 +225,20 @@ export interface ContextClearParams {
   scope?: "session" | "workspace";
 }
 
+/** Tamanho do índice lexical antes da limpeza (CTX-04). */
+export interface ContextClearIndexSize {
+  indexedFileCount: number;
+  chunkCount: number;
+  lexicalBytes: number;
+}
+
+/** Resultado de context.clear com escopo e tamanho exibíveis (CTX-04). */
+export interface ContextClearResult {
+  cleared: true;
+  scope: "workspace";
+  size: ContextClearIndexSize;
+}
+
 export interface ExtensionInstallParams {
   packageRef: string;
 }
@@ -297,7 +311,7 @@ export interface RpcResultMap {
   [RPC_METHOD.CONTEXT_ATTACH]: ContextAttachResult;
   [RPC_METHOD.CONTEXT_INDEX]: { indexed: number };
   [RPC_METHOD.CONTEXT_SEARCH]: { hits: Array<{ ref: string; score: number }> };
-  [RPC_METHOD.CONTEXT_CLEAR]: { cleared: true };
+  [RPC_METHOD.CONTEXT_CLEAR]: ContextClearResult;
   [RPC_METHOD.EXTENSION_INSTALL]: { extensionId: string };
   [RPC_METHOD.EXTENSION_ENABLE]: { enabled: true };
   [RPC_METHOD.EXTENSION_DISABLE]: { disabled: true };

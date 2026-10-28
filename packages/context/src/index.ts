@@ -36,6 +36,17 @@ export {
   type ExecuteContextSearchRpcOptions,
 } from "./rpc/context-search.js";
 export {
+  executeContextClearRpc,
+} from "./rpc/context-clear.js";
+export {
+  clearWorkspaceContextIndex,
+  type ClearWorkspaceContextIndexResult,
+} from "./indexer/clear-context-index.js";
+export {
+  describeContextIndexSize,
+  type ContextIndexSizeSnapshot,
+} from "./indexer/describe-context-index.js";
+export {
   buildContextExclusionRules,
   evaluateContextPathExclusion,
   filterIncludedContextAttachmentDrafts,
