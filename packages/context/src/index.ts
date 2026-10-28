@@ -61,6 +61,12 @@ export {
 } from "./indexer/chunk-text.js";
 export { hashContextFileContent } from "./indexer/content-hash.js";
 export { indexContextFile } from "./indexer/index-context-file.js";
+export {
+  purgeExcludedContextIndexPaths,
+  type PurgeExcludedContextIndexInput,
+  type PurgeExcludedContextIndexResult,
+} from "./indexer/purge-excluded-context-index.js";
+export { removeContextFileIndex } from "./indexer/remove-context-file-index.js";
 export { reindexContextFileOnSave } from "./indexer/reindex-context-file-on-save.js";
 export type { ReindexContextFileOnSaveInput } from "./indexer/reindex-context-file-on-save.js";
 export { ensureContextIndexSchema } from "./indexer/schema.js";

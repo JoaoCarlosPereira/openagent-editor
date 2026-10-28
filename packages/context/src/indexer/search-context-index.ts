@@ -6,6 +6,7 @@ import {
   buildContextFtsMatchExpression,
   snippetFromLexicalText,
 } from "./fts-query.js";
+import { purgeExcludedContextIndexPaths } from "./purge-excluded-context-index.js";
 import { ensureContextIndexSchema } from "./schema.js";
 import type {
   ContextIndexSearchHit,
@@ -41,6 +42,12 @@ export function searchContextIndex(
 ): SearchContextIndexResult {
   ensureContextIndexSchema(database);
   requireNonEmptyQuery(input.query);
+
+  if (input.exclusionRuleset) {
+    purgeExcludedContextIndexPaths(database, {
+      exclusionRuleset: input.exclusionRuleset,
+    });
+  }
 
   const matchExpression = buildContextFtsMatchExpression(input.query);
   let ftsRows: FtsRow[];

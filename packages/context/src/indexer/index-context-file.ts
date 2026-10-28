@@ -4,6 +4,7 @@ import { PROTOCOL_ERROR_CODES, ProtocolError } from "@openagent/protocol";
 import { evaluateContextPathExclusion } from "../exclusions/rules.js";
 import { chunkContextFileText, DEFAULT_CONTEXT_INDEX_CHUNK_SIZE } from "./chunk-text.js";
 import { hashContextFileContent } from "./content-hash.js";
+import { removeContextFileIndex } from "./remove-context-file-index.js";
 import { ensureContextIndexSchema } from "./schema.js";
 import type { IndexContextFileInput, IndexContextFileResult } from "./types.js";
 
@@ -16,11 +17,6 @@ function requireIndexedPath(path: string): string {
     indexInvalid("path inválido para indexação de contexto.");
   }
   return path.trim();
-}
-
-function removeContextFileIndex(database: DatabaseSync, path: string): void {
-  database.prepare("DELETE FROM context_file_fts WHERE path = ?").run(path);
-  database.prepare("DELETE FROM context_index_file WHERE path = ?").run(path);
 }
 
 function readStoredContentHash(
