@@ -27,6 +27,15 @@ export {
   type ApplyConflictViewSnapshot,
 } from "./review/apply-conflict.js";
 export {
+  CheckpointRestoreController,
+  buildCheckpointRestoreView,
+  type AcceptRestoreOutcomeInput,
+  type CheckpointRestoreConflictEntry,
+  type CheckpointRestorePhase,
+  type CheckpointRestoreRequest,
+  type CheckpointRestoreViewSnapshot,
+} from "./review/checkpoint-restore.js";
+export {
   PlanProgressController,
   buildPlanProgressView,
   type PlanProgressPushInput,

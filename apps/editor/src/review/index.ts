@@ -21,6 +21,19 @@ export {
 } from "./apply-conflict.js";
 
 export {
+  CheckpointRestoreController,
+  CHECKPOINT_RESTORE_IDLE_MESSAGE,
+  CHECKPOINT_RESTORE_OK_MESSAGE,
+  CHECKPOINT_RESTORE_CONFLICT_MESSAGE,
+  buildCheckpointRestoreView,
+  type AcceptRestoreOutcomeInput,
+  type CheckpointRestoreConflictEntry,
+  type CheckpointRestorePhase,
+  type CheckpointRestoreRequest,
+  type CheckpointRestoreViewSnapshot,
+} from "./checkpoint-restore.js";
+
+export {
   PlanProgressController,
   PLAN_ACCEPTED_EVENT,
   PLAN_PRESENTED_EVENT,
