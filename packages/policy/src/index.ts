@@ -43,6 +43,25 @@ export {
   type CreateToolPermissionRequestInput,
 } from "./permission-model.js";
 export {
+  RUN_PERMISSION_DECIDED_EVENT,
+  RUN_PERMISSION_REQUESTED_EVENT,
+  RunToolPermissionFlow,
+  assertRunToolMayExecute,
+  buildPermissionDecidedPayload,
+  buildPermissionRequestedPayload,
+  persistHarnessEventWithPayload,
+  persistPermissionDecidedEvent,
+  persistPermissionRequestedEvent,
+  prepareRunToolPermission,
+  resolveRunToolPermission,
+  validateBeginRunToolPermissionInput,
+  type BeginRunToolPermissionInput,
+  type PermissionDecidedPayload,
+  type PermissionRequestedPayload,
+  type RunPermissionEventWriter,
+  type RunToolPermissionPrepareResult,
+} from "./run-permission.js";
+export {
   formatGrantScopeLabel,
   GRANT_SCOPE_KINDS,
   validateGrantScope,

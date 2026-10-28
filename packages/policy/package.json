@@ -11,5 +11,8 @@
   },
   "dependencies": {
     "@openagent/protocol": "0.1.0"
+  },
+  "devDependencies": {
+    "@openagent/storage": "0.1.0"
   }
 }
