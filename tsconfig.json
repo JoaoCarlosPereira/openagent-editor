@@ -16,13 +16,13 @@
     "noEmit": true,
     "skipLibCheck": true
   },
+  "files": [
+    "packages/workspace-scaffold.ts"
+  ],
   "include": [
-    "packages/*/src/**/*.ts",
-    "packages/*/test/**/*.ts",
-    "services/*/src/**/*.ts",
-    "services/*/test/**/*.ts",
-    "apps/*/src/**/*.ts",
-    "apps/*/test/**/*.ts",
+    "packages/**/*.ts",
+    "services/**/*.ts",
+    "apps/**/*.ts",
     "extension/**/*.js",
     "tests/**/*.js"
   ]

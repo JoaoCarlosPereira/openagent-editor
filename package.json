@@ -6,6 +6,7 @@
   "version": "0.3.0",
   "license": "MIT",
   "private": true,
+  "buildNote": "build validates workspace dependencies, TypeScript, and lint; it does not package an editor application.",
   "workspaces": [
     "packages/*",
     "services/*",
@@ -76,6 +77,8 @@
     "check": "node --check extension/index.js && node --check extension/client.js && node --check extension/html.js && node --check extension/context.js && node --check extension/inline.js && node --check extension/agent.js && node --check extension/paths.js",
     "check:provenance": "node --import tsx scripts/check-provenance-gate.mjs",
     "test:unit": "node scripts/run-unit-tests.mjs",
+    "build": "npm run build:workspace",
+    "build:workspace": "npm ls --depth=0 && npm run typecheck && npm run lint",
     "typecheck": "tsc -p tsconfig.json",
     "lint": "eslint --max-warnings 0 .",
     "parity:report": "node scripts/parity-report.mjs"
