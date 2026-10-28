@@ -44,3 +44,14 @@ export {
   type SidecarProcessSpawnInput,
   type StartCliProxySidecarSupervisorOptions,
 } from "./cliproxy-sidecar-supervisor.js";
+export {
+  CLI_PROXY_STREAM_HARNESS_EVENT_TYPES,
+  CliProxyStreamHarnessNormalizer,
+  assertCliProxyStreamHarnessNormalizerInput,
+  consumeOpenAiSseResponse,
+  mapCliProxyChatCompletionHttpFailure,
+  parseOpenAiStreamErrorObject,
+  toHarnessEventFromNormalization,
+  type CliProxyStreamHarnessNormalization,
+  type CliProxyStreamHarnessNormalizerInput,
+} from "./cliproxy-stream-harness-normalizer.js";
