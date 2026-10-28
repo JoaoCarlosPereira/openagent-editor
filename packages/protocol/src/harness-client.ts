@@ -5,7 +5,7 @@ import { validateHarnessEvent } from "./harness-event.js";
 import { PROTOCOL_ERROR_CODES, ProtocolError } from "./errors.js";
 import { OPENAGENT_DAEMON_PROTOCOL_VERSION } from "./protocol-version.js";
 import {
-  buildWorkspaceTransportAck,
+  validateWorkspaceTransportAck,
   validateWorkspaceTransportHello,
   type WorkspaceTransportAck,
   type WorkspaceTransportHello,
@@ -223,14 +223,16 @@ async function performTransportHandshake(
   if (workspaceResponse["type"] === "protocol.error") {
     throwProtocolErrorFromRecord(workspaceResponse);
   }
-  if (workspaceResponse["type"] !== "workspace.ack") {
+  const ackValidation = validateWorkspaceTransportAck(workspaceResponse);
+  if (!ackValidation.valid) {
     throw new ProtocolError(
-      PROTOCOL_ERROR_CODES.INVALID_STATE,
-      "Handshake de workspace não retornou workspace.ack.",
+      ackValidation.code,
+      ackValidation.errors.join(" "),
+      ackValidation.errors,
     );
   }
 
-  return buildWorkspaceTransportAck(workspaceValidation.value);
+  return ackValidation.value;
 }
 
 class TransportHarnessClient implements HarnessClient {

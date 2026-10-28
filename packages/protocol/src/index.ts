@@ -115,9 +115,11 @@ export {
 export {
   buildProtocolTransportErrorFrame,
   buildWorkspaceTransportAck,
+  validateWorkspaceTransportAck,
   validateWorkspaceTransportHello,
   type ProtocolTransportErrorFrame,
   type WorkspaceTransportAck,
+  type WorkspaceTransportAckValidationResult,
   type WorkspaceTransportHello,
   type WorkspaceTransportValidationResult,
 } from "./workspace-transport.js";
