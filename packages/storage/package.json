@@ -1,0 +1,15 @@
+{
+  "name": "@openagent/storage",
+  "version": "0.1.0",
+  "description": "SQLite WAL, migrações e CAS local por workspace do OpenAgent Editor",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "private": true,
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@openagent/protocol": "0.1.0"
+  }
+}
