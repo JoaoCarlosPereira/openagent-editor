@@ -194,3 +194,14 @@ export {
   parseMcpStdioServerLaunch,
   type McpStdioServerLaunch,
 } from "./mcp/mcp-stdio-config.js";
+
+export {
+  discoverMcpHttpTools,
+  type DiscoveredMcpHttpTool,
+  type McpHttpToolDiscoveryResult,
+} from "./mcp/discover-mcp-http-tools.js";
+
+export {
+  parseMcpHttpServerEndpoint,
+  type McpHttpServerEndpoint,
+} from "./mcp/mcp-http-config.js";
