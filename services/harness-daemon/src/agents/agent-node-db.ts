@@ -54,6 +54,7 @@ export function loadRunLifecycleState(db: WorkspaceDatabase, runId: string): Run
 export type StoredAgentNodeRow = {
   id: string;
   run_id: string;
+  parent_id: string | null;
   name: string;
   state: string;
   result_ref: string | null;
@@ -65,7 +66,9 @@ export function loadAgentNodeRow(
 ): StoredAgentNodeRow | null {
   return withAgentSqlite(db, (sqlite) => {
     const row = sqlite
-      .prepare("SELECT id, run_id, name, state, result_ref FROM agent_node WHERE id = ?")
+      .prepare(
+        "SELECT id, run_id, parent_id, name, state, result_ref FROM agent_node WHERE id = ?",
+      )
       .get(agentId) as StoredAgentNodeRow | undefined;
     return row ?? null;
   });

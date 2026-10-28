@@ -8,6 +8,7 @@ import {
   type RpcResultMap,
 } from "@openagent/protocol";
 import type { DaemonRpcContext } from "../runs/run-rpc-handler.js";
+import { handleProjectAccept, handleProjectReject } from "./project-accept-reject.js";
 import { handleProjectCreate } from "./project-create.js";
 
 function mapProtocolError(error: unknown): ProtocolError {
@@ -44,6 +45,14 @@ export function handleProjectRpc(
     case RPC_METHOD.PROJECT_CREATE: {
       const params = (request.payload ?? {}) as RpcParamsMap[typeof RPC_METHOD.PROJECT_CREATE];
       return handleProjectCreate(context, request.runId, params);
+    }
+    case RPC_METHOD.PROJECT_ACCEPT: {
+      const params = (request.payload ?? {}) as RpcParamsMap[typeof RPC_METHOD.PROJECT_ACCEPT];
+      return handleProjectAccept(context, request.runId, params);
+    }
+    case RPC_METHOD.PROJECT_REJECT: {
+      const params = (request.payload ?? {}) as RpcParamsMap[typeof RPC_METHOD.PROJECT_REJECT];
+      return handleProjectReject(context, request.runId, params);
     }
     default:
       throw new ProtocolError(

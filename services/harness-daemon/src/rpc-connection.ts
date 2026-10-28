@@ -46,7 +46,11 @@ const AGENT_RPC_METHODS = new Set<string>([
   RPC_METHOD.AGENT_CANCEL,
 ]);
 
-const PROJECT_RPC_METHODS = new Set<string>([RPC_METHOD.PROJECT_CREATE]);
+const PROJECT_RPC_METHODS = new Set<string>([
+  RPC_METHOD.PROJECT_CREATE,
+  RPC_METHOD.PROJECT_ACCEPT,
+  RPC_METHOD.PROJECT_REJECT,
+]);
 
 function writeProtocolError(socket: net.Socket, code: ProtocolErrorCode, message: string): void {
   writeProtocolFrame(
