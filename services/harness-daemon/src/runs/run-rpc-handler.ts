@@ -10,6 +10,8 @@ import {
   type RpcResultMap,
 } from "@openagent/protocol";
 import { openWorkspaceDatabase, type WorkspaceDatabase } from "@openagent/storage";
+import { executeAgentRunLoop } from "../agent/agent-run-loop.js";
+import { tryExtractAgentLoopPlanFromUserText } from "../agent/agent-loop-plan.js";
 import { RunMessageQueue } from "../queue/run-message-queue.js";
 import {
   consumePendingRunQueueAtRunEnd,
@@ -190,12 +192,29 @@ export function handleRunStart(
 
     persistRunStart(db, request.sessionId, request.runId, startedAtIso);
 
-    return db.appendHarnessEvent({
+    const startedEvent = db.appendHarnessEvent({
       runId: request.runId,
       type: RUN_STARTED_EVENT_TYPE,
       payloadRef: cas.contentRef,
       timestamp,
     });
+
+    const runMode = params.mode ?? context.binding.mode;
+    const agentLoopPlan = tryExtractAgentLoopPlanFromUserText(inputResult.value.text);
+    if (runMode === "agent" && agentLoopPlan) {
+      executeAgentRunLoop({
+        context,
+        db,
+        sessionId: request.sessionId,
+        runId: request.runId,
+        agentMode: "agent",
+        workspaceRoot: context.binding.workspaceRoot,
+        plan: agentLoopPlan,
+        machine,
+      });
+    }
+
+    return startedEvent;
   } finally {
     db.close();
   }
