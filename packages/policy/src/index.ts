@@ -43,6 +43,16 @@ export {
   type CreateToolPermissionRequestInput,
 } from "./permission-model.js";
 export {
+  parseSubagentDeclaredCapabilities,
+  parseSubagentGrantCheck,
+  parseSubagentRunGrantSeeds,
+  prepareInheritedSubagentToolPermission,
+  seedRunGrantsFromSubagentObjective,
+  stripSubagentObjectiveMarkers,
+  type SubagentGrantCheckSpec,
+  type SubagentRunGrantSeed,
+} from "./subagent-grant-policy.js";
+export {
   RUN_PERMISSION_DECIDED_EVENT,
   RUN_PERMISSION_REQUESTED_EVENT,
   RunToolPermissionFlow,

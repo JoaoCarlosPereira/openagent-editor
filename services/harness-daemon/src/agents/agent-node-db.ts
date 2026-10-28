@@ -12,6 +12,22 @@ export function withAgentSqlite<T>(db: WorkspaceDatabase, run: (sqlite: Database
   }
 }
 
+export function loadRunSessionId(db: WorkspaceDatabase, runId: string): string {
+  return withAgentSqlite(db, (sqlite) => {
+    const row = sqlite
+      .prepare("SELECT session_id FROM run WHERE id = ?")
+      .get(runId) as { session_id?: string } | undefined;
+    if (!row?.session_id) {
+      throw new ProtocolError(
+        PROTOCOL_ERROR_CODES.INVALID_STATE,
+        "sessionId ausente para run do subagente.",
+        [runId],
+      );
+    }
+    return row.session_id;
+  });
+}
+
 export function loadRunLifecycleState(db: WorkspaceDatabase, runId: string): RunLifecycleState | null {
   return withAgentSqlite(db, (sqlite) => {
     const row = sqlite

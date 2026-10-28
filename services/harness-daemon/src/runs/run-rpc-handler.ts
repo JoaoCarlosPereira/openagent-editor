@@ -26,6 +26,7 @@ import {
   enqueueRunMessage,
   removePendingRunMessage,
 } from "../queue/run-queue-coordinator.js";
+import type { RunGrantRegistryMap } from "../agents/agent-subagent-grants.js";
 import type { SubagentRuntimeRegistry } from "../agents/agent-subagent-runtime.js";
 import { RunStateMachine } from "../state/run-state-machine.js";
 import type { RunLifecycleState } from "../state/run-state.js";
@@ -38,6 +39,8 @@ export type DaemonRpcContext = SessionRpcContext & {
   runQueues: Map<string, RunMessageQueue>;
   /** Subagentes em execução por runId (AGT-07). */
   subagentRuns?: SubagentRuntimeRegistry;
+  /** Grants do run pai compartilhados com subagentes (AGT-05 / PER-01). */
+  runGrantRegistries?: RunGrantRegistryMap;
 };
 
 export { consumePendingRunQueueAtRunEnd };

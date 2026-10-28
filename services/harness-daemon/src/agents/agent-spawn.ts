@@ -6,13 +6,25 @@ import {
   type RpcResultMap,
   RPC_METHOD,
 } from "@openagent/protocol";
-import { persistHarnessEventWithPayload } from "@openagent/policy";
+import {
+  parseSubagentDeclaredCapabilities,
+  parseSubagentGrantCheck,
+  persistHarnessEventWithPayload,
+  seedRunGrantsFromSubagentObjective,
+  stripSubagentObjectiveMarkers,
+} from "@openagent/policy";
 import { openWorkspaceDatabase } from "@openagent/storage";
 import {
   loadAgentNodeRow,
   loadRunLifecycleState,
+  loadRunSessionId,
   updateAgentNodeState,
 } from "./agent-node-db.js";
+import {
+  buildRunGrantContext,
+  prepareSubagentRunToolPermission,
+  runGrantRegistryForContext,
+} from "./agent-subagent-grants.js";
 import {
   parseSubagentObjectiveDelay,
   registerSubagentRun,
@@ -59,11 +71,39 @@ function assertSpawnPreconditions(
   }
 }
 
+function resolveSubagentPermissionPhase(
+  context: DaemonRpcContext,
+  runId: string,
+  sessionId: string,
+  objective: string,
+): { phase?: "granted" | "pending"; declaredCapabilities: string[] } {
+  const grantCheck = parseSubagentGrantCheck(objective);
+  const declaredCapabilities = parseSubagentDeclaredCapabilities(objective);
+  if (!grantCheck) {
+    return { declaredCapabilities };
+  }
+  const prepared = prepareSubagentRunToolPermission(
+    context,
+    {
+      runId,
+      sessionId,
+      request: {
+        requestId: grantCheck.requestId,
+        capability: grantCheck.capability,
+        target: grantCheck.target,
+      },
+    },
+    declaredCapabilities,
+  );
+  return { phase: prepared.phase, declaredCapabilities };
+}
+
 async function runSubagentToCompletion(
   context: DaemonRpcContext,
   runId: string,
   agentId: string,
   objective: string,
+  sessionId: string,
   signal: AbortSignal,
 ): Promise<void> {
   const { delayMs, objectiveText } = parseSubagentObjectiveDelay(objective);
@@ -87,10 +127,16 @@ async function runSubagentToCompletion(
     }
 
     const name = node.name;
+    const permission = resolveSubagentPermissionPhase(context, runId, sessionId, objective);
+    const displayObjective = stripSubagentObjectiveMarkers(
+      objectiveText.length > 0 ? objectiveText : objective,
+    );
     const resultBody = JSON.stringify({
       agentId,
-      objective: objectiveText,
+      objective: displayObjective,
       summary: `Subagente "${name}" concluiu o objetivo local.`,
+      inheritedGrantPhase: permission.phase ?? null,
+      declaredCapabilities: permission.declaredCapabilities,
     });
     const resultCas = db.putCasBlob(Buffer.from(resultBody, "utf8"));
     updateAgentNodeState(db, agentId, "complete", resultCas.contentRef);
@@ -119,10 +165,22 @@ export function spawnSubagentFromObjective(
   });
   try {
     assertSpawnPreconditions(context, runId, db);
+    parseSubagentGrantCheck(objective);
+
+    const sessionId = loadRunSessionId(db, runId);
+    const grantContext = buildRunGrantContext(context, sessionId);
+    seedRunGrantsFromSubagentObjective(
+      objective,
+      runGrantRegistryForContext(context, runId),
+      grantContext,
+    );
 
     const agentId = randomUUID();
     const { objectiveText } = parseSubagentObjectiveDelay(objective);
-    const name = agentDisplayName(objectiveText.length > 0 ? objectiveText : objective);
+    const displayObjective = stripSubagentObjectiveMarkers(
+      objectiveText.length > 0 ? objectiveText : objective,
+    );
+    const name = agentDisplayName(displayObjective.length > 0 ? displayObjective : objective);
 
     db.insertAgentNode({
       id: agentId,
@@ -136,7 +194,7 @@ export function spawnSubagentFromObjective(
     persistHarnessEventWithPayload(db, runId, AGENT_SPAWNED_EVENT, {
       agentId,
       name,
-      objective: objectiveText.length > 0 ? objectiveText : objective.trim(),
+      objective: displayObjective.length > 0 ? displayObjective : objective.trim(),
     });
 
     const abortController = registerSubagentRun(context, runId, agentId);
@@ -145,6 +203,7 @@ export function spawnSubagentFromObjective(
       runId,
       agentId,
       objective,
+      sessionId,
       abortController.signal,
     ).catch(() => {
       unregisterSubagentRun(context, runId, agentId);
