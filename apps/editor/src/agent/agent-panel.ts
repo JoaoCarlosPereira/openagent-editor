@@ -2,6 +2,7 @@ import {
   ProtocolError,
   USER_INPUT_EMPTY_MESSAGE,
   validateUserInput,
+  type AgentMode,
   type UserInput,
 } from "@openagent/protocol";
 
@@ -14,34 +15,56 @@ import {
   createAgentHistoryMessage,
   type AgentHistoryMessage,
 } from "./agent-history.js";
+import {
+  DEFAULT_AGENT_PANEL_MODELS,
+  assertAgentPanelMode,
+  assertAgentPanelModelId,
+  type AgentPanelModelOption,
+} from "./agent-panel-selectors.js";
 
 export type { AgentHistoryMessage, AgentHistoryRole } from "./agent-history.js";
 export { buildAgentPanelView, type AgentPanelViewSnapshot } from "./agent-panel-view.js";
+export {
+  AGENT_PANEL_MODES,
+  DEFAULT_AGENT_PANEL_MODELS,
+  type AgentPanelModelOption,
+} from "./agent-panel-selectors.js";
 
 export interface AgentPanelOpenInput {
   sessionId: string;
   initialHistory?: readonly AgentHistoryMessage[];
+  mode?: AgentMode;
+  modelId?: string;
+  availableModels?: readonly AgentPanelModelOption[];
 }
 
 export interface AgentPanelSubmitResult {
   userInput: UserInput;
   history: readonly AgentHistoryMessage[];
+  mode: AgentMode;
+  modelId: string;
   view: AgentPanelViewSnapshot;
 }
 
 /**
- * UI-01 (127): painel com composer e histórico; envio validado via protocolo (VAL-01).
+ * UI-01 (127/128): painel com seletores de modo/modelo, composer e histórico; envio validado (VAL-01).
  */
 export class AgentPanelController {
   private sessionId = "";
   private history: AgentHistoryMessage[] = [];
   private composerText = "";
   private composerDisabled = false;
+  private mode: AgentMode = "agent";
+  private modelId = DEFAULT_AGENT_PANEL_MODELS[0]!.id;
+  private availableModels: readonly AgentPanelModelOption[] = DEFAULT_AGENT_PANEL_MODELS;
   private view: AgentPanelViewSnapshot = buildAgentPanelView({
     sessionId: "",
     history: [],
     composerText: "",
     composerDisabled: false,
+    mode: "agent",
+    modelId: DEFAULT_AGENT_PANEL_MODELS[0]!.id,
+    availableModels: DEFAULT_AGENT_PANEL_MODELS,
   });
 
   get snapshot(): AgentPanelViewSnapshot {
@@ -53,6 +76,27 @@ export class AgentPanelController {
     this.history = [...(input.initialHistory ?? [])];
     this.composerText = "";
     this.composerDisabled = false;
+    this.availableModels =
+      input.availableModels && input.availableModels.length > 0
+        ? [...input.availableModels]
+        : [...DEFAULT_AGENT_PANEL_MODELS];
+    this.mode = input.mode !== undefined ? assertAgentPanelMode(input.mode) : "agent";
+    this.modelId =
+      input.modelId !== undefined
+        ? assertAgentPanelModelId(input.modelId, this.availableModels)
+        : this.availableModels[0]!.id;
+    this.refreshView();
+    return this.view;
+  }
+
+  setMode(mode: unknown): AgentPanelViewSnapshot {
+    this.mode = assertAgentPanelMode(mode);
+    this.refreshView();
+    return this.view;
+  }
+
+  setModel(modelId: unknown): AgentPanelViewSnapshot {
+    this.modelId = assertAgentPanelModelId(modelId, this.availableModels);
     this.refreshView();
     return this.view;
   }
@@ -87,6 +131,8 @@ export class AgentPanelController {
     return {
       userInput: validation.value,
       history: [...this.history],
+      mode: this.mode,
+      modelId: this.modelId,
       view: this.view,
     };
   }
@@ -98,6 +144,9 @@ export class AgentPanelController {
       history: this.history,
       composerText: this.composerText,
       composerDisabled: this.composerDisabled,
+      mode: this.mode,
+      modelId: this.modelId,
+      availableModels: this.availableModels,
     });
   }
 }

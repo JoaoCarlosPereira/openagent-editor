@@ -1,10 +1,20 @@
+import type { AgentMode } from "@openagent/protocol";
+
 import { formatAgentHistoryRoleLabel, type AgentHistoryMessage } from "./agent-history.js";
+import {
+  AGENT_PANEL_MODE_LABELS,
+  AGENT_PANEL_MODES,
+  type AgentPanelModelOption,
+} from "./agent-panel-selectors.js";
 
 export interface AgentPanelViewInput {
   sessionId: string;
   history: readonly AgentHistoryMessage[];
   composerText: string;
   composerDisabled: boolean;
+  mode: AgentMode;
+  modelId: string;
+  availableModels: readonly AgentPanelModelOption[];
 }
 
 export interface AgentPanelViewSnapshot {
@@ -13,6 +23,8 @@ export interface AgentPanelViewSnapshot {
     sessionId: string;
     historyCount: number;
     composerText: string;
+    mode: AgentMode;
+    modelId: string;
     focusOrder: readonly string[];
   };
 }
@@ -35,7 +47,38 @@ function renderHistoryMessage(message: AgentHistoryMessage): string {
   ].join("");
 }
 
-/** UI-01 (127): painel do agente com composer e histórico acessível por teclado. */
+function renderModeSelect(selectedMode: AgentMode): string {
+  const options = AGENT_PANEL_MODES.map((mode) => {
+    const selected = mode === selectedMode ? " selected" : "";
+    return `<option value="${mode}"${selected}>${AGENT_PANEL_MODE_LABELS[mode]}</option>`;
+  }).join("");
+  return [
+    `<select id="agent-mode-selector" data-testid="agent-mode-selector"`,
+    ` aria-label="Modo do agente" tabindex="0">`,
+    options,
+    `</select>`,
+  ].join("");
+}
+
+function renderModelSelect(
+  selectedModelId: string,
+  availableModels: readonly AgentPanelModelOption[],
+): string {
+  const options = availableModels
+    .map((model) => {
+      const selected = model.id === selectedModelId ? " selected" : "";
+      return `<option value="${escapeHtml(model.id)}"${selected}>${escapeHtml(model.label)}</option>`;
+    })
+    .join("");
+  return [
+    `<select id="agent-model-selector" data-testid="agent-model-selector"`,
+    ` aria-label="Modelo" tabindex="0">`,
+    options,
+    `</select>`,
+  ].join("");
+}
+
+/** UI-01 (127/128): painel do agente com seletores, composer e histórico acessível por teclado. */
 export function buildAgentPanelView(input: AgentPanelViewInput): AgentPanelViewSnapshot {
   const historyItems =
     input.history.length > 0
@@ -56,12 +99,8 @@ export function buildAgentPanelView(input: AgentPanelViewInput): AgentPanelViewS
   const html = [
     `<section role="region" aria-labelledby="agent-panel-title" data-testid="agent-panel">`,
     `<h2 id="agent-panel-title">Painel do agente</h2>`,
-    `<select id="agent-mode-selector" data-testid="agent-mode-selector" aria-label="Modo do agente" tabindex="0" disabled>`,
-    `<option value="agent">Agent</option>`,
-    `</select>`,
-    `<select id="agent-model-selector" data-testid="agent-model-selector" aria-label="Modelo" tabindex="0" disabled>`,
-    `<option value="default">Padrão</option>`,
-    `</select>`,
+    renderModeSelect(input.mode),
+    renderModelSelect(input.modelId, input.availableModels),
     `<div data-testid="agent-context-slot" role="group" aria-label="Contexto anexado" tabindex="0"></div>`,
     `<ol data-testid="agent-history" aria-live="polite" tabindex="0">${historyItems}</ol>`,
     `<form data-testid="agent-composer">`,
@@ -81,6 +120,8 @@ export function buildAgentPanelView(input: AgentPanelViewInput): AgentPanelViewS
       sessionId: input.sessionId,
       historyCount: input.history.length,
       composerText: input.composerText,
+      mode: input.mode,
+      modelId: input.modelId,
       focusOrder,
     },
   };
