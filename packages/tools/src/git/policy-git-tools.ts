@@ -1,3 +1,5 @@
+import path from "node:path";
+
 import type { AgentMode } from "@openagent/protocol";
 import {
   assertCapabilityAllowedForAgentMode,
@@ -53,7 +55,11 @@ function normalizeOptionalRelativePath(raw: unknown): string | undefined {
   if (typeof raw !== "string" || !raw.trim()) {
     throw invalidToolInputError("Caminho relativo inválido.");
   }
-  return raw.trim();
+  const trimmed = raw.trim();
+  if (path.isAbsolute(trimmed)) {
+    throw invalidToolInputError("Caminho relativo inválido.");
+  }
+  return trimmed;
 }
 
 /**
@@ -73,7 +79,7 @@ export function preparePolicyGitStatus(
       sessionId: input.sessionId,
       executionMode: context.executionMode,
       capability: "git.status",
-      target: { kind: "git", operation: "status" },
+      target: { kind: "command", command: "git status" },
       requestId: input.requestId,
     },
     sandboxOptions,
@@ -91,6 +97,7 @@ export function preparePolicyGitDiff(
 ): SandboxToolDispatchPrepareResult {
   assertCapabilityAllowedForAgentMode(context.agentMode, "git.diff");
   const relativePath = normalizeOptionalRelativePath(input.relativePath);
+  const diffCommand = relativePath ? `git diff -- ${relativePath}` : "git diff";
   return prepareSandboxToolDispatch(
     flow,
     {
@@ -98,11 +105,7 @@ export function preparePolicyGitDiff(
       sessionId: input.sessionId,
       executionMode: context.executionMode,
       capability: "git.diff",
-      target: {
-        kind: "git",
-        operation: "diff",
-        ...(relativePath ? { path: relativePath } : {}),
-      },
+      target: { kind: "command", command: diffCommand },
       requestId: input.requestId,
     },
     sandboxOptions,

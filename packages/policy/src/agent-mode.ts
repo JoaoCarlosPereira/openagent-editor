@@ -35,6 +35,19 @@ export function askAgentModeBlockedError(): ProtocolError {
   return permissionDeniedError(AGENT_MODE_ASK_BLOCKED_MESSAGE, [AGENT_MODE_ASK_BLOCKED_MESSAGE]);
 }
 
+/** Capabilities de agente (Git CLI) bloqueadas no modo Ask — distintas de leitura de arquivo. */
+const ASK_BLOCKED_NON_FILE_READ_CAPABILITIES: ReadonlySet<PolicyCapability> = new Set([
+  "git.status",
+  "git.diff",
+]);
+
+function isBlockedInAskAgentMode(capability: PolicyCapability): boolean {
+  if (isMutatingPolicyCapability(capability)) {
+    return true;
+  }
+  return ASK_BLOCKED_NON_FILE_READ_CAPABILITIES.has(capability);
+}
+
 /**
  * AGT-01: em Ask, recusa gravação de arquivo, comando e demais capabilities mutáveis;
  * leitura e busca permanecem permitidas.
@@ -46,7 +59,7 @@ export function assertCapabilityAllowedForAgentMode(
   if (agentMode !== "ask") {
     return;
   }
-  if (!isMutatingPolicyCapability(capability)) {
+  if (!isBlockedInAskAgentMode(capability)) {
     return;
   }
   throw askAgentModeBlockedError();
