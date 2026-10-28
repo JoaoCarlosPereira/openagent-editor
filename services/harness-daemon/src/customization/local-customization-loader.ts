@@ -3,8 +3,10 @@ import path from "node:path";
 
 import {
   applyLocalCustomizationInvocation,
+  invokeLocalCustomizationWithGrantPolicy,
   mergeLocalCustomizationAssetsByPrecedence,
   type LoadedLocalCustomizationAsset,
+  type LocalCustomizationInvocationOutcome,
   type LocalCustomizationInvokeResult,
 } from "@openagent/policy";
 import {
@@ -72,6 +74,14 @@ export class WorkspaceLocalCustomizationAssets {
 
   invoke(invokeRef: string): LocalCustomizationInvokeResult {
     return applyLocalCustomizationInvocation(this.assets, invokeRef);
+  }
+
+  /** Invoca com emissão observável e sem ampliar grants de plugin (CUS-02). */
+  invokeWithPolicy(
+    invokeRef: string,
+    input: { sessionId: string; emittedAt?: number },
+  ): LocalCustomizationInvocationOutcome {
+    return invokeLocalCustomizationWithGrantPolicy(this.assets, invokeRef, input);
   }
 }
 

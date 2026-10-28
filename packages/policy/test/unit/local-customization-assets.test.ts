@@ -4,7 +4,9 @@ import test from "node:test";
 import { PROTOCOL_ERROR_CODES, ProtocolError } from "@openagent/protocol";
 
 import {
+  LOCAL_CUSTOMIZATION_INVOKED_EVENT_TYPE,
   applyLocalCustomizationInvocation,
+  invokeLocalCustomizationWithGrantPolicy,
   mergeLocalCustomizationAssetsByPrecedence,
   parseLocalCustomizationInvokeRef,
   type LoadedLocalCustomizationAsset,
@@ -65,6 +67,27 @@ test("[CUS-02] caminho de erro: referência inválida retorna INVALID_STATE", ()
       return true;
     },
   );
+});
+
+test("[CUS-02] plugin expõe capabilities declaradas sem ampliar grant", () => {
+  const assets: LoadedLocalCustomizationAsset[] = [
+    {
+      id: "deploy",
+      kind: "plugin",
+      layer: "project",
+      origin: ".cursor/plugins/deploy/plugin.json",
+      instruction: "Publique artefatos.",
+      requestedCapabilities: ["shell.exec", "file.write"],
+      precedence: 2,
+    },
+  ];
+
+  const outcome = invokeLocalCustomizationWithGrantPolicy(assets, "plugin:deploy", {
+    sessionId: "ses-plugin-grant",
+  });
+  assert.equal(outcome.invoked.type, LOCAL_CUSTOMIZATION_INVOKED_EVENT_TYPE);
+  assert.equal(outcome.result.instruction, "Publique artefatos.");
+  assert.deepEqual(outcome.invoked.declaredPluginCapabilities, ["shell.exec", "file.write"]);
 });
 
 test("[CUS-02] caminho de erro: ativo ausente retorna INVALID_STATE sem efeito colateral", () => {

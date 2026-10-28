@@ -49,10 +49,41 @@ function stripYamlFrontmatter(content: string): string {
   return trimmed.slice(end + 4).trimStart();
 }
 
+function parseRequestedCapabilities(record: Record<string, unknown>): string[] {
+  const raw = record["requestedCapabilities"];
+  if (raw === undefined) {
+    return [];
+  }
+  if (!Array.isArray(raw)) {
+    throw new ProtocolError(
+      PROTOCOL_ERROR_CODES.INVALID_STATE,
+      "Manifesto de plugin inválido.",
+      ["Campo 'requestedCapabilities' deve ser um array de strings."],
+    );
+  }
+  const capabilities: string[] = [];
+  for (const entry of raw) {
+    if (typeof entry !== "string" || !entry.trim()) {
+      throw new ProtocolError(
+        PROTOCOL_ERROR_CODES.INVALID_STATE,
+        "Manifesto de plugin inválido.",
+        ["Cada capability em 'requestedCapabilities' deve ser string não vazia."],
+      );
+    }
+    capabilities.push(entry.trim());
+  }
+  return capabilities;
+}
+
 function parsePluginManifestJson(
   raw: string,
   origin: string,
-): { manifest: LocalCustomizationAssetManifest; instruction: string; id: string } {
+): {
+  manifest: LocalCustomizationAssetManifest;
+  instruction: string;
+  id: string;
+  requestedCapabilities: string[];
+} {
   let parsed: unknown;
   try {
     parsed = JSON.parse(raw);
@@ -88,7 +119,8 @@ function parsePluginManifestJson(
   if (typeof record.description === "string" && record.description.trim()) {
     manifest.description = record.description.trim();
   }
-  return { manifest, instruction, id: name };
+  const requestedCapabilities = parseRequestedCapabilities(record);
+  return { manifest, instruction, id: name, requestedCapabilities };
 }
 
 function collectCommandAssets(
@@ -207,7 +239,7 @@ function collectPluginAssets(
     }
     const origin = `${originPrefix}/${entry}/${PLUGIN_MANIFEST_FILE}`;
     const raw = reader.readFileSync(manifestPath, "utf8");
-    const { manifest, instruction, id } = parsePluginManifestJson(raw, origin);
+    const { manifest, instruction, id, requestedCapabilities } = parsePluginManifestJson(raw, origin);
     loaded.push({
       id,
       kind: "plugin",
@@ -215,6 +247,7 @@ function collectPluginAssets(
       origin,
       instruction,
       manifest,
+      requestedCapabilities,
       precedence,
     });
   }

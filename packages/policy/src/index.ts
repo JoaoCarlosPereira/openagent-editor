@@ -116,13 +116,18 @@ export {
   type SessionRulesLoadedEmission,
 } from "./hooks/customization-rules.js";
 export {
+  LOCAL_CUSTOMIZATION_INVOKED_EVENT_TYPE,
   applyLocalCustomizationInvocation,
+  buildLocalCustomizationInvokedEmission,
+  invokeLocalCustomizationWithGrantPolicy,
   mergeLocalCustomizationAssetsByPrecedence,
   parseLocalCustomizationInvokeRef,
   type LoadedLocalCustomizationAsset,
   type LocalCustomizationAssetKind,
   type LocalCustomizationAssetLayer,
   type LocalCustomizationAssetManifest,
+  type LocalCustomizationInvokedEmission,
+  type LocalCustomizationInvocationOutcome,
   type LocalCustomizationInvokeDisplay,
   type LocalCustomizationInvokeResult,
 } from "./hooks/local-customization-assets.js";

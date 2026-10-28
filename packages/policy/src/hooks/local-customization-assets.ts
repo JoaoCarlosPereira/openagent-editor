@@ -1,5 +1,7 @@
 import { PROTOCOL_ERROR_CODES, ProtocolError } from "@openagent/protocol";
 
+import type { PolicyCapability } from "../types.js";
+
 /** Tipo de ativo local invocável (CUS-02). */
 export type LocalCustomizationAssetKind = "command" | "skill" | "plugin";
 
@@ -19,6 +21,11 @@ export interface LoadedLocalCustomizationAsset {
   origin: string;
   instruction: string;
   manifest?: LocalCustomizationAssetManifest;
+  /**
+   * Capabilities declaradas no manifesto do plugin (informativas).
+   * A invocação nunca registra grants automaticamente (ADR-006 / CUS-02).
+   */
+  requestedCapabilities?: readonly PolicyCapability[];
   /** Maior valor = maior precedência na mesclagem. */
   precedence: number;
 }
@@ -36,6 +43,25 @@ export interface LocalCustomizationInvokeResult {
   instruction: string;
   display: LocalCustomizationInvokeDisplay;
 }
+
+/** Evento observável ao invocar comando/skill/plugin local (CUS-02). */
+export const LOCAL_CUSTOMIZATION_INVOKED_EVENT_TYPE = "local.customization.invoked" as const;
+
+export type LocalCustomizationInvokedEmission = {
+  type: typeof LOCAL_CUSTOMIZATION_INVOKED_EVENT_TYPE;
+  sessionId: string;
+  invokeRef: string;
+  instruction: string;
+  display: LocalCustomizationInvokeDisplay;
+  /** Capabilities declaradas pelo plugin; vazio para command/skill. */
+  declaredPluginCapabilities: readonly PolicyCapability[];
+  emittedAt: number;
+};
+
+export type LocalCustomizationInvocationOutcome = {
+  result: LocalCustomizationInvokeResult;
+  invoked: LocalCustomizationInvokedEmission;
+};
 
 const INVOKE_REF_PATTERN = /^(skill|command|plugin):[a-zA-Z0-9._-]+$/;
 
@@ -115,4 +141,62 @@ export function applyLocalCustomizationInvocation(
       manifest: match.manifest,
     },
   };
+}
+
+/** Monta emissão estruturada de invocação com origem (CUS-02). */
+export function buildLocalCustomizationInvokedEmission(input: {
+  sessionId: string;
+  result: LocalCustomizationInvokeResult;
+  declaredPluginCapabilities?: readonly PolicyCapability[];
+  emittedAt?: number;
+}): LocalCustomizationInvokedEmission {
+  return {
+    type: LOCAL_CUSTOMIZATION_INVOKED_EVENT_TYPE,
+    sessionId: input.sessionId.trim(),
+    invokeRef: input.result.invokeRef,
+    instruction: input.result.instruction,
+    display: input.result.display,
+    declaredPluginCapabilities: [...(input.declaredPluginCapabilities ?? [])],
+    emittedAt: input.emittedAt ?? Date.now(),
+  };
+}
+
+function findLoadedAsset(
+  assets: readonly LoadedLocalCustomizationAsset[],
+  invokeRef: string,
+): LoadedLocalCustomizationAsset {
+  const { kind, assetId } = parseLocalCustomizationInvokeRef(invokeRef);
+  const match = assets.find((asset) => asset.kind === kind && asset.id === assetId);
+  if (!match) {
+    throw new ProtocolError(
+      PROTOCOL_ERROR_CODES.INVALID_STATE,
+      "Ativo local não encontrado.",
+      [`Nenhum ${kind} '${assetId}' carregado para este workspace.`],
+    );
+  }
+  return match;
+}
+
+/**
+ * Aplica instrução declarada, expõe origem e garante que plugin não amplia grant
+ * (capabilities declaradas permanecem informativas; PER-01 continua obrigatório).
+ */
+export function invokeLocalCustomizationWithGrantPolicy(
+  assets: readonly LoadedLocalCustomizationAsset[],
+  invokeRef: string,
+  input: { sessionId: string; emittedAt?: number },
+): LocalCustomizationInvocationOutcome {
+  const match = findLoadedAsset(assets, invokeRef);
+  const result = applyLocalCustomizationInvocation(assets, invokeRef);
+  const declaredPluginCapabilities =
+    match.kind === "plugin" ? (match.requestedCapabilities ?? []) : [];
+
+  const invoked = buildLocalCustomizationInvokedEmission({
+    sessionId: input.sessionId,
+    result,
+    declaredPluginCapabilities,
+    emittedAt: input.emittedAt,
+  });
+
+  return { result, invoked };
 }

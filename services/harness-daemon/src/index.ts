@@ -82,3 +82,8 @@ export {
   loadWorkspaceLocalCustomizationAssets,
   type LoadWorkspaceLocalCustomizationInput,
 } from "./customization/local-customization-loader.js";
+
+export {
+  invokeWorkspaceLocalCustomization,
+  type InvokeWorkspaceLocalCustomizationInput,
+} from "./customization/local-customization-invocation.js";
