@@ -1,9 +1,12 @@
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
+import { runStorageMigrations } from "./migration-runner.js";
+import { STORAGE_MIGRATIONS } from "./migrations/index.js";
+import { STORAGE_SCHEMA_VERSION } from "./schema-version.js";
 import { assertValidWorkspaceId } from "./workspace-id.js";
 
-export const STORAGE_SCHEMA_VERSION = 1;
+export { STORAGE_SCHEMA_VERSION };
 
 export type SessionResumeRecord = {
   sessionId: string;
@@ -27,21 +30,6 @@ export type WorkspaceDatabase = {
   listSessionResumes(): SessionResumeRecord[];
   close(): void;
 };
-
-const INITIAL_SCHEMA_SQL = `
-CREATE TABLE IF NOT EXISTS storage_meta (
-  key TEXT PRIMARY KEY NOT NULL,
-  value TEXT NOT NULL
-);
-
-CREATE TABLE IF NOT EXISTS session_resume (
-  session_id TEXT PRIMARY KEY NOT NULL,
-  mode TEXT NOT NULL,
-  messages_json TEXT NOT NULL,
-  tools_json TEXT NOT NULL,
-  attachments_json TEXT NOT NULL
-);
-`;
 
 function readJournalMode(database: DatabaseSync): "wal" {
   const row = database.prepare("PRAGMA journal_mode").get() as { journal_mode?: string };
@@ -70,16 +58,6 @@ function sessionResumeFromRow(row: SessionResumeRow): SessionResumeRecord {
   };
 }
 
-function bootstrapSchema(database: DatabaseSync): void {
-  database.exec(INITIAL_SCHEMA_SQL);
-  database
-    .prepare(
-      `INSERT INTO storage_meta(key, value) VALUES('schema_version', ?)
-       ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
-    )
-    .run(String(STORAGE_SCHEMA_VERSION));
-}
-
 export function resolveWorkspaceDatabasePath(
   dataRoot: string,
   workspaceId: string,
@@ -102,7 +80,7 @@ export function openWorkspaceDatabase(
   database.exec("PRAGMA busy_timeout = 5000");
   database.exec("PRAGMA journal_mode = WAL");
   const journalMode = readJournalMode(database);
-  bootstrapSchema(database);
+  runStorageMigrations(database, STORAGE_MIGRATIONS);
 
   const upsert = database.prepare(`
     INSERT INTO session_resume(
