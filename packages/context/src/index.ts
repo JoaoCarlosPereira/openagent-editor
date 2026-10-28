@@ -32,9 +32,15 @@ export {
   type ExecuteContextIndexRpcOptions,
 } from "./rpc/context-index.js";
 export {
+  executeContextSearchRpc,
+  type ExecuteContextSearchRpcOptions,
+} from "./rpc/context-search.js";
+export {
   buildContextExclusionRules,
   evaluateContextPathExclusion,
+  filterIncludedContextAttachmentDrafts,
   filterIncludedContextPaths,
+  resolveContextExclusionRuleset,
   loadProjectGitignorePatterns,
   parseWorkspaceExclusionPatterns,
   type BuildContextExclusionRulesInput,

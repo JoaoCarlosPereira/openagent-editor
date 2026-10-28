@@ -8,10 +8,18 @@ import {
 import { buildContextSendPreview } from "../attachments/preview.js";
 import { parseContextAttachmentDrafts } from "../attachments/validate.js";
 import type { ContextSendPreview } from "../attachments/types.js";
+import {
+  filterIncludedContextAttachmentDrafts,
+  resolveContextExclusionRuleset,
+} from "../exclusions/rules.js";
 
 export interface ExecuteContextAttachRpcOptions {
   /** Valor de workspace.context_limit quando persistido; omitido usa default API-03. */
   workspaceContextLimitTokens?: number | null;
+  /** Raiz do workspace para aplicar exclusões (CTX-03) em anexos automáticos. */
+  workspaceRoot?: string;
+  /** Padrões de workspace.exclusions_json (array ou string JSON). */
+  workspaceExclusionPatterns?: unknown;
 }
 
 function toRpcResult(preview: ContextSendPreview): ContextAttachResult {
@@ -60,8 +68,23 @@ export function executeContextAttachRpc(
     );
   }
 
+  let attachments = parsed.value;
+  if (options.workspaceRoot !== undefined && options.workspaceRoot.trim().length > 0) {
+    const ruleset = resolveContextExclusionRuleset({
+      workspaceRoot: options.workspaceRoot,
+      workspaceExclusionPatterns: options.workspaceExclusionPatterns ?? [],
+    });
+    attachments = filterIncludedContextAttachmentDrafts(ruleset, attachments);
+    if (attachments.length === 0) {
+      throw new ProtocolError(
+        PROTOCOL_ERROR_CODES.INVALID_STATE,
+        "Nenhum anexo permanece após aplicar regras de exclusão do workspace.",
+      );
+    }
+  }
+
   const preview = buildContextSendPreview({
-    attachments: parsed.value,
+    attachments,
     messageText: params.messageText,
     workspaceContextLimitTokens: options.workspaceContextLimitTokens,
   });

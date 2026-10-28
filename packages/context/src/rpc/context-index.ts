@@ -9,11 +9,25 @@ import {
 } from "@openagent/protocol";
 
 import type { ContextExclusionRuleset } from "../exclusions/types.js";
+import { resolveContextExclusionRuleset } from "../exclusions/rules.js";
 import { reindexContextFileOnSave } from "../indexer/reindex-context-file-on-save.js";
 
 export interface ExecuteContextIndexRpcOptions {
   workspaceRoot: string;
   exclusionRuleset?: ContextExclusionRuleset;
+  workspaceExclusionPatterns?: unknown;
+}
+
+function resolveIndexExclusionRuleset(
+  options: ExecuteContextIndexRpcOptions,
+): ContextExclusionRuleset {
+  if (options.exclusionRuleset) {
+    return options.exclusionRuleset;
+  }
+  return resolveContextExclusionRuleset({
+    workspaceRoot: options.workspaceRoot,
+    workspaceExclusionPatterns: options.workspaceExclusionPatterns ?? [],
+  });
 }
 
 function indexRpcInvalid(message: string, details?: string[]): never {
@@ -45,12 +59,14 @@ export function executeContextIndexRpc(
     }
   }
 
+  const exclusionRuleset = resolveIndexExclusionRuleset(options);
+
   let indexed = 0;
   for (const relativePath of paths) {
     const result = reindexContextFileOnSave(database, {
       workspaceRoot: options.workspaceRoot,
       relativePath,
-      exclusionRuleset: options.exclusionRuleset,
+      exclusionRuleset,
     });
     if (result.indexed) {
       indexed += 1;

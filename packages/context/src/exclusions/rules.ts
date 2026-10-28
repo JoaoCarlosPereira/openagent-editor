@@ -4,10 +4,11 @@ import path from "node:path";
 import {
   outOfScopePathError,
   PROTOCOL_ERROR_CODES,
-  type ProtocolError,
+  ProtocolError,
 } from "@openagent/protocol";
 import { resolveCanonicalWorkspacePath } from "@openagent/policy";
 
+import type { ContextAttachmentDraft } from "../attachments/types.js";
 import { parseGitignoreLines } from "./gitignore.js";
 import {
   findExclusionMatch,
@@ -179,6 +180,46 @@ export function filterIncludedContextPaths(
     if (result.included) {
       included.push(result.canonicalPath);
     }
+  }
+  return included;
+}
+
+/**
+ * Monta ruleset de exclusão ou lança INVALID_STATE (CTX-03 caminho de erro).
+ */
+export function resolveContextExclusionRuleset(
+  input: BuildContextExclusionRulesInput,
+): ContextExclusionRuleset {
+  const built = buildContextExclusionRules(input);
+  if ("valid" in built) {
+    if (!built.valid) {
+      throw new ProtocolError(built.code, built.errors.join(" "));
+    }
+    throw new ProtocolError(
+      PROTOCOL_ERROR_CODES.INVALID_STATE,
+      "Ruleset de exclusão inválido.",
+    );
+  }
+  return built;
+}
+
+/**
+ * Remove anexos cujo caminho está excluído (contexto automático / attach, CTX-03).
+ */
+export function filterIncludedContextAttachmentDrafts(
+  ruleset: ContextExclusionRuleset,
+  attachments: readonly ContextAttachmentDraft[],
+): ContextAttachmentDraft[] {
+  const included: ContextAttachmentDraft[] = [];
+  for (const attachment of attachments) {
+    const result = evaluateContextPathExclusion({
+      ruleset,
+      requestedPath: attachment.path,
+    });
+    if ("error" in result || !result.included) {
+      continue;
+    }
+    included.push(attachment);
   }
   return included;
 }
