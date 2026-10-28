@@ -15,6 +15,7 @@ import {
 import { dispatchAgentRpc } from "./agents/agent-rpc-handler.js";
 import { dispatchCheckpointRpc } from "./checkpoints/checkpoint-rpc-handler.js";
 import { dispatchContextRpc } from "./context/context-rpc-handler.js";
+import { dispatchProjectRpc } from "./projects/project-rpc-handler.js";
 import { dispatchRunRpc, type DaemonRpcContext } from "./runs/run-rpc-handler.js";
 import { dispatchSessionRpc } from "./sessions/session-rpc-handler.js";
 
@@ -44,6 +45,8 @@ const AGENT_RPC_METHODS = new Set<string>([
   RPC_METHOD.AGENT_SPAWN,
   RPC_METHOD.AGENT_CANCEL,
 ]);
+
+const PROJECT_RPC_METHODS = new Set<string>([RPC_METHOD.PROJECT_CREATE]);
 
 function writeProtocolError(socket: net.Socket, code: ProtocolErrorCode, message: string): void {
   writeProtocolFrame(
@@ -97,7 +100,8 @@ export async function serveRpcOnConnection(
     const isCheckpoint = CHECKPOINT_RPC_METHODS.has(request.method);
     const isContext = CONTEXT_RPC_METHODS.has(request.method);
     const isAgent = AGENT_RPC_METHODS.has(request.method);
-    if (!isSession && !isRun && !isCheckpoint && !isContext && !isAgent) {
+    const isProject = PROJECT_RPC_METHODS.has(request.method);
+    if (!isSession && !isRun && !isCheckpoint && !isContext && !isAgent && !isProject) {
       writeProtocolError(
         socket,
         PROTOCOL_ERROR_CODES.INVALID_STATE,
@@ -115,7 +119,9 @@ export async function serveRpcOnConnection(
             ? dispatchContextRpc(context, request)
             : isAgent
               ? dispatchAgentRpc(context, request)
-              : dispatchSessionRpc(context, request);
+              : isProject
+                ? dispatchProjectRpc(context, request)
+                : dispatchSessionRpc(context, request);
       writeProtocolFrame(
         socket,
         Buffer.from(
