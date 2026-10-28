@@ -1,94 +1,13 @@
 import { PROTOCOL_ERROR_CODES, ProtocolError } from "@openagent/protocol";
 
-/** Tipo de comando registrado no painel de comandos. */
-export interface CommandEntry {
-  command: string;
-  callback: (...args: unknown[]) => unknown;
-}
-
-export interface CommandRegistration {
-  commandId: string;
-  callback: (...args: unknown[]) => unknown;
-}
-
-/** Namespace de comandos da API de extensões. */
-export interface CommandsNamespace {
-  registerCommand(
-    commandId: string,
-    callback: (...args: unknown[]) => unknown
-  ): CommandRegistration;
-  unregisterCommand(commandId: string): void;
-  getRegisteredCommands(): CommandEntry[];
-  executeCommand<T>(commandId: string, ...args: unknown[]): Promise<T>;
-}
-
-/** Item da barra de status (parte inferior da janela) */
-export interface StatusBarItem {
-  id: string;
-  alignment: "right" | "left";
-  text: string;
-  color?: string;
-  tooltip?: string;
-}
-
-/** Namespace de janela da API de extensões. */
-export interface WindowNamespace {
-  showInformationMessage(message: string, ...options: unknown[]): Promise<unknown>;
-  showWarningMessage(message: string, ...options: unknown[]): Promise<unknown>;
-  showErrorMessage(message: string, ...options: unknown[]): Promise<unknown>;
-  createStatusBarItem(id: string, alignment: "right" | "left"): StatusBarItem;
-  getStatusBarItems(): StatusBarItem[];
-  showInputBox(options?: Record<string, unknown>): Promise<string | undefined>;
-}
-
-/** Representação de um arquivo no workspace */
-export interface WorkspaceFile {
-  uri: string;
-  name: string;
-  isDirectory: boolean;
-}
-
-/** Documento aberto no editor */
-export interface TextDocumentData {
-  uri: string;
-  version: number;
-  lineCount: number;
-  text(): string;
-}
-
-/** Tipo de decoração aplicada a um editor de texto */
-export interface TextEditorDecorationType {
-  id: string;
-  hoverMessage?: string | unknown;
-  outlineColor?: string;
-  backgroundColor?: string;
-  margin?: string | unknown;
-  borderWidth?: string | unknown;
-  borderStyle?: string;
-  borderRadius?: string | unknown;
-  overlineColor?: string;
-  textDecoration?: string;
-  opacity?: number;
-  zIndex?: number;
-}
-
-/** Namespace de workspace da API de extensões. */
-export interface WorkspaceNamespace {
-  readonly rootPath?: string;
-  readonly name?: string;
-  openTextDocument(uri: string): Promise<TextDocumentData>;
-  openTextDocuments(): TextDocumentData[];
-  saveTextDocument(uri: string): Promise<boolean>;
-  findFiles(
-    includePattern: string,
-    excludePattern?: string,
-    maxResults?: number
-  ): Promise<WorkspaceFile[]>;
-  getConfigurationSection(section: string): Record<string, unknown> | undefined;
-  createTextEditorDecorationType(
-    options: Omit<TextEditorDecorationType, "id">
-  ): TextEditorDecorationType;
-}
+import type {
+  CommandEntry, CommandRegistration, CommandsNamespace, StatusBarItem,
+  TextDocumentData, TextEditorDecorationType, WindowNamespace, WorkspaceFile, WorkspaceNamespace,
+} from "./frozen-surface.js";
+export type {
+  CommandEntry, CommandRegistration, CommandsNamespace, StatusBarItem,
+  TextDocumentData, TextEditorDecorationType, WindowNamespace, WorkspaceFile, WorkspaceNamespace,
+};
 
 export interface WorkspaceAdapter {
   files: readonly WorkspaceFile[];
@@ -189,14 +108,64 @@ export function createWorkspaceNamespace(
       return success;
     },
     async findFiles(includePattern, excludePattern, maxResults) {
-      if (!includePattern.trim()) throw invalid("Padrão de inclusão inválido.");
-      const wildcard = (pattern: string) => {
-        const escaped = pattern.split("*").map((part) => part.replace(/[.+?^${}()|[\\]\\\\]/g, "\\\\$&"));
-        return new RegExp(`^${escaped.join(".*")}$`);
+      const validatePattern = (pattern: unknown, label: string): string => {
+        if (typeof pattern !== "string" || pattern.trim().length === 0 || pattern.includes("\0")) {
+          throw invalid(`Padrão de ${label} inválido.`);
+        }
+        const normalized = pattern.replace(/\\/g, "/").replace(/^\.\//, "");
+        if (normalized.startsWith("/") || normalized.split("/").includes("..")) {
+          throw invalid(`Padrão de ${label} fora do workspace.`);
+        }
+        return normalized;
       };
-      const include = wildcard(includePattern);
-      const exclude = excludePattern ? wildcard(excludePattern) : undefined;
-      const matches = adapter.files.filter((file) => include.test(file.name) && !exclude?.test(file.name));
+      const includeGlob = validatePattern(includePattern, "inclusão");
+      const excludeGlob = excludePattern === undefined ? undefined : validatePattern(excludePattern, "exclusão");
+      if (maxResults !== undefined && (!Number.isInteger(maxResults) || maxResults < 0)) {
+        throw invalid("maxResults deve ser um inteiro não negativo.");
+      }
+      const compileGlob = (glob: string): RegExp => {
+        let expression = "^";
+        for (let index = 0; index < glob.length; index += 1) {
+          const char = glob[index];
+          if (char === "*") {
+            if (glob[index + 1] === "*") {
+              index += 1;
+              if (glob[index + 1] === "/") {
+                index += 1;
+                expression += "(?:.*/)?";
+              } else expression += ".*";
+            } else expression += "[^/]*";
+          } else if (char === "?") expression += "[^/]";
+          else expression += char?.replace(/[|{}()[\]^$+?.]/g, "\\$&") ?? "";
+        }
+        return new RegExp(`${expression}$`);
+      };
+      const include = compileGlob(includeGlob);
+      const exclude = excludeGlob === undefined ? undefined : compileGlob(excludeGlob);
+      const relativePath = (file: WorkspaceFile): string => {
+        let pathname = file.uri;
+        try {
+          pathname = new URL(file.uri).pathname;
+          pathname = decodeURIComponent(pathname);
+        } catch { /* URI pode ser um caminho relativo fornecido pelo adapter. */ }
+        pathname = pathname.replace(/\\/g, "/");
+        const rootPath = root?.replace(/\\/g, "/").replace(/\/$/, "");
+        if (rootPath && pathname.startsWith(`${rootPath}/`)) pathname = pathname.slice(rootPath.length + 1);
+        else if (pathname.startsWith("/")) pathname = pathname.replace(/^\/+/, "");
+        const fromName = file.name.replace(/\\/g, "/");
+        if (!pathname || pathname === file.uri || (!pathname.includes("/") && fromName.includes("/"))) pathname = fromName;
+        const segments: string[] = [];
+        for (const segment of pathname.split("/")) {
+          if (!segment || segment === ".") continue;
+          if (segment === "..") throw invalid("Caminho de arquivo fora do workspace.");
+          segments.push(segment);
+        }
+        return segments.join("/");
+      };
+      const matches = adapter.files.filter((file) => {
+        const path = relativePath(file);
+        return include.test(path) && !exclude?.test(path);
+      });
       return maxResults === undefined ? matches : matches.slice(0, maxResults);
     },
     getConfigurationSection(section) {

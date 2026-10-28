@@ -316,6 +316,30 @@ test("[LOC-01] workspace: findFiles com exclude filtra", async () => {
   assert.equal(remainingFile.name, "test-b.ts");
 });
 
+test("[LOC-01] workspace: findFiles casa glob sobre caminhos aninhados e aplica exclusão", async () => {
+  const adapter: WorkspaceAdapter = {
+    files: [
+      { uri: "file:///root/src/main.ts", name: "src\\main.ts", isDirectory: false },
+      { uri: "file:///root/src/nested/util.ts", name: "src/nested/util.ts", isDirectory: false },
+      { uri: "file:///root/test/main.ts", name: "test/main.ts", isDirectory: false },
+    ], contents: {},
+  };
+  const ns = createWorkspaceNamespace("/root", "ws", adapter);
+  const files = await ns.findFiles("**/*.ts", "test/**");
+  assert.deepEqual(files.map((file) => file.uri), ["file:///root/src/main.ts", "file:///root/src/nested/util.ts"]);
+});
+
+test("[LOC-01] workspace: findFiles rejeita argumentos inválidos com INVALID_STATE", async () => {
+  const ns = createWorkspaceNamespace("/root", "ws", {
+    files: [{ uri: "file:///root/a.ts", name: "a.ts", isDirectory: false }], contents: {},
+  });
+  for (const limit of [-1, 1.5]) {
+    await assertLaunchError(ns.findFiles("**/*.ts", undefined, limit), "maxResults", PROTOCOL_ERROR_CODES.INVALID_STATE);
+  }
+  await assertLaunchError(ns.findFiles("../**/*.ts"), "fora do workspace", PROTOCOL_ERROR_CODES.INVALID_STATE);
+  assert.equal((await ns.findFiles("**/*.ts")).length, 1, "falhas de validação não alteram os arquivos");
+});
+
 test("[LOC-01] workspace: openTextDocuments retorna docs abertos", async () => {
   const adapter: WorkspaceAdapter = {
     files: [],
