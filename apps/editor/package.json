@@ -7,7 +7,9 @@
   "exports": {
     ".": "./src/index.ts",
     "./agent": "./src/agent/agent-panel.ts",
-    "./permissions": "./src/permissions/permission-dialog.ts"
+    "./permissions": "./src/permissions/permission-dialog.ts",
+    "./main": "./src/main/index.ts",
+    "./workbench": "./src/workbench/index.ts"
   },
   "dependencies": {
     "@openagent/policy": "0.1.0",
