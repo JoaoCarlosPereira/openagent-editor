@@ -214,22 +214,22 @@ export class PlanProgressController {
       this.progressRatio = 0;
     } else if (event.type === PLAN_ACCEPTED_EVENT) {
       const payload = parsePlanArtifactPayload(input.payload, this.runId, PLAN_ACCEPTED_EVENT);
+      if (this.phase !== "idle" && this.planId !== payload.planId) {
+        throw new ProtocolError("INVALID_STATE", "planId do aceite diverge do plano apresentado.", [
+          this.planId,
+          payload.planId,
+        ]);
+      }
       this.acceptStreamEvent(event, "plan.accepted");
       if (this.phase === "idle") {
         this.planId = payload.planId;
         this.title = payload.title;
         this.steps = payload.steps;
         this.totalSteps = payload.steps.length;
-      } else if (this.planId !== payload.planId) {
-        throw new ProtocolError("INVALID_STATE", "planId do aceite diverge do plano apresentado.", [
-          this.planId,
-          payload.planId,
-        ]);
       }
       this.phase = "accepted";
     } else if (event.type === PLAN_PROGRESS_EVENT) {
       const payload = parseProgressPayload(input.payload, this.runId);
-      this.acceptStreamEvent(event, "plan.progress");
       if (this.phase === "idle" || this.phase === "presented") {
         throw new ProtocolError(
           "INVALID_STATE",
@@ -243,6 +243,7 @@ export class PlanProgressController {
           payload.planId,
         ]);
       }
+      this.acceptStreamEvent(event, "plan.progress");
       this.planId = payload.planId;
       this.currentStepId = payload.currentStepId;
       this.currentStepLabel = payload.currentStepLabel;

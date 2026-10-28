@@ -169,5 +169,20 @@ describe("AGT-02 e2e — plano e progresso do modo Plan", () => {
       },
     );
     assert.equal(panel.snapshot.html, before);
+
+    // Recovery: progress prematuro não consome a sequence — accepted legítimo com seq=2 funciona.
+    const accepted = panel.push({
+      event: harnessEvent(2, PLAN_ACCEPTED_EVENT, "sha256:plan-accepted-recovery"),
+      payload: {
+        type: PLAN_ACCEPTED_EVENT,
+        runId: RUN_ID,
+        planId: PLAN_ID,
+        title: "Plano estável",
+        steps: STEPS,
+      },
+    });
+    assert.equal(accepted.accessible.phase, "accepted");
+    assert.match(accepted.html, /data-phase="accepted"/);
+    assert.match(accepted.html, /data-testid="plan-progress"/);
   });
 });
