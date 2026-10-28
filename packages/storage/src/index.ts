@@ -42,6 +42,14 @@ export {
 export { deleteSessionStorage, type DeleteSessionStorageResult } from "./delete.js";
 
 export {
+  applyHarnessEventToProjections,
+  rebuildProjectionsFromEventLog,
+  syncSessionResumeProjection,
+  type ApplyContext,
+  type RebuildProjectionsFromEventLogResult,
+} from "./event-log-projections.js";
+
+export {
   insertStoredAgentNode,
   insertStoredMessage,
   insertStoredQueueItem,

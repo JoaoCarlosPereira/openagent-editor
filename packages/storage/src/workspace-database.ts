@@ -28,6 +28,13 @@ import {
   type StoredQueueItem,
   type StoredToolInvocation,
 } from "./session-projections.js";
+import {
+  applyHarnessEventToProjections,
+  rebuildProjectionsFromEventLog,
+  syncSessionResumeProjection,
+  type ApplyContext,
+  type RebuildProjectionsFromEventLogResult,
+} from "./event-log-projections.js";
 import { assertValidWorkspaceId } from "./workspace-id.js";
 
 export { STORAGE_SCHEMA_VERSION };
@@ -69,6 +76,8 @@ export type WorkspaceDatabase = {
     queueItemId: string,
   ): RemovePendingQueueItemResult;
   deleteSession(sessionId: string): DeleteSessionStorageResult;
+  applyHarnessEventToProjections(event: HarnessEvent): void;
+  rebuildProjectionsFromEventLog(sessionId: string): RebuildProjectionsFromEventLogResult;
   close(): void;
 };
 
@@ -135,6 +144,11 @@ export function openWorkspaceDatabase(
       tools_json = excluded.tools_json,
       attachments_json = excluded.attachments_json
   `);
+
+  let projectionContext: ApplyContext = {
+    mode: "ask",
+    attachments: [],
+  };
 
   const selectAll = database.prepare(`
     SELECT
@@ -205,6 +219,23 @@ export function openWorkspaceDatabase(
     },
     deleteSession(sessionId: string) {
       return deleteSessionStorage(database, casRoot, sessionId);
+    },
+    applyHarnessEventToProjections(event: HarnessEvent) {
+      applyHarnessEventToProjections(database, casRoot, event, projectionContext);
+      const sessionRow = database
+        .prepare("SELECT session_id AS sessionId FROM run WHERE id = ?")
+        .get(event.runId) as { sessionId?: string } | undefined;
+      if (sessionRow?.sessionId) {
+        syncSessionResumeProjection(database, sessionRow.sessionId, projectionContext);
+      }
+    },
+    rebuildProjectionsFromEventLog(sessionId: string) {
+      const result = rebuildProjectionsFromEventLog(database, casRoot, sessionId);
+      projectionContext = {
+        mode: result.mode,
+        attachments: [],
+      };
+      return result;
     },
     close() {
       database.close();
