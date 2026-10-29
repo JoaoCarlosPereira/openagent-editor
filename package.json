@@ -12,7 +12,9 @@
     "services/*",
     "apps/*"
   ],
-  "engines": { "vscode": "^1.96.0" },
+  "engines": {
+    "vscode": "^1.96.0"
+  },
   "main": "./extension/index.js",
   "activationEvents": [
     "onView:openagent.chat",
@@ -23,19 +25,39 @@
   ],
   "contributes": {
     "commands": [
-      { "command": "openagent.ask", "title": "OpenAgent: Ask about Selection" },
-      { "command": "openagent.editSelection", "title": "OpenAgent: Edit Selection" },
-      { "command": "openagent.agent", "title": "OpenAgent: Open Agent" },
-      { "command": "openagent.setApiKey", "title": "OpenAgent: Set API Key" }
+      {
+        "command": "openagent.ask",
+        "title": "OpenAgent: Ask about Selection"
+      },
+      {
+        "command": "openagent.editSelection",
+        "title": "OpenAgent: Edit Selection"
+      },
+      {
+        "command": "openagent.agent",
+        "title": "OpenAgent: Open Agent"
+      },
+      {
+        "command": "openagent.setApiKey",
+        "title": "OpenAgent: Set API Key"
+      }
     ],
     "viewsContainers": {
       "activitybar": [
-        { "id": "openagent", "title": "OpenAgent", "icon": "media/icon.svg" }
+        {
+          "id": "openagent",
+          "title": "OpenAgent",
+          "icon": "media/icon.svg"
+        }
       ]
     },
     "views": {
       "openagent": [
-        { "id": "openagent.chat", "name": "Chat", "type": "webview" }
+        {
+          "id": "openagent.chat",
+          "name": "Chat",
+          "type": "webview"
+        }
       ]
     },
     "configuration": {
@@ -67,12 +89,21 @@
     },
     "menus": {
       "editor/context": [
-        { "command": "openagent.ask", "when": "editorHasSelection", "group": "navigation@10" },
-        { "command": "openagent.editSelection", "when": "editorHasSelection", "group": "navigation@11" }
+        {
+          "command": "openagent.ask",
+          "when": "editorHasSelection",
+          "group": "navigation@10"
+        },
+        {
+          "command": "openagent.editSelection",
+          "when": "editorHasSelection",
+          "group": "navigation@11"
+        }
       ]
     }
   },
   "scripts": {
+    "editor:start": "electron apps/editor/runtime/main.mjs",
     "test": "node --test tests/*.test.js",
     "test:integration": "node scripts/test-integration.js",
     "check": "node --check extension/index.js && node --check extension/client.js && node --check extension/html.js && node --check extension/context.js && node --check extension/inline.js && node --check extension/agent.js && node --check extension/paths.js",
@@ -88,6 +119,7 @@
   "devDependencies": {
     "@eslint/js": "10.0.1",
     "@types/node": "22.20.5",
+    "electron": "45.1.0",
     "eslint": "10.13.0",
     "globals": "17.13.0",
     "tsx": "4.20.6",

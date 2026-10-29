@@ -176,6 +176,10 @@ export class WorkbenchShellController {
     return this.textEditorDocument;
   }
 
+  get visibleEntries(): readonly FileTreeEntry[] {
+    return this.fileTreeEntries;
+  }
+
   /** Inicializa o shell com identidade OpenAgent antes de abrir pasta. */
   bootstrap(input: { platform: string; repoRoot?: string }): WorkbenchShellViewSnapshot {
     this.platform = input.platform;
@@ -197,12 +201,14 @@ export class WorkbenchShellController {
   }
 
   openFolder(input: WorkbenchShellOpenInput): WorkbenchShellOpenResult {
-    this.platform = input.platform;
-    this.identity = createOpenAgentProductIdentity(input.repoRoot);
+    const identity = createOpenAgentProductIdentity(input.repoRoot);
     const folderPath = assertFolderPath(input.folderPath);
+    const fileTreeEntries = collectVisibleEntries(folderPath, []);
+    this.platform = input.platform;
+    this.identity = identity;
     this.folderPath = folderPath;
     this.expandedDirectories = [];
-    this.fileTreeEntries = collectVisibleEntries(folderPath, this.expandedDirectories);
+    this.fileTreeEntries = fileTreeEntries;
     this.textEditorDocument = null;
     this.refreshView();
     return {
@@ -229,10 +235,12 @@ export class WorkbenchShellController {
     const relative = relativeDirectory.trim().split(path.sep).join("/");
     // Valida confinamento e existência antes de marcar expandido.
     listFileTreeDirectory(this.folderPath, relative);
-    if (!this.expandedDirectories.includes(relative)) {
-      this.expandedDirectories = [...this.expandedDirectories, relative];
-    }
-    this.fileTreeEntries = collectVisibleEntries(this.folderPath, this.expandedDirectories);
+    const expandedDirectories = this.expandedDirectories.includes(relative)
+      ? this.expandedDirectories
+      : [...this.expandedDirectories, relative];
+    const fileTreeEntries = collectVisibleEntries(this.folderPath, expandedDirectories);
+    this.expandedDirectories = expandedDirectories;
+    this.fileTreeEntries = fileTreeEntries;
     this.refreshView();
     return this.view;
   }

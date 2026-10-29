@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; base-uri 'none'; form-action 'none'">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>OpenAgent Editor</title>
+  <link rel="stylesheet" href="./style.css">
+  <script src="./renderer.js" defer></script>
+</head>
+<body>
+  <header><h1>OpenAgent Editor</h1><button id="folder">Abrir pasta</button><button id="save" disabled>Salvar</button></header>
+  <p id="workspace">Nenhuma pasta aberta</p>
+  <p id="error" role="alert"></p>
+  <main>
+    <nav aria-label="Arquivos"><ul id="files"></ul></nav>
+    <section aria-label="Editor"><p id="filename">Abra um arquivo para editar</p><textarea id="content" aria-label="Conteúdo do arquivo" disabled spellcheck="false"></textarea></section>
+  </main>
+</body>
+</html>

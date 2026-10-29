@@ -1,4 +1,4 @@
-import { readFileSync, statSync, writeFileSync } from "node:fs";
+import { closeSync, fchmodSync, fsyncSync, mkdtempSync, openSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
 import path from "node:path";
 
 import {
@@ -142,7 +142,30 @@ export function saveTextEditorDocument(
   }
   const root = assertNonEmptyRoot(rootFolder);
   const file = resolveFileUnderRoot(root, document.relativePath);
-  writeFileSync(file.canonicalPath, document.content, "utf8");
+  const conflict = () => new ProtocolError("CONFLICT", "O arquivo foi alterado fora do editor.", []);
+  const before = statSync(file.canonicalPath, { bigint: true });
+  if (readFileSync(file.canonicalPath, "utf8") !== document.diskContent) throw conflict();
+  const tempDir = mkdtempSync(path.join(path.dirname(file.canonicalPath), ".openagent-save-"));
+  const temp = path.join(tempDir, "document");
+  try {
+    const fd = openSync(temp, "wx", Number(before.mode & 0o777n));
+    try {
+      fchmodSync(fd, Number(before.mode & 0o777n));
+      writeFileSync(fd, document.content, "utf8");
+      fsyncSync(fd);
+    } finally {
+      closeSync(fd);
+    }
+    const resolved = resolveFileUnderRoot(root, document.relativePath);
+    const after = statSync(resolved.canonicalPath, { bigint: true });
+    if (resolved.canonicalPath !== file.canonicalPath || before.dev !== after.dev ||
+        before.ino !== after.ino || before.size !== after.size ||
+        before.mtimeNs !== after.mtimeNs || before.ctimeNs !== after.ctimeNs ||
+        readFileSync(resolved.canonicalPath, "utf8") !== document.diskContent) throw conflict();
+    renameSync(temp, file.canonicalPath);
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true });
+  }
   return {
     relativePath: file.relativePath,
     content: document.content,
