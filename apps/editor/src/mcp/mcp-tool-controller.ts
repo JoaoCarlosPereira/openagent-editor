@@ -173,7 +173,9 @@ export class McpToolController {
         description: tool.description,
         inputSchema: tool.inputSchema,
       }));
-      return this.getToolListView() ?? null;
+      const view = this.getToolListView();
+      if (!view) throw new ProtocolError("INVALID_STATE", "Lista de ferramentas MCP indisponível após discovery.", []);
+      return view;
     } catch (error) {
       throw error instanceof ProtocolError
         ? error

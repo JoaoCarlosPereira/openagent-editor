@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
+import { execPath } from "node:process";
+
+import { ProtocolError } from "@openagent/protocol";
 import { McpToolController } from "../../src/index.js";
 import type { McpToolView } from "../../src/mcp/mcp-tool-list-view.js";
 
