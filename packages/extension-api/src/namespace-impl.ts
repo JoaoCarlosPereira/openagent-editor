@@ -1,12 +1,17 @@
 import { PROTOCOL_ERROR_CODES, ProtocolError } from "@openagent/protocol";
 
 import type {
-  CommandEntry, CommandRegistration, CommandsNamespace, StatusBarItem,
-  TextDocumentData, TextEditorDecorationType, WindowNamespace, WorkspaceFile, WorkspaceNamespace,
+  CommandEntry, CommandRegistration, CommandsNamespace, CompletionContext,
+  CompletionItem, CompletionItemProvider, CompletionList, Disposable,
+  DocumentFilter, DocumentSelector, Hover, HoverContents, HoverProvider, LanguagesNamespace,
+  Position, Range, StatusBarItem, TextDocumentData, TextEditorDecorationType,
+  WindowNamespace, WorkspaceFile, WorkspaceNamespace,
 } from "./frozen-surface.js";
 export type {
-  CommandEntry, CommandRegistration, CommandsNamespace, StatusBarItem,
-  TextDocumentData, TextEditorDecorationType, WindowNamespace, WorkspaceFile, WorkspaceNamespace,
+  CommandEntry, CommandRegistration, CommandsNamespace, CompletionContext, CompletionItem,
+  CompletionItemProvider, CompletionList, Disposable, DocumentFilter, DocumentSelector, Hover,
+  HoverContents, HoverProvider, LanguagesNamespace, Position, Range, StatusBarItem, TextDocumentData,
+  TextEditorDecorationType, WindowNamespace, WorkspaceFile, WorkspaceNamespace,
 };
 
 export interface WorkspaceAdapter {
@@ -227,4 +232,238 @@ export function createWorkspaceNamespace(
     },
   };
   return namespace;
+}
+
+export interface RegisteredCompletionProvider {
+  id: string;
+  selector: DocumentSelector;
+  provider: CompletionItemProvider;
+  triggerCharacters?: string[];
+}
+
+export interface RegisteredHoverProvider {
+  id: string;
+  selector: DocumentSelector;
+  provider: HoverProvider;
+}
+
+function matchSingleSelector(selector: string | DocumentFilter, doc: { uri: string; languageId?: string }): boolean {
+  if (typeof selector === "string") {
+    if (selector === "*") return true;
+    if (doc.languageId === selector) return true;
+    const uri = doc.uri.toLowerCase();
+    const sel = selector.toLowerCase();
+    if (sel === "typescript" && (uri.endsWith(".ts") || uri.endsWith(".tsx"))) return true;
+    if (sel === "javascript" && (uri.endsWith(".js") || uri.endsWith(".jsx") || uri.endsWith(".mjs") || uri.endsWith(".cjs"))) return true;
+    if (sel === "json" && uri.endsWith(".json")) return true;
+    if (sel === "markdown" && (uri.endsWith(".md") || uri.endsWith(".markdown"))) return true;
+    if (uri.endsWith("." + sel)) return true;
+    return uri.includes(sel);
+  }
+  if (selector && typeof selector === "object") {
+    const uri = doc.uri;
+    if (selector.scheme !== undefined) {
+      const scheme = uri.split(":")[0];
+      if (scheme !== selector.scheme) return false;
+    }
+    if (selector.language !== undefined && selector.language !== "*") {
+      if (!matchSingleSelector(selector.language, doc)) return false;
+    }
+    if (selector.filepath !== undefined) {
+      if (!uri.includes(selector.filepath)) return false;
+    }
+    if (selector.pattern !== undefined) {
+      try {
+        const regex = new RegExp(selector.pattern);
+        if (!regex.test(uri)) return false;
+      } catch {
+        return false;
+      }
+    }
+    return true;
+  }
+  return false;
+}
+
+export function matchDocumentSelector(
+  selector: DocumentSelector,
+  document: { uri: string; languageId?: string }
+): boolean {
+  if (typeof selector === "string") {
+    return matchSingleSelector(selector, document);
+  }
+  if (Array.isArray(selector)) {
+    return selector.some((s) => matchSingleSelector(s, document));
+  }
+  if (selector && typeof selector === "object") {
+    return matchSingleSelector(selector as DocumentFilter, document);
+  }
+  return false;
+}
+
+function validateSelector(selector: unknown): DocumentSelector {
+  if (!selector) throw invalid("Seletor de documento inválido.");
+  if (typeof selector === "string") {
+    if (selector.trim().length === 0) throw invalid("Seletor de documento não pode ser vazio.");
+    return selector;
+  }
+  if (Array.isArray(selector)) {
+    if (selector.length === 0) throw invalid("Lista de seletores não pode ser vazia.");
+    for (const item of selector) {
+      validateSelector(item);
+    }
+    return selector as DocumentSelector;
+  }
+  if (typeof selector === "object") {
+    const s = selector as Record<string, unknown>;
+    const hasProperty = Object.keys(s).length > 0;
+    if (!hasProperty) throw invalid("Seletor de documento não pode ser objeto vazio.");
+    return selector as DocumentSelector;
+  }
+  throw invalid("Seletor de documento inválido.");
+}
+
+export function createLanguagesNamespace(): LanguagesNamespace & {
+  getCompletionItems(document: TextDocumentData, position: Position, context?: CompletionContext): Promise<CompletionItem[]>;
+  getHover(document: TextDocumentData, position: Position): Promise<Hover | HoverContents | undefined>;
+  getRegisteredCompletionProviders(): readonly RegisteredCompletionProvider[];
+  getRegisteredHoverProviders(): readonly RegisteredHoverProvider[];
+} {
+  let nextCompletionId = 0;
+  let nextHoverId = 0;
+  const completionProviders = new Map<string, RegisteredCompletionProvider>();
+  const hoverProviders = new Map<string, RegisteredHoverProvider>();
+
+  const registerCompletion = (
+    selector: DocumentSelector,
+    provider: CompletionItemProvider,
+    ...triggerCharacters: string[]
+  ) => {
+    const validSelector = validateSelector(selector);
+    if (!provider || typeof provider !== "object") {
+      throw invalid("Provider de completion inválido: objeto esperado.");
+    }
+    if (typeof provider.provideCompletionItems !== "function") {
+      throw invalid("Provider de completion deve implementar provideCompletionItems().");
+    }
+    if (provider.resolveCompletionItem !== undefined && typeof provider.resolveCompletionItem !== "function") {
+      throw invalid("resolveCompletionItem deve ser função quando fornecido.");
+    }
+
+    const flatTriggers = triggerCharacters.flat();
+    for (const char of flatTriggers) {
+      if (typeof char !== "string") {
+        throw invalid("Caracteres de trigger devem ser strings.");
+      }
+    }
+
+    const id = "completion-provider-" + (nextCompletionId++);
+    const entry: RegisteredCompletionProvider = {
+      id,
+      selector: validSelector,
+      provider,
+      triggerCharacters: flatTriggers.length ? flatTriggers : undefined,
+    };
+    completionProviders.set(id, entry);
+
+    return {
+      dispose() {
+        completionProviders.delete(id);
+      },
+    };
+  };
+
+  const registerHover = (selector: DocumentSelector, provider: HoverProvider) => {
+    const validSelector = validateSelector(selector);
+    if (!provider || typeof provider !== "object") {
+      throw invalid("Provider de hover inválido: objeto esperado.");
+    }
+    if (typeof provider.provideHover !== "function") {
+      throw invalid("Provider de hover deve implementar provideHover().");
+    }
+
+    const id = "hover-provider-" + (nextHoverId++);
+    const entry: RegisteredHoverProvider = {
+      id,
+      selector: validSelector,
+      provider,
+    };
+    hoverProviders.set(id, entry);
+
+    return {
+      dispose() {
+        hoverProviders.delete(id);
+      },
+    };
+  };
+
+  const validateDocAndPos = (doc: unknown, pos: unknown): { document: TextDocumentData; position: Position } => {
+    if (!doc || typeof doc !== "object" || typeof (doc as TextDocumentData).uri !== "string" || !(doc as TextDocumentData).uri.trim()) {
+      throw invalid("Documento inválido.");
+    }
+    if (!pos || typeof pos !== "object") {
+      throw invalid("Posição inválida.");
+    }
+    const p = pos as Position;
+    if (!Number.isSafeInteger(p.line) || p.line < 0 || !Number.isSafeInteger(p.character) || p.character < 0) {
+      throw invalid("Posição inválida: line e character devem ser inteiros não negativos.");
+    }
+    return { document: doc as TextDocumentData, position: p };
+  };
+
+  return {
+    registerCompletionItemProvider: registerCompletion,
+    registerCompletionProvider: registerCompletion,
+    registerHoverProvider: registerHover,
+
+    registerSignatureHelpProvider() {
+      return { dispose() {} };
+    },
+    registerDefinitionProvider() {
+      return { dispose() {} };
+    },
+    registerCodeActionsProvider() {
+      return { dispose() {} };
+    },
+    registerDiagnosticProvider() {
+      return { dispose() {} };
+    },
+
+    async getCompletionItems(document, position, context) {
+      const { document: doc, position: pos } = validateDocAndPos(document, position);
+      const items: CompletionItem[] = [];
+      for (const entry of completionProviders.values()) {
+        if (matchDocumentSelector(entry.selector, doc)) {
+          const res = await entry.provider.provideCompletionItems(doc, pos, undefined, context);
+          if (Array.isArray(res)) {
+            items.push(...res);
+          } else if (res && typeof res === "object" && Array.isArray((res as CompletionList).items)) {
+            items.push(...(res as CompletionList).items);
+          }
+        }
+      }
+      return items;
+    },
+
+    async getHover(document, position) {
+      const { document: doc, position: pos } = validateDocAndPos(document, position);
+      for (const entry of hoverProviders.values()) {
+        if (matchDocumentSelector(entry.selector, doc)) {
+          const res = await entry.provider.provideHover(doc, pos, undefined);
+          if (res !== undefined && res !== null) {
+            return res;
+          }
+        }
+      }
+      return undefined;
+    },
+
+    getRegisteredCompletionProviders() {
+      return Array.from(completionProviders.values());
+    },
+
+    getRegisteredHoverProviders() {
+      return Array.from(hoverProviders.values());
+    },
+  };
 }

@@ -45,7 +45,31 @@ export type ExtensionWorkerRequest =
       args: unknown[];
     }
   | { kind: "deactivate"; requestId: string; extensionId: string }
-  | { kind: "ping"; requestId: string };
+  | { kind: "ping"; requestId: string }
+  | {
+      kind: "provideCompletionItems";
+      requestId: string;
+      extensionId: string;
+      providerId?: string;
+      document: { uri: string; version?: number; lineCount?: number; text?: string };
+      position: { line: number; character: number };
+      context?: unknown;
+    }
+  | {
+      kind: "resolveCompletionItem";
+      requestId: string;
+      extensionId: string;
+      providerId?: string;
+      item: unknown;
+    }
+  | {
+      kind: "provideHover";
+      requestId: string;
+      extensionId: string;
+      providerId?: string;
+      document: { uri: string; version?: number; lineCount?: number; text?: string };
+      position: { line: number; character: number };
+    };
 
 export type ExtensionWorkerRequestPayload =
   | { kind: "init"; config: ExtensionHostConfig }
@@ -63,7 +87,28 @@ export type ExtensionWorkerRequestPayload =
       args: unknown[];
     }
   | { kind: "deactivate"; extensionId: string }
-  | { kind: "ping" };
+  | { kind: "ping" }
+  | {
+      kind: "provideCompletionItems";
+      extensionId: string;
+      providerId?: string;
+      document: { uri: string; version?: number; lineCount?: number; text?: string };
+      position: { line: number; character: number };
+      context?: unknown;
+    }
+  | {
+      kind: "resolveCompletionItem";
+      extensionId: string;
+      providerId?: string;
+      item: unknown;
+    }
+  | {
+      kind: "provideHover";
+      extensionId: string;
+      providerId?: string;
+      document: { uri: string; version?: number; lineCount?: number; text?: string };
+      position: { line: number; character: number };
+    };
 
 export type ExtensionWorkerResponse =
   | {
@@ -87,6 +132,27 @@ export type ExtensionWorkerResponse =
     }
   | {
       kind: "event";
-      eventType: "commandRegistered" | "outputAppended" | "messageShown";
+      eventType:
+        | "commandRegistered"
+        | "outputAppended"
+        | "messageShown"
+        | "completionProviderRegistered"
+        | "completionProviderUnregistered"
+        | "hoverProviderRegistered"
+        | "hoverProviderUnregistered"
+        | string;
       payload: unknown;
     };
+
+export interface RegisteredCompletionProviderInfo {
+  extensionId: string;
+  providerId: string;
+  selector: unknown;
+  triggerCharacters?: string[];
+}
+
+export interface RegisteredHoverProviderInfo {
+  extensionId: string;
+  providerId: string;
+  selector: unknown;
+}

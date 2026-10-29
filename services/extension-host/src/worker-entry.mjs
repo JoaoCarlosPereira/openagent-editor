@@ -1,3 +1,61 @@
+
+function wrapTextDocument(rawDoc) {
+  if (!rawDoc || typeof rawDoc !== "object") {
+    return {
+      uri: "",
+      version: 1,
+      lineCount: 1,
+      text() { return ""; },
+    };
+  }
+  const textContent = typeof rawDoc.text === "function" ? rawDoc.text() : String(rawDoc.text || "");
+  return {
+    uri: rawDoc.uri || "",
+    version: rawDoc.version || 1,
+    lineCount: rawDoc.lineCount || textContent.split("\n").length,
+    text() { return textContent; },
+  };
+}
+
+function matchSingleSelector(selector, uri) {
+  if (selector === "*") return true;
+  if (typeof selector === "string") {
+    const u = uri.toLowerCase();
+    const sel = selector.toLowerCase();
+    if (sel === "typescript" && (u.endsWith(".ts") || u.endsWith(".tsx"))) return true;
+    if (sel === "javascript" && (u.endsWith(".js") || u.endsWith(".jsx") || u.endsWith(".mjs") || u.endsWith(".cjs"))) return true;
+    if (sel === "json" && u.endsWith(".json")) return true;
+    if (sel === "markdown" && (u.endsWith(".md") || u.endsWith(".markdown"))) return true;
+    if (u.endsWith("." + sel)) return true;
+    return u.includes(sel);
+  }
+  if (selector && typeof selector === "object") {
+    if (selector.scheme) {
+      const scheme = uri.split(":")[0];
+      if (scheme !== selector.scheme) return false;
+    }
+    if (selector.language && selector.language !== "*") {
+      if (!matchSingleSelector(selector.language, uri)) return false;
+    }
+    if (selector.filepath && !uri.includes(selector.filepath)) return false;
+    if (selector.pattern) {
+      try {
+        if (!new RegExp(selector.pattern).test(uri)) return false;
+      } catch {
+        return false;
+      }
+    }
+    return true;
+  }
+  return false;
+}
+
+function matchesSelector(selector, uri) {
+  if (typeof selector === "string") return matchSingleSelector(selector, uri);
+  if (Array.isArray(selector)) return selector.some((s) => matchSingleSelector(s, uri));
+  if (selector && typeof selector === "object") return matchSingleSelector(selector, uri);
+  return false;
+}
 import { parentPort } from "node:worker_threads";
 import { pathToFileURL } from "node:url";
 
@@ -14,6 +72,14 @@ const commandRegistry = new Map();
 
 /** @type {Map<string, string[]>} */
 const outputChannels = new Map();
+
+/** @type {Map<string, { id: string, extensionId: string, selector: any, provider: any, triggerCharacters?: string[] }>} */
+const completionProviderRegistry = new Map();
+
+/** @type {Map<string, { id: string, extensionId: string, selector: any, provider: any }>} */
+const hoverProviderRegistry = new Map();
+
+let nextProviderId = 0;
 
 let nextEditorRequestId = 0;
 const pendingEditorRequests = new Map();
@@ -178,11 +244,156 @@ function createExtensionApi(extensionId, extensionPath, subscriptions) {
     },
   };
 
+  const languagesApi = {
+    registerCompletionItemProvider(selector, provider, ...triggerCharacters) {
+      if (!selector || (typeof selector !== "string" && typeof selector !== "object")) {
+        const error = new Error("Seletor de documento inválido.");
+        error.code = "INVALID_STATE";
+        throw error;
+      }
+      if (typeof selector === "string" && !selector.trim()) {
+        const error = new Error("Seletor de documento não pode ser vazio.");
+        error.code = "INVALID_STATE";
+        throw error;
+      }
+      if (Array.isArray(selector) && selector.length === 0) {
+        const error = new Error("Lista de seletores não pode ser vazia.");
+        error.code = "INVALID_STATE";
+        throw error;
+      }
+      if (!provider || typeof provider !== "object") {
+        const error = new Error("Provider de completion inválido: objeto esperado.");
+        error.code = "INVALID_STATE";
+        throw error;
+      }
+      if (typeof provider.provideCompletionItems !== "function") {
+        const error = new Error("Provider de completion deve implementar provideCompletionItems().");
+        error.code = "INVALID_STATE";
+        throw error;
+      }
+      if (provider.resolveCompletionItem !== undefined && typeof provider.resolveCompletionItem !== "function") {
+        const error = new Error("resolveCompletionItem deve ser função quando fornecido.");
+        error.code = "INVALID_STATE";
+        throw error;
+      }
+
+      const flatTriggers = triggerCharacters.flat();
+      for (const char of flatTriggers) {
+        if (typeof char !== "string") {
+          const error = new Error("Caracteres de trigger devem ser strings.");
+          error.code = "INVALID_STATE";
+          throw error;
+        }
+      }
+
+      const providerId = "comp-" + (nextProviderId++);
+      completionProviderRegistry.set(providerId, {
+        id: providerId,
+        extensionId,
+        selector,
+        provider,
+        triggerCharacters: flatTriggers.length ? flatTriggers : undefined,
+      });
+
+      const disposable = {
+        dispose() {
+          if (completionProviderRegistry.has(providerId)) {
+            completionProviderRegistry.delete(providerId);
+            post({
+              kind: "event",
+              eventType: "completionProviderUnregistered",
+              payload: { extensionId, providerId },
+            });
+          }
+        },
+      };
+      subscriptions.push(disposable);
+
+      post({
+        kind: "event",
+        eventType: "completionProviderRegistered",
+        payload: {
+          extensionId,
+          providerId,
+          selector,
+          triggerCharacters: flatTriggers.length ? flatTriggers : undefined,
+        },
+      });
+
+      return disposable;
+    },
+    registerCompletionProvider(selector, provider, ...triggerCharacters) {
+      return this.registerCompletionItemProvider(selector, provider, ...triggerCharacters);
+    },
+    registerHoverProvider(selector, provider) {
+      if (!selector || (typeof selector !== "string" && typeof selector !== "object")) {
+        const error = new Error("Seletor de documento inválido.");
+        error.code = "INVALID_STATE";
+        throw error;
+      }
+      if (typeof selector === "string" && !selector.trim()) {
+        const error = new Error("Seletor de documento não pode ser vazio.");
+        error.code = "INVALID_STATE";
+        throw error;
+      }
+      if (Array.isArray(selector) && selector.length === 0) {
+        const error = new Error("Lista de seletores não pode ser vazia.");
+        error.code = "INVALID_STATE";
+        throw error;
+      }
+      if (!provider || typeof provider !== "object") {
+        const error = new Error("Provider de hover inválido: objeto esperado.");
+        error.code = "INVALID_STATE";
+        throw error;
+      }
+      if (typeof provider.provideHover !== "function") {
+        const error = new Error("Provider de hover deve implementar provideHover().");
+        error.code = "INVALID_STATE";
+        throw error;
+      }
+
+      const providerId = "hover-" + (nextProviderId++);
+      hoverProviderRegistry.set(providerId, {
+        id: providerId,
+        extensionId,
+        selector,
+        provider,
+      });
+
+      const disposable = {
+        dispose() {
+          if (hoverProviderRegistry.has(providerId)) {
+            hoverProviderRegistry.delete(providerId);
+            post({
+              kind: "event",
+              eventType: "hoverProviderUnregistered",
+              payload: { extensionId, providerId },
+            });
+          }
+        },
+      };
+      subscriptions.push(disposable);
+
+      post({
+        kind: "event",
+        eventType: "hoverProviderRegistered",
+        payload: {
+          extensionId,
+          providerId,
+          selector,
+        },
+      });
+
+      return disposable;
+    },
+  };
+
   return {
     version: FROZEN_EXTENSION_API_VERSION,
     commands: commandsApi,
     window: windowApi,
     workspace: workspaceApi,
+    languages: languagesApi,
   };
 }
 
@@ -277,6 +488,114 @@ parentPort?.on("message", async (message) => {
     return;
   }
 
+  if (message.kind === "provideCompletionItems") {
+    const { requestId, extensionId, providerId, document: rawDoc, position, context } = message;
+    try {
+      const doc = wrapTextDocument(rawDoc);
+      const providers = [];
+      if (providerId) {
+        const reg = completionProviderRegistry.get(providerId);
+        if (reg) providers.push(reg);
+      } else {
+        for (const reg of completionProviderRegistry.values()) {
+          if (extensionId === "*" || reg.extensionId === extensionId) {
+            if (matchesSelector(reg.selector, doc.uri)) {
+              providers.push(reg);
+            }
+          }
+        }
+      }
+
+      const allItems = [];
+      for (const reg of providers) {
+        const res = await reg.provider.provideCompletionItems(doc, position, undefined, context);
+        if (Array.isArray(res)) {
+          allItems.push(...res);
+        } else if (res && typeof res === "object" && Array.isArray(res.items)) {
+          allItems.push(...res.items);
+        }
+      }
+
+      post({ kind: "result", requestId, output: allItems });
+    } catch (err) {
+      post({
+        kind: "error",
+        requestId,
+        code: err?.code || "INVALID_STATE",
+        message: err instanceof Error ? err.message : String(err),
+      });
+    }
+    return;
+  }
+
+  if (message.kind === "resolveCompletionItem") {
+    const { requestId, extensionId, providerId, item } = message;
+    try {
+      let resolved = item;
+      let reg = providerId ? completionProviderRegistry.get(providerId) : null;
+      if (!reg) {
+        for (const candidate of completionProviderRegistry.values()) {
+          if ((!extensionId || extensionId === "*" || candidate.extensionId === extensionId) &&
+              typeof candidate.provider.resolveCompletionItem === "function") {
+            reg = candidate;
+            break;
+          }
+        }
+      }
+      if (reg && typeof reg.provider.resolveCompletionItem === "function") {
+        resolved = await reg.provider.resolveCompletionItem(item);
+      }
+      post({ kind: "result", requestId, output: resolved });
+    } catch (err) {
+      post({
+        kind: "error",
+        requestId,
+        code: err?.code || "INVALID_STATE",
+        message: err instanceof Error ? err.message : String(err),
+      });
+    }
+    return;
+  }
+
+  if (message.kind === "provideHover") {
+    const { requestId, extensionId, providerId, document: rawDoc, position } = message;
+    try {
+      const doc = wrapTextDocument(rawDoc);
+      const providers = [];
+      if (providerId) {
+        const reg = hoverProviderRegistry.get(providerId);
+        if (reg) providers.push(reg);
+      } else {
+        for (const reg of hoverProviderRegistry.values()) {
+          if (extensionId === "*" || reg.extensionId === extensionId) {
+            if (matchesSelector(reg.selector, doc.uri)) {
+              providers.push(reg);
+            }
+          }
+        }
+      }
+
+      let hoverResult = undefined;
+      for (const reg of providers) {
+        const res = await reg.provider.provideHover(doc, position, undefined);
+        if (res !== undefined && res !== null) {
+          hoverResult = res;
+          break;
+        }
+      }
+
+      post({ kind: "result", requestId, output: hoverResult });
+    } catch (err) {
+      post({
+        kind: "error",
+        requestId,
+        code: err?.code || "INVALID_STATE",
+        message: err instanceof Error ? err.message : String(err),
+      });
+    }
+    return;
+  }
+
   if (message.kind === "executeCommand") {
     const { requestId, command, args } = message;
     const registered = commandRegistry.get(command);
@@ -334,6 +653,18 @@ parentPort?.on("message", async (message) => {
       for (const [cmd, reg] of Array.from(commandRegistry.entries())) {
         if (reg.extensionId === extensionId) {
           commandRegistry.delete(cmd);
+        }
+      }
+
+      for (const [id, reg] of Array.from(completionProviderRegistry.entries())) {
+        if (reg.extensionId === extensionId) {
+          completionProviderRegistry.delete(id);
+        }
+      }
+
+      for (const [id, reg] of Array.from(hoverProviderRegistry.entries())) {
+        if (reg.extensionId === extensionId) {
+          hoverProviderRegistry.delete(id);
         }
       }
 

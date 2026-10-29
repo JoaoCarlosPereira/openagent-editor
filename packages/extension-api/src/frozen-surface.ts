@@ -2,6 +2,7 @@ import {
   createCommandsNamespace as _createCommandsNamespace,
   createWindowNamespace as _createWindowNamespace,
   createWorkspaceNamespace as _createWorkspaceNamespace,
+  createLanguagesNamespace as _createLanguagesNamespace,
 } from "./namespace-impl.js";
 import type { WorkspaceAdapter, WindowAdapter } from "./namespace-impl.js";
 
@@ -30,6 +31,10 @@ export type { WorkspaceAdapter, WindowAdapter } from "./namespace-impl.js";
 export const FROZEN_EXTENSION_API_VERSION = "3.24.18" as const;
 
 export type FrozenVersion = typeof FROZEN_EXTENSION_API_VERSION;
+
+export interface Disposable {
+  dispose(): void;
+}
 
 // ─── Re-exports de tipos ────────────────────────────────────────────────────────
 
@@ -138,6 +143,28 @@ export interface WorkspaceNamespace {
 
 // ─── Namespace: languages ─────────────────────────────────────────────────────────
 
+export interface Position {
+  line: number;
+  character: number;
+}
+
+export interface Range {
+  start: Position;
+  end: Position;
+}
+
+export interface DocumentFilter {
+  scheme?: string;
+  language?: string;
+  pattern?: string;
+  filepath?: string;
+}
+
+export type DocumentSelector =
+  | string
+  | DocumentFilter
+  | readonly (string | DocumentFilter)[];
+
 /** Item de completude (autocomplete) */
 export interface CompletionItem {
   label: string;
@@ -145,6 +172,58 @@ export interface CompletionItem {
   detail?: string;
   documentation?: string | { kind: "markdown"; value: string };
   preselect?: boolean;
+  insertText?: string;
+  filterText?: string;
+  sortText?: string;
+}
+
+export interface CompletionList {
+  isIncomplete?: boolean;
+  items: CompletionItem[];
+}
+
+export interface CompletionContext {
+  triggerKind?: number;
+  triggerCharacter?: string;
+}
+
+export interface CompletionItemProvider {
+  provideCompletionItems(
+    document: TextDocumentData,
+    position: Position,
+    token?: unknown,
+    context?: CompletionContext
+  ):
+    | Promise<CompletionItem[] | CompletionList | undefined>
+    | CompletionItem[]
+    | CompletionList
+    | undefined;
+  resolveCompletionItem?(
+    item: CompletionItem,
+    token?: unknown
+  ): Promise<CompletionItem> | CompletionItem;
+}
+
+export interface HoverContents {
+  kind: "markdown";
+  value: string;
+}
+
+export interface Hover {
+  contents: HoverContents[] | HoverContents | string[] | string;
+  range?: Range;
+}
+
+export interface HoverProvider {
+  provideHover(
+    document: TextDocumentData,
+    position: Position,
+    token?: unknown
+  ):
+    | Promise<Hover | HoverContents | undefined>
+    | Hover
+    | HoverContents
+    | undefined;
 }
 
 export interface SignatureParameterInfo {
@@ -216,34 +295,28 @@ export interface Diagnostic {
 
 /** Namespace de languages da API de extensões. */
 export interface LanguagesNamespace {
+  registerCompletionItemProvider(
+    selector: DocumentSelector,
+    provider: CompletionItemProvider,
+    ...triggerCharacters: string[]
+  ): { dispose(): void };
   registerCompletionProvider(
-    selector: { scheme: string; language?: string; filepath?: string },
-    provider: {
-      resolveCompletionItem?: (item: CompletionItem) => Promise<CompletionItem>;
-      provideCompletionItems: (
-        document: TextDocumentData,
-        position: { line: number; character: number }
-      ) => Promise<CompletionItem[]>;
-    },
-    triggerCharacters?: string[]
-  ): unknown;
+    selector: DocumentSelector,
+    provider: CompletionItemProvider,
+    ...triggerCharacters: string[]
+  ): { dispose(): void };
+  registerHoverProvider(
+    selector: DocumentSelector,
+    provider: HoverProvider
+  ): { dispose(): void };
   registerSignatureHelpProvider(
     selector: { scheme: string; language?: string; filepath?: string },
     provider: {
       provideSignatureHelp: (
         document: TextDocumentData,
-        position: { line: number; character: number },
+        position: Position,
         token?: unknown
       ) => Promise<SignatureHelp>;
-    }
-  ): unknown;
-  registerHoverProvider(
-    selector: { scheme: string; language?: string; filepath?: string },
-    provider: {
-      provideHover: (
-        document: TextDocumentData,
-        position: { line: number; character: number }
-      ) => Promise<HoverContents | undefined>;
     }
   ): unknown;
   registerDefinitionProvider(
@@ -251,7 +324,7 @@ export interface LanguagesNamespace {
     provider: {
       provideDefinition: (
         document: TextDocumentData,
-        position: { line: number; character: number }
+        position: Position
       ) => Promise<DefinitionLocation[]>;
     }
   ): unknown;
@@ -260,10 +333,7 @@ export interface LanguagesNamespace {
     provider: {
       provideCodeActions: (
         document: TextDocumentData,
-        range: {
-          start: { line: number; character: number };
-          end: { line: number; character: number };
-        },
+        range: Range,
         context: CodeActionContext
       ) => Promise<CodeAction[]>;
     }
@@ -277,6 +347,15 @@ export interface LanguagesNamespace {
       ) => Promise<Diagnostic[]>;
     }
   ): unknown;
+  getCompletionItems?(
+    document: TextDocumentData,
+    position: Position,
+    context?: CompletionContext
+  ): Promise<CompletionItem[]>;
+  getHover?(
+    document: TextDocumentData,
+    position: Position
+  ): Promise<Hover | HoverContents | undefined>;
 }
 
 // ─── Namespace: env ───────────────────────────────────────────────────────────────
@@ -333,6 +412,7 @@ export {
   _createCommandsNamespace as createCommandsNamespace,
   _createWindowNamespace as createWindowNamespace,
   _createWorkspaceNamespace as createWorkspaceNamespace,
+  _createLanguagesNamespace as createLanguagesNamespace,
 };
 
 /**
@@ -358,14 +438,7 @@ export function createFrozenSurface(
     workspaceAdapter
   );
 
-  const languagesStub: LanguagesNamespace = {
-    registerCompletionProvider() { return undefined; },
-    registerSignatureHelpProvider() { return undefined; },
-    registerHoverProvider() { return undefined; },
-    registerDefinitionProvider() { return undefined; },
-    registerCodeActionsProvider() { return undefined; },
-    registerDiagnosticProvider() { return undefined; },
-  };
+  const languagesNs = _createLanguagesNamespace();
 
   const envStub: EnvironmentNamespace = {
     os: "unknown",
@@ -399,7 +472,7 @@ export function createFrozenSurface(
     commands,
     window: windowNs,
     workspace: workspaceNs,
-    languages: languagesStub,
+    languages: languagesNs,
     env: envStub,
     memento: mementoStub,
     output: outputStub,

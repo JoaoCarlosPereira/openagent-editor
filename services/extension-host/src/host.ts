@@ -48,6 +48,14 @@ export class IsolatedExtensionHost {
   private readonly options: IsolatedExtensionHostOptions;
   private readonly extensionWorkers = new Map<string, Worker>();
   private readonly commands = new Map<string, string>();
+  private readonly completionProviders = new Map<
+    string,
+    { extensionId: string; providerId: string; selector: unknown; triggerCharacters?: string[] }
+  >();
+  private readonly hoverProviders = new Map<
+    string,
+    { extensionId: string; providerId: string; selector: unknown }
+  >();
   private terminated = false;
   private nextRequestId = 0;
   private readonly extensions = new Map<string, ExtensionRegistration>();
@@ -118,6 +126,43 @@ export class IsolatedExtensionHost {
         if (owner && message.eventType === "commandRegistered" && message.payload && typeof message.payload === "object") {
           const payload = message.payload as { command?: unknown };
           if (typeof payload.command === "string") this.commands.set(payload.command, owner);
+        }
+        if (owner && message.eventType === "completionProviderRegistered" && message.payload && typeof message.payload === "object") {
+          const payload = message.payload as { providerId?: unknown; selector?: unknown; triggerCharacters?: unknown };
+          if (typeof payload.providerId === "string") {
+            const key = `${owner}:${payload.providerId}`;
+            this.completionProviders.set(key, {
+              extensionId: owner,
+              providerId: payload.providerId,
+              selector: payload.selector,
+              triggerCharacters: Array.isArray(payload.triggerCharacters) ? payload.triggerCharacters as string[] : undefined,
+            });
+          }
+        }
+        if (message.eventType === "completionProviderUnregistered" && message.payload && typeof message.payload === "object") {
+          const payload = message.payload as { providerId?: unknown };
+          if (typeof payload.providerId === "string") {
+            const key = owner ? `${owner}:${payload.providerId}` : payload.providerId;
+            this.completionProviders.delete(key);
+          }
+        }
+        if (owner && message.eventType === "hoverProviderRegistered" && message.payload && typeof message.payload === "object") {
+          const payload = message.payload as { providerId?: unknown; selector?: unknown };
+          if (typeof payload.providerId === "string") {
+            const key = `${owner}:${payload.providerId}`;
+            this.hoverProviders.set(key, {
+              extensionId: owner,
+              providerId: payload.providerId,
+              selector: payload.selector,
+            });
+          }
+        }
+        if (message.eventType === "hoverProviderUnregistered" && message.payload && typeof message.payload === "object") {
+          const payload = message.payload as { providerId?: unknown };
+          if (typeof payload.providerId === "string") {
+            const key = owner ? `${owner}:${payload.providerId}` : payload.providerId;
+            this.hoverProviders.delete(key);
+          }
         }
         for (const listener of this.listeners) {
           try {
@@ -478,6 +523,12 @@ export class IsolatedExtensionHost {
       for (const [command, owner] of this.commands) {
         if (owner === canonicalId) this.commands.delete(command);
       }
+      for (const [id, reg] of Array.from(this.completionProviders.entries())) {
+        if (reg.extensionId === canonicalId) this.completionProviders.delete(id);
+      }
+      for (const [id, reg] of Array.from(this.hoverProviders.entries())) {
+        if (reg.extensionId === canonicalId) this.hoverProviders.delete(id);
+      }
       registration.deactivatedAt = Date.now();
       return result;
     } catch (err) {
@@ -485,6 +536,202 @@ export class IsolatedExtensionHost {
       registration.lastError = (err as Error).message;
       throw err;
     }
+  }
+
+
+  /**
+   * Invoca providers de completion registrados pelas extensões ativas.
+   */
+  async provideCompletionItems<T = unknown>(
+    document: string | { uri: string; version?: number; lineCount?: number; text?: string | (() => string) },
+    position: { line: number; character: number },
+    context?: unknown,
+    extensionId?: string,
+  ): Promise<T[]> {
+    if (this.terminated) {
+      throw new ProtocolError(PROTOCOL_ERROR_CODES.INVALID_STATE, "Extension host já foi encerrado.");
+    }
+
+    const uri = typeof document === "string" ? document : document?.uri;
+    if (typeof uri !== "string" || !uri.trim()) {
+      throw new ProtocolError(PROTOCOL_ERROR_CODES.INVALID_STATE, "URI de documento inválida para completion.");
+    }
+    if (!position || typeof position !== "object" ||
+        !Number.isSafeInteger(position.line) || position.line < 0 ||
+        !Number.isSafeInteger(position.character) || position.character < 0) {
+      throw new ProtocolError(PROTOCOL_ERROR_CODES.INVALID_STATE, "Posição inválida para completion.");
+    }
+
+    const docPayload = typeof document === "string"
+      ? { uri: document, version: 1, lineCount: 1, text: "" }
+      : {
+          uri: document.uri,
+          version: document.version ?? 1,
+          lineCount: document.lineCount ?? 1,
+          text: typeof document.text === "function" ? document.text() : (document.text ?? ""),
+        };
+
+    if (extensionId) {
+      const canonicalId = extensionId.toLowerCase();
+      const ext = this.extensions.get(canonicalId);
+      if (!ext || ext.state !== "active") {
+        throw new ProtocolError(PROTOCOL_ERROR_CODES.INVALID_STATE, `Extensão '${extensionId}' não está ativa.`);
+      }
+      const worker = this.extensionWorkers.get(canonicalId);
+      if (!worker) {
+        throw new ProtocolError(PROTOCOL_ERROR_CODES.INVALID_STATE, `Worker da extensão '${extensionId}' não encontrado.`);
+      }
+      return this.sendRequest<T[]>({
+        kind: "provideCompletionItems",
+        extensionId: canonicalId,
+        document: docPayload,
+        position,
+        context,
+      }, worker);
+    }
+
+    const results: T[] = [];
+    for (const [extId, reg] of this.extensions) {
+      if (reg.state !== "active") continue;
+      const worker = this.extensionWorkers.get(extId);
+      if (!worker) continue;
+      const hasProvider = Array.from(this.completionProviders.values()).some((p) => p.extensionId === extId);
+      if (!hasProvider) continue;
+      const items = await this.sendRequest<T[]>({
+        kind: "provideCompletionItems",
+        extensionId: extId,
+        document: docPayload,
+        position,
+        context,
+      }, worker);
+      if (Array.isArray(items)) {
+        results.push(...items);
+      }
+    }
+    return results;
+  }
+
+  /**
+   * Invoca providers de hover registrados pelas extensões ativas.
+   */
+  async provideHover<T = unknown>(
+    document: string | { uri: string; version?: number; lineCount?: number; text?: string | (() => string) },
+    position: { line: number; character: number },
+    extensionId?: string,
+  ): Promise<T | undefined> {
+    if (this.terminated) {
+      throw new ProtocolError(PROTOCOL_ERROR_CODES.INVALID_STATE, "Extension host já foi encerrado.");
+    }
+
+    const uri = typeof document === "string" ? document : document?.uri;
+    if (typeof uri !== "string" || !uri.trim()) {
+      throw new ProtocolError(PROTOCOL_ERROR_CODES.INVALID_STATE, "URI de documento inválida para hover.");
+    }
+    if (!position || typeof position !== "object" ||
+        !Number.isSafeInteger(position.line) || position.line < 0 ||
+        !Number.isSafeInteger(position.character) || position.character < 0) {
+      throw new ProtocolError(PROTOCOL_ERROR_CODES.INVALID_STATE, "Posição inválida para hover.");
+    }
+
+    const docPayload = typeof document === "string"
+      ? { uri: document, version: 1, lineCount: 1, text: "" }
+      : {
+          uri: document.uri,
+          version: document.version ?? 1,
+          lineCount: document.lineCount ?? 1,
+          text: typeof document.text === "function" ? document.text() : (document.text ?? ""),
+        };
+
+    if (extensionId) {
+      const canonicalId = extensionId.toLowerCase();
+      const ext = this.extensions.get(canonicalId);
+      if (!ext || ext.state !== "active") {
+        throw new ProtocolError(PROTOCOL_ERROR_CODES.INVALID_STATE, `Extensão '${extensionId}' não está ativa.`);
+      }
+      const worker = this.extensionWorkers.get(canonicalId);
+      if (!worker) {
+        throw new ProtocolError(PROTOCOL_ERROR_CODES.INVALID_STATE, `Worker da extensão '${extensionId}' não encontrado.`);
+      }
+      return this.sendRequest<T | undefined>({
+        kind: "provideHover",
+        extensionId: canonicalId,
+        document: docPayload,
+        position,
+      }, worker);
+    }
+
+    for (const [extId, reg] of this.extensions) {
+      if (reg.state !== "active") continue;
+      const worker = this.extensionWorkers.get(extId);
+      if (!worker) continue;
+      const hasProvider = Array.from(this.hoverProviders.values()).some((p) => p.extensionId === extId);
+      if (!hasProvider) continue;
+      const hover = await this.sendRequest<T | undefined>({
+        kind: "provideHover",
+        extensionId: extId,
+        document: docPayload,
+        position,
+      }, worker);
+      if (hover !== undefined && hover !== null) {
+        return hover;
+      }
+    }
+    return undefined;
+  }
+
+  /**
+   * Resolve detalhes adicionais de um completion item através do provider correspondente.
+   */
+  async resolveCompletionItem<T = unknown>(
+    item: unknown,
+    extensionId?: string,
+    providerId?: string,
+  ): Promise<T> {
+    if (this.terminated) {
+      throw new ProtocolError(PROTOCOL_ERROR_CODES.INVALID_STATE, "Extension host já foi encerrado.");
+    }
+    if (!item || typeof item !== "object") {
+      throw new ProtocolError(PROTOCOL_ERROR_CODES.INVALID_STATE, "Item de completion inválido.");
+    }
+    const targetExtensionId = extensionId
+      ? extensionId.toLowerCase()
+      : providerId
+        ? this.completionProviders.get(providerId)?.extensionId
+        : Array.from(this.extensions.keys())[0];
+    if (!targetExtensionId) {
+      throw new ProtocolError(PROTOCOL_ERROR_CODES.INVALID_STATE, "Extensão não identificada para resolução de completion.");
+    }
+    const ext = this.extensions.get(targetExtensionId);
+    if (!ext || ext.state !== "active") {
+      throw new ProtocolError(PROTOCOL_ERROR_CODES.INVALID_STATE, `Extensão '${targetExtensionId}' não está ativa.`);
+    }
+    const worker = this.extensionWorkers.get(targetExtensionId);
+    if (!worker) {
+      throw new ProtocolError(PROTOCOL_ERROR_CODES.INVALID_STATE, "Worker não encontrado.");
+    }
+    return this.sendRequest<T>({
+      kind: "resolveCompletionItem",
+      extensionId: targetExtensionId,
+      providerId,
+      item,
+    }, worker);
+  }
+
+  getRegisteredCompletionProviders(): readonly {
+    extensionId: string;
+    providerId: string;
+    selector: unknown;
+    triggerCharacters?: string[];
+  }[] {
+    return Array.from(this.completionProviders.values());
+  }
+
+  getRegisteredHoverProviders(): readonly {
+    extensionId: string;
+    providerId: string;
+    selector: unknown;
+  }[] {
+    return Array.from(this.hoverProviders.values());
   }
 
   get isTerminated(): boolean {

@@ -1,4 +1,5 @@
 import { PROTOCOL_ERROR_CODES, ProtocolError } from "@openagent/protocol";
+import type { DocumentSelector, CompletionItemProvider, HoverProvider } from "./frozen-surface.js";
 
 /**
  * Versão congelada do contrato da API de extensões (ADR-007 / Cursor 3.24.18).
@@ -93,11 +94,29 @@ export interface ExtensionContext {
   readonly subscriptions: Disposable[];
 }
 
+export interface ExtensionLanguagesApi {
+  registerCompletionItemProvider(
+    selector: DocumentSelector,
+    provider: CompletionItemProvider,
+    ...triggerCharacters: string[]
+  ): Disposable;
+  registerCompletionProvider(
+    selector: DocumentSelector,
+    provider: CompletionItemProvider,
+    ...triggerCharacters: string[]
+  ): Disposable;
+  registerHoverProvider(
+    selector: DocumentSelector,
+    provider: HoverProvider
+  ): Disposable;
+}
+
 export interface OpenAgentExtensionApi {
   readonly version: typeof FROZEN_EXTENSION_API_VERSION;
   readonly commands: ExtensionCommandsApi;
   readonly window: ExtensionWindowApi;
   readonly workspace: ExtensionWorkspaceApi;
+  readonly languages: ExtensionLanguagesApi;
 }
 
 export interface ExtensionModule {
@@ -167,6 +186,7 @@ export {
   createCommandsNamespace,
   createWindowNamespace,
   createWorkspaceNamespace,
+  createLanguagesNamespace,
   EXPECTED_SURFACE_KEYS,
   EXPECTED_SURFACE_TYPES,
   type FrozenExtensionApiSurface,
@@ -179,7 +199,16 @@ export {
   type TextEditorDecorationType,
   type WorkspaceFile,
   type WorkspaceNamespace,
+  type Position,
+  type Range,
+  type DocumentFilter,
+  type DocumentSelector,
   type CompletionItem,
+  type CompletionList,
+  type CompletionContext,
+  type CompletionItemProvider,
+  type Hover,
+  type HoverProvider,
   type SignatureHelp,
   type SignatureInfo,
   type SignatureParameterInfo,
@@ -198,6 +227,8 @@ export {
   type WorkspaceAdapter,
   type WindowAdapter,
 } from "./frozen-surface.js";
+
+export { matchDocumentSelector, type RegisteredCompletionProvider, type RegisteredHoverProvider } from "./namespace-impl.js";
 
 export {
   validateFrozenSurface,
