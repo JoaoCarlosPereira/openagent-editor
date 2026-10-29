@@ -88,20 +88,49 @@ test("aborto interrompe a leitura sem mapear o cancelamento para erro de provedo
   });
 });
 
-test("HTTP de erro vira erro PROVIDER_* sem vazar a credencial", async () => {
+test("HTTP 401 redige credencial ecoada e qualquer Bearer da mensagem e hints", async () => {
+  const controller = new AbortController();
+  const credential = "secret-credential-0987654321";
+  const bearer = "Bearer second-token-abcdefghijk";
+  const body = JSON.stringify({
+    error: { message: `Incorrect API key provided: ${credential}; authorization ${bearer}` },
+  });
+  await assert.rejects(
+    drain(
+      streamCliProxyChatText({
+        ...BASE,
+        credential,
+        signal: controller.signal,
+        fetchImpl: async () => new Response(body, { status: 401 }),
+      }),
+    ),
+    (error: unknown) => {
+      assert.ok(error instanceof ProtocolError);
+      assert.match(error.code, /^PROVIDER_/);
+      assert.ok(!error.message.includes(credential));
+      assert.ok(!error.message.includes("second-token-abcdefghijk"));
+      assert.equal(error.hints?.providerCause, error.message);
+      assert.match(error.message, /\[REDACTED\]/);
+      return true;
+    },
+  );
+});
+
+test("HTTP provider failure sem eco preserva causa útil sem credencial", async () => {
   const controller = new AbortController();
   await assert.rejects(
     drain(
       streamCliProxyChatText({
         ...BASE,
         signal: controller.signal,
-        fetchImpl: async () => new Response("rate limit k", { status: 429 }),
+        fetchImpl: async () => new Response(JSON.stringify({ error: { message: "rate limit exceeded" } }), { status: 429 }),
       }),
     ),
     (error: unknown) => {
       assert.ok(error instanceof ProtocolError);
-      assert.match(error.code, /^PROVIDER_/);
-      assert.ok(!error.message.includes("Bearer k"));
+      assert.equal(error.code, "PROVIDER_RATE_LIMIT");
+      assert.equal(error.message, "rate limit exceeded");
+      assert.equal(error.hints?.providerCause, "rate limit exceeded");
       return true;
     },
   );

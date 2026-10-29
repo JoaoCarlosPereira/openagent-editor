@@ -10,6 +10,7 @@ import {
   assertNonEmptyCliProxyField,
   mapCliProxyInlineStreamErrorObject,
   providerFailurePreservationHints,
+  redactProviderCredentials,
 } from "./cliproxy-provider-errors.js";
 
 export {
@@ -228,11 +229,14 @@ export class CliProxyStreamHarnessNormalizer {
 
   buildProviderFailureNormalization(error: ProtocolError): CliProxyStreamHarnessNormalization {
     const hints = providerFailurePreservationHints();
+    const rawCause =
+      typeof error.hints?.providerCause === "string" ? error.hints.providerCause : error.message;
+    const providerCause = redactProviderCredentials(rawCause);
     if (this.closed) {
       return this.emit(CLI_PROXY_STREAM_HARNESS_EVENT_TYPES.PROVIDER_FAILURE, {
         ...this.basePayload(),
         code: error.code,
-        providerCause: error.hints?.providerCause ?? error.message,
+        providerCause,
         ...hints,
       });
     }
@@ -240,7 +244,7 @@ export class CliProxyStreamHarnessNormalizer {
     return this.emit(CLI_PROXY_STREAM_HARNESS_EVENT_TYPES.PROVIDER_FAILURE, {
       ...this.basePayload(),
       code: error.code,
-      providerCause: error.hints?.providerCause ?? error.message,
+      providerCause,
       text: this.accumulatedText,
       ...hints,
     });

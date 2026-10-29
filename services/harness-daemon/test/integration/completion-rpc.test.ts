@@ -426,6 +426,7 @@ test.describe("completion.start/cancel no daemon (TAB-01)", { concurrency: 1 }, 
     const source: CompletionTextSource = () => ({
       async *[Symbol.asyncIterator]() {
         await Promise.resolve();
+        yield "";
         throw new ProtocolError("PROVIDER_TIMEOUT", cause, [cause], { providerCause: cause });
       },
     });
@@ -454,6 +455,7 @@ test.describe("completion.start/cancel no daemon (TAB-01)", { concurrency: 1 }, 
       const noEchoSource: CompletionTextSource = () => ({
         async *[Symbol.asyncIterator]() {
           await Promise.resolve();
+          yield "";
           throw new ProtocolError("PROVIDER_RATE_LIMIT", "rate limit exceeded", [], { providerCause: "rate limit exceeded" });
         },
       });

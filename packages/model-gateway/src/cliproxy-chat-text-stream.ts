@@ -70,6 +70,7 @@ export async function* streamCliProxyChatText(
       response.status,
       bodyText,
       `Provedor recusou o pedido de completion (${response.status}).`,
+      input.credential,
     );
   }
   if (!response.body) {

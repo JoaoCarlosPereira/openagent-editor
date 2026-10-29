@@ -61,6 +61,7 @@ export {
   mapCliProxyOpenAiHttpFailure,
   parseOpenAiCompatibleErrorBody,
   providerFailurePreservationHints,
+  redactProviderCredentials,
 } from "./cliproxy-provider-errors.js";
 export {
   assertProviderFailureEditorStateUnchanged,
