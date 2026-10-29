@@ -143,6 +143,7 @@ export {
   buildProjectsLocalView,
   PROJECT_OBJECTIVE_MAX_LENGTH,
   type ProjectsLocalPort,
+  type ProjectsLocalCoordinator,
   type ProjectTaskResult,
   type ProjectLocalPhase,
   type ProjectNodeStatus,

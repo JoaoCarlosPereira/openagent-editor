@@ -1,5 +1,12 @@
 import { randomUUID } from "node:crypto";
-import { PROTOCOL_ERROR_CODES, ProtocolError } from "@openagent/protocol";
+import {
+  PROTOCOL_ERROR_CODES,
+  ProtocolError,
+  RPC_METHOD,
+  type ProjectAcceptParams,
+  type ProjectCreateParams,
+  type ProjectRejectParams,
+} from "@openagent/protocol";
 import {
   buildProjectsLocalView,
   type ProjectLocalPhase,
@@ -14,11 +21,16 @@ export interface ProjectTaskResult {
   result: string;
 }
 
-/** Porta do coordenador local (espelha project.create/accept/reject do protocolo). */
+/** Porta RPC do coordenador local: params e resultados exatamente como project.create/accept/reject do protocolo. */
 export interface ProjectsLocalPort {
-  create(input: { objective: string }): Promise<{ projectId: string; tasks: readonly ProjectTaskResult[] }>;
-  accept(input: { projectId: string; nodeId: string }): Promise<{ accepted: true }>;
-  reject(input: { projectId: string; nodeId: string }): Promise<{ rejected: true }>;
+  create(input: { method: typeof RPC_METHOD.PROJECT_CREATE; params: ProjectCreateParams }): Promise<{ projectId: string }>;
+  accept(input: { method: typeof RPC_METHOD.PROJECT_ACCEPT; params: ProjectAcceptParams }): Promise<{ accepted: true }>;
+  reject(input: { method: typeof RPC_METHOD.PROJECT_REJECT; params: ProjectRejectParams }): Promise<{ rejected: true }>;
+}
+
+/** Coordenador local: alem da porta RPC, expoe as tarefas produzidas por um projeto (fora do contrato RPC). */
+export interface ProjectsLocalCoordinator extends ProjectsLocalPort {
+  tasksOf(projectId: string): Promise<readonly ProjectTaskResult[]>;
 }
 
 export const PROJECT_OBJECTIVE_MAX_LENGTH = 2000;
@@ -36,38 +48,52 @@ function invalid(message: string, fields: readonly string[] = []): ProtocolError
   return new ProtocolError(PROTOCOL_ERROR_CODES.INVALID_STATE, message, [...fields]);
 }
 
+/** Codigo exibido na view: o do ProtocolError; so falhas nao tipadas (sem codigo) caem em INVALID_STATE. */
+function codeOf(error: unknown): string {
+  return error instanceof ProtocolError ? error.code : PROTOCOL_ERROR_CODES.INVALID_STATE;
+}
+
+type NodeDecision = "awaiting_review" | "accepted" | "rejected";
+
 /** Coordenador local em memoria: cada tarefa roda como agente na mesma maquina via executor injetavel. */
-export class LocalProjectCoordinator implements ProjectsLocalPort {
-  private readonly projects = new Map<string, Map<string, "awaiting_review" | "accepted" | "rejected">>();
+export class LocalProjectCoordinator implements ProjectsLocalCoordinator {
+  private readonly projects = new Map<string, readonly ProjectTaskResult[]>();
+  private readonly decisions = new Map<string, NodeDecision>();
 
   constructor(private readonly runTask: (title: string) => Promise<string> = async (title) => `Resultado local: ${title}`) {}
 
-  async create(input: { objective: string }): Promise<{ projectId: string; tasks: readonly ProjectTaskResult[] }> {
+  async create(input: { method: typeof RPC_METHOD.PROJECT_CREATE; params: ProjectCreateParams }): Promise<{ projectId: string }> {
     const projectId = `project-${randomUUID()}`;
     const tasks: ProjectTaskResult[] = [];
-    for (const [index, title] of decomposeObjective(input.objective).entries()) {
+    for (const [index, title] of decomposeObjective(input.params.objective).entries()) {
       tasks.push({ nodeId: `${projectId}-node-${index + 1}`, title, result: await this.runTask(title) });
     }
-    this.projects.set(projectId, new Map(tasks.map((task) => [task.nodeId, "awaiting_review"])));
-    return { projectId, tasks };
+    this.projects.set(projectId, tasks);
+    for (const task of tasks) this.decisions.set(task.nodeId, "awaiting_review");
+    return { projectId };
   }
 
-  async accept(input: { projectId: string; nodeId: string }): Promise<{ accepted: true }> {
-    this.decide(input, "accepted");
+  async tasksOf(projectId: string): Promise<readonly ProjectTaskResult[]> {
+    const tasks = this.projects.get(projectId);
+    if (!tasks) throw invalid("Projeto desconhecido.", ["projectId"]);
+    return tasks.map((task) => ({ ...task }));
+  }
+
+  async accept(input: { method: typeof RPC_METHOD.PROJECT_ACCEPT; params: ProjectAcceptParams }): Promise<{ accepted: true }> {
+    this.decide(input.params.nodeId, "accepted");
     return { accepted: true };
   }
 
-  async reject(input: { projectId: string; nodeId: string }): Promise<{ rejected: true }> {
-    this.decide(input, "rejected");
+  async reject(input: { method: typeof RPC_METHOD.PROJECT_REJECT; params: ProjectRejectParams }): Promise<{ rejected: true }> {
+    this.decide(input.params.nodeId, "rejected");
     return { rejected: true };
   }
 
-  private decide(input: { projectId: string; nodeId: string }, next: "accepted" | "rejected"): void {
-    const nodes = this.projects.get(input.projectId);
-    if (!nodes || nodes.get(input.nodeId) !== "awaiting_review") {
+  private decide(nodeId: string, next: Exclude<NodeDecision, "awaiting_review">): void {
+    if (this.decisions.get(nodeId) !== "awaiting_review") {
       throw invalid("Resultado do projeto nao esta aguardando revisao.", ["nodeId"]);
     }
-    nodes.set(input.nodeId, next);
+    this.decisions.set(nodeId, next);
   }
 }
 
@@ -77,10 +103,12 @@ export class ProjectsLocalController {
   private objective: string | null = null;
   private nodes: ProjectNodeView[] = [];
   private code: string | null = null;
+  private readonly inFlight = new Set<string>();
 
-  constructor(private readonly port: ProjectsLocalPort = new LocalProjectCoordinator()) {
-    if (!port || typeof port.create !== "function" || typeof port.accept !== "function" || typeof port.reject !== "function") {
-      throw invalid("Porta de projetos locais invalida.", ["port"]);
+  constructor(private readonly coordinator: ProjectsLocalCoordinator = new LocalProjectCoordinator()) {
+    const c = coordinator as Partial<ProjectsLocalCoordinator> | null | undefined;
+    if (!c || typeof c.create !== "function" || typeof c.accept !== "function" || typeof c.reject !== "function" || typeof c.tasksOf !== "function") {
+      throw invalid("Coordenador de projetos locais invalido.", ["coordinator"]);
     }
   }
 
@@ -90,22 +118,23 @@ export class ProjectsLocalController {
 
   async createProject(objective: string): Promise<ProjectsLocalViewSnapshot> {
     if (this.phase !== "idle") throw invalid("Criacao de projeto fora de estado valido.", ["state"]);
-    if (typeof objective !== "string" || objective.trim().length === 0 || objective.length > PROJECT_OBJECTIVE_MAX_LENGTH) {
+    const trimmed = typeof objective === "string" ? objective.trim() : "";
+    if (trimmed.length === 0 || trimmed.length > PROJECT_OBJECTIVE_MAX_LENGTH) {
       throw invalid("Objetivo do projeto invalido.", ["objective"]);
     }
-    const trimmed = objective.trim();
     this.phase = "creating";
     this.code = null;
     try {
-      const created = await this.port.create({ objective: trimmed });
-      if (created.tasks.length === 0) throw invalid("Coordenador nao produziu tarefas.", ["tasks"]);
-      this.projectId = created.projectId;
+      const { projectId } = await this.coordinator.create({ method: RPC_METHOD.PROJECT_CREATE, params: { objective: trimmed } });
+      const tasks = await this.coordinator.tasksOf(projectId);
+      if (tasks.length === 0) throw invalid("Coordenador nao produziu tarefas.", ["tasks"]);
+      this.projectId = projectId;
       this.objective = trimmed;
-      this.nodes = created.tasks.map((task) => ({ nodeId: task.nodeId, title: task.title, result: task.result, status: "awaiting_review" }));
+      this.nodes = tasks.map((task) => ({ nodeId: task.nodeId, title: task.title, result: task.result, status: "awaiting_review" }));
       this.phase = "review";
     } catch (error) {
       this.phase = "idle";
-      this.code = this.codeOf(error);
+      this.code = codeOf(error);
       throw error;
     }
     return this.snapshot;
@@ -123,30 +152,20 @@ export class ProjectsLocalController {
     if (this.phase !== "review" || !this.projectId) throw invalid("Nao ha projeto aguardando revisao.", ["state"]);
     const node = typeof nodeId === "string" ? this.nodes.find((n) => n.nodeId === nodeId) : undefined;
     if (!node) throw invalid("Resultado do projeto desconhecido.", ["nodeId"]);
-    if (node.status !== "awaiting_review") throw invalid("Resultado do projeto ja foi decidido.", ["nodeId"]);
+    if (node.status !== "awaiting_review" || this.inFlight.has(nodeId)) throw invalid("Resultado do projeto ja foi decidido.", ["nodeId"]);
+    this.inFlight.add(nodeId);
     try {
-      const input = { projectId: this.projectId, nodeId };
-      if (status === "accepted") await this.port.accept(input);
-      else await this.port.reject(input);
+      if (status === "accepted") await this.coordinator.accept({ method: RPC_METHOD.PROJECT_ACCEPT, params: { nodeId } });
+      else await this.coordinator.reject({ method: RPC_METHOD.PROJECT_REJECT, params: { nodeId } });
     } catch (error) {
-      this.code = this.codeOf(error);
+      this.code = codeOf(error);
       throw error;
+    } finally {
+      this.inFlight.delete(nodeId);
     }
     node.status = status;
     this.code = null;
     if (this.nodes.every((n) => n.status !== "awaiting_review")) this.phase = "completed";
     return this.snapshot;
   }
-
-  private codeOf(error: unknown): string {
-    return error instanceof ProtocolError ? error.code : PROTOCOL_ERROR_CODES.INVALID_STATE;
-  }
 }
-
-export { buildProjectsLocalView } from "./projects-local-view.js";
-export type {
-  ProjectLocalPhase,
-  ProjectNodeStatus,
-  ProjectNodeView,
-  ProjectsLocalViewSnapshot,
-} from "./projects-local-view.js";

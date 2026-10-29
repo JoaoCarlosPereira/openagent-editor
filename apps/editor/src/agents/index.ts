@@ -54,12 +54,16 @@ export {
   ProjectsLocalController,
   LocalProjectCoordinator,
   decomposeObjective,
-  buildProjectsLocalView,
   PROJECT_OBJECTIVE_MAX_LENGTH,
   type ProjectsLocalPort,
+  type ProjectsLocalCoordinator,
   type ProjectTaskResult,
+} from "./projects-local.js";
+
+export {
+  buildProjectsLocalView,
   type ProjectLocalPhase,
   type ProjectNodeStatus,
   type ProjectNodeView,
   type ProjectsLocalViewSnapshot,
-} from "./projects-local.js";
+} from "./projects-local-view.js";
