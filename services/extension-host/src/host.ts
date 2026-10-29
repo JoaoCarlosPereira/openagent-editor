@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import { createHash } from "node:crypto";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { Worker } from "node:worker_threads";
@@ -102,6 +103,7 @@ export class IsolatedExtensionHost {
   private nextRequestId = 0;
   private readonly extensions = new Map<string, ExtensionRegistration>();
   private readonly installing = new Set<string>();
+  private readonly changingEnablement = new Set<string>();
   private readonly pending = new Map<
     string,
     {
@@ -152,6 +154,10 @@ export class IsolatedExtensionHost {
             if (!this.options.editorRequest) throw new ProtocolError(PROTOCOL_ERROR_CODES.INVALID_STATE, "Editor indisponível.");
             if (!this.options.authorizeEditorRequest || !await this.options.authorizeEditorRequest(message)) {
               throw new ProtocolError(PROTOCOL_ERROR_CODES.PERMISSION_DENIED, "Operação de editor não autorizada.");
+            }
+            if (this.terminated || this.extensionWorkers.get(owner) !== worker ||
+                this.extensions.get(owner) !== extension || !["loading", "active"].includes(extension.state)) {
+              throw new ProtocolError(PROTOCOL_ERROR_CODES.CANCELLED, "Extensão não está mais ativa.");
             }
             const output = await this.options.editorRequest(message);
             worker.postMessage({ kind: "editorResponse", requestId: message.requestId, output });
@@ -240,13 +246,26 @@ export class IsolatedExtensionHost {
       }
     });
 
-    worker.on("error", (error) => {
+    const invalidateWorker = (error: Error) => {
+      if (owner && this.extensionWorkers.get(owner) === worker) {
+        this.extensionWorkers.delete(owner);
+        this.clearExtensionRegistrations(owner);
+        const registration = this.extensions.get(owner);
+        if (registration && ["loading", "active", "deactivating"].includes(registration.state)) {
+          registration.state = "failed";
+          registration.lastError = error.message;
+        }
+      }
       for (const [id, entry] of this.pending) {
         if (entry.worker !== worker) continue;
         entry.reject(error);
         this.pending.delete(id);
       }
-    });
+    };
+    worker.on("error", invalidateWorker);
+    worker.on("exit", (code) => invalidateWorker(
+      new ProtocolError(PROTOCOL_ERROR_CODES.CANCELLED, `Worker encerrado (código ${code}).`),
+    ));
   }
 
   static async spawn(
@@ -436,7 +455,8 @@ export class IsolatedExtensionHost {
   registerExtensionFromDirectory(extensionDirectory: string): ExtensionRegistration {
     const registration = this.inspectExtensionFromDirectory(extensionDirectory);
     const existing = this.extensions.get(registration.id);
-    if (existing && !["unloaded", "deactivated", "failed"].includes(existing.state)) {
+    if (this.changingEnablement.has(registration.id) ||
+        (existing && !["unloaded", "deactivated", "failed"].includes(existing.state))) {
       throw new ProtocolError(PROTOCOL_ERROR_CODES.CONFLICT, "Extensão em execução ou transição.");
     }
     this.extensions.set(registration.id, registration);
@@ -539,7 +559,7 @@ export class IsolatedExtensionHost {
         await installVsixPackage(vsixPath, this.config.extensionsDirectory, (directory) => {
           candidate = this.inspectExtensionFromDirectory(directory, true);
           const existing = this.extensions.get(candidate.id);
-          if (this.installing.has(candidate.id) ||
+          if (this.installing.has(candidate.id) || this.changingEnablement.has(candidate.id) ||
               (existing && !["unloaded", "deactivated", "failed"].includes(existing.state))) {
             throw new ProtocolError(PROTOCOL_ERROR_CODES.CONFLICT, "Extensão em execução ou transição.");
           }
@@ -599,6 +619,70 @@ export class IsolatedExtensionHost {
     return Array.from(this.extensions.values());
   }
 
+  private enablementPath(extensionId: string): string {
+    return path.join(this.config.extensionsDirectory, `.disabled-${createHash("sha256").update(extensionId).digest("hex")}`);
+  }
+
+  // The preference is shared on disk, but running hosts do not synchronize lifecycle transitions.
+  private requireExtension(extensionId: string): ExtensionRegistration {
+    if (this.terminated || typeof extensionId !== "string" || !extensionId.trim()) {
+      throw new ProtocolError(PROTOCOL_ERROR_CODES.INVALID_STATE, "Host encerrado ou identificador inválido.");
+    }
+    const registration = this.extensions.get(extensionId.toLowerCase());
+    if (!registration) throw new ProtocolError(PROTOCOL_ERROR_CODES.INVALID_STATE, "Extensão não registrada.");
+    return registration;
+  }
+
+  isExtensionEnabled(extensionId: string): boolean {
+    const registration = this.requireExtension(extensionId);
+    try {
+      fs.lstatSync(this.enablementPath(registration.id));
+      return false;
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") return true;
+      throw error;
+    }
+  }
+
+  async enableExtension(extensionId: string): Promise<void> {
+    const registration = this.requireExtension(extensionId);
+    const id = registration.id;
+    if (this.installing.has(id) || this.changingEnablement.has(id) ||
+        ["loading", "deactivating"].includes(registration.state)) {
+      throw new ProtocolError(PROTOCOL_ERROR_CODES.CONFLICT, "Extensão em transição.");
+    }
+    try {
+      fs.unlinkSync(this.enablementPath(id));
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+    }
+  }
+
+  async disableExtension(extensionId: string): Promise<void> {
+    const registration = this.requireExtension(extensionId);
+    const id = registration.id;
+    if (this.installing.has(id) || this.changingEnablement.has(id) ||
+        ["loading", "deactivating"].includes(registration.state)) {
+      throw new ProtocolError(PROTOCOL_ERROR_CODES.CONFLICT, "Extensão em transição.");
+    }
+    this.changingEnablement.add(id);
+    try {
+      if (registration.state === "active") await this.deactivateExtension(id);
+      await this.discardExtensionWorker(id);
+      if (this.terminated) throw new ProtocolError(PROTOCOL_ERROR_CODES.INVALID_STATE, "Extension host já foi encerrado.");
+      try {
+        fs.closeSync(fs.openSync(this.enablementPath(id), "wx", 0o600));
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code === "EEXIST" &&
+            fs.lstatSync(this.enablementPath(id)).isFile()) return;
+        throw new ProtocolError(PROTOCOL_ERROR_CODES.INVALID_STATE,
+          `Não foi possível persistir a desabilitação; a extensão pode estar desativada e requer ativação explícita: ${String(error)}`);
+      }
+    } finally {
+      this.changingEnablement.delete(id);
+    }
+  }
+
   /**
    * Ativa a extensão no worker isolado.
    */
@@ -611,8 +695,8 @@ export class IsolatedExtensionHost {
     if (this.terminated) {
       throw new ProtocolError(PROTOCOL_ERROR_CODES.INVALID_STATE, "Extension host já foi encerrado.");
     }
-    const canonicalId = extensionId.toLowerCase();
-    if (this.installing.has(canonicalId)) {
+    const canonicalId = this.requireExtension(extensionId).id;
+    if (this.installing.has(canonicalId) || this.changingEnablement.has(canonicalId)) {
       throw new ProtocolError(PROTOCOL_ERROR_CODES.CONFLICT, "Instalação da extensão em andamento.");
     }
     const registration = this.extensions.get(canonicalId);
@@ -623,6 +707,9 @@ export class IsolatedExtensionHost {
       );
     }
 
+    if (!this.isExtensionEnabled(canonicalId)) {
+      throw new ProtocolError(PROTOCOL_ERROR_CODES.INVALID_STATE, "Extensão desabilitada.");
+    }
     if (["active", "loading", "deactivating"].includes(registration.state)) {
       throw new ProtocolError(
         PROTOCOL_ERROR_CODES.INVALID_STATE,
