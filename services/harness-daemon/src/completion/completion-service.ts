@@ -18,6 +18,7 @@ import { openWorkspaceDatabase, sha256Hex, type WorkspaceDatabase } from "@opena
 import type { DaemonRpcContext } from "../runs/run-rpc-handler.js";
 import { readCompletionSnapshot, type CompletionSnapshot } from "./completion-state.js";
 import { createCliProxyCompletionSource, type CompletionTextSource } from "./completion-source.js";
+import { redactProviderCredentials } from "@openagent/model-gateway";
 
 export type CompletionEmit = (event: HarnessEvent, payload: CompletionEventPayload) => void;
 
@@ -131,9 +132,23 @@ function abortSignalPromise(signal: AbortSignal): Promise<"aborted"> {
   });
 }
 
+/** Só falhas do gateway/provedor ou stream interrompido permitem retry idempotente. */
+function isRetryableCompletionError(error: unknown): boolean {
+  if (!isProtocolError(error)) {
+    return false;
+  }
+  return error.code === PROTOCOL_ERROR_CODES.INCOMPLETE_STREAM || error.code.startsWith("PROVIDER_");
+}
+
 function incompleteDetails(error: unknown): { code: string; reason: string } {
   if (isProtocolError(error)) {
-    return { code: error.code, reason: error.message };
+    const stableReasons: Record<string, string> = {
+      [PROTOCOL_ERROR_CODES.INCOMPLETE_STREAM]: "Stream de completion encerrado antes do fim.",
+    };
+    const reason = error.code.startsWith("PROVIDER_")
+      ? `Falha do provedor (${error.code}).`
+      : (stableReasons[error.code] ?? "Completion interrompida.");
+    return { code: error.code, reason: redactProviderCredentials(reason) };
   }
   return {
     code: PROTOCOL_ERROR_CODES.INCOMPLETE_STREAM,
@@ -316,7 +331,7 @@ export async function runCompletionStart(input: StartCompletionInput): Promise<C
             attempt,
             text,
           });
-        } else {
+        } else if (isRetryableCompletionError(error)) {
           const { code, reason } = incompleteDetails(error);
           settle("incomplete", {
             type: COMPLETION_EVENT_TYPE.INCOMPLETE,
@@ -328,6 +343,9 @@ export async function runCompletionStart(input: StartCompletionInput): Promise<C
             idempotentRetry: true,
             skipRepeatedMutations: true,
           });
+        } else {
+          // Erros de configuração/estado são estáveis: não criar started nem terminal retryable.
+          throw error;
         }
       } finally {
         // Libera a conexão do provedor sem esperar a fonte responder (ela pode estar travada).
@@ -357,6 +375,17 @@ export async function runCompletionCancel(
   request: RpcRequestEnvelope<typeof RPC_METHOD.COMPLETION_CANCEL>,
 ): Promise<CompletionCancelResult> {
   const params = (request.payload ?? {}) as RpcParamsMap[typeof RPC_METHOD.COMPLETION_CANCEL];
+  // Validar o vínculo antes de consultar gerações globais: pedidos divergentes nunca abortam.
+  const bindingDb = openWorkspaceDatabase({
+    dataRoot: context.dataRoot,
+    workspaceId: context.binding.workspaceId,
+  });
+  try {
+    assertRunBinding(context, bindingDb, request);
+  } finally {
+    bindingDb.close();
+  }
+
   const entry = activeCompletions.get(activeKey(context, request.runId, params.completionId));
   if (entry) {
     entry.controller.abort();

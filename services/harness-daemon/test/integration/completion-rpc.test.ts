@@ -86,13 +86,13 @@ type Harness = {
   stop(): Promise<void>;
 };
 
-async function setup(): Promise<Harness> {
+async function setup(completionSource?: CompletionTextSource): Promise<Harness> {
   const dataRoot = await mkdtemp(path.join(os.tmpdir(), "oa-completion-"));
   const source = new ControlledSource();
   const daemon = await startHarnessDaemon({
     dataRoot,
     runtimeDirectory: path.join(dataRoot, "runtime"),
-    completionSource: source.source,
+    completionSource: completionSource ?? source.source,
     drainTimeoutMs: 50,
   });
   const client = await connectHarnessClient({ address: daemon.address, workspaceHello: WORKSPACE });
@@ -147,6 +147,19 @@ function persistedCompletionTypes(h: Harness, completionId: string): string[] {
       }))
       .filter((item) => item.payload.completionId === completionId)
       .map((item) => item.type);
+  } finally {
+    db.close();
+  }
+}
+
+function persistedCompletionPayloads(h: Harness, completionId: string): Array<Record<string, unknown>> {
+  const db = openWorkspaceDatabase({ dataRoot: h.dataRoot, workspaceId: WORKSPACE.workspaceId });
+  try {
+    return db
+      .listHarnessEvents(h.runId)
+      .filter((event) => event.type.startsWith("completion."))
+      .map((event) => JSON.parse(Buffer.from(db.readCasBlob(event.payloadRef)).toString("utf8")) as Record<string, unknown>)
+      .filter((payload) => payload["completionId"] === completionId);
   } finally {
     db.close();
   }
@@ -225,6 +238,57 @@ test.describe("completion.start/cancel no daemon (TAB-01)", { concurrency: 1 }, 
       assert.equal(last?.type === COMPLETION_EVENT_TYPE.CANCELLED && last.text, "parc");
       assert.equal((await stream.result).state, "cancelled");
       assert.equal(h.source.calls[0]?.signal.aborted, true);
+    } finally {
+      await h.stop();
+    }
+  });
+
+  test("[TAB-01] cancel com sessão divergente retorna INVALID_STATE sem abortar geração", async () => {
+    const h = await setup();
+    try {
+      const stream = h.client.startCompletion({
+        sessionId: h.sessionId,
+        runId: h.runId,
+        completionId: "c-wrong-session",
+        prefix: "x",
+      });
+      const collected = collect(stream);
+      await waitFor(() => persistedCompletionTypes(h, "c-wrong-session").includes(COMPLETION_EVENT_TYPE.STARTED));
+
+      await assert.rejects(
+        h.client.cancelCompletion({
+          sessionId: "session-divergente",
+          runId: h.runId,
+          completionId: "c-wrong-session",
+        }),
+        { code: PROTOCOL_ERROR_CODES.INVALID_STATE },
+      );
+      assert.equal(h.source.calls[0]?.signal.aborted, false);
+      assert.deepEqual(persistedCompletionTypes(h, "c-wrong-session"), [COMPLETION_EVENT_TYPE.STARTED]);
+
+      h.source.push("c-wrong-session", "ok");
+      h.source.push("c-wrong-session", "end");
+      assert.equal((await collected).at(-1)?.payload.type, COMPLETION_EVENT_TYPE.COMPLETED);
+    } finally {
+      await h.stop();
+    }
+  });
+
+  test("[TAB-01] erro de estado da fonte não vira incomplete retryable", async () => {
+    const h = await setup();
+    try {
+      const stream = h.client.startCompletion({
+        sessionId: h.sessionId,
+        runId: h.runId,
+        completionId: "c-source-state-error",
+        prefix: "x",
+      });
+      h.source.push("c-source-state-error", new ProtocolError(
+        PROTOCOL_ERROR_CODES.INVALID_STATE,
+        "Perfil de provedor ausente.",
+      ));
+      await assert.rejects(collect(stream), { code: PROTOCOL_ERROR_CODES.INVALID_STATE });
+      assert.deepEqual(persistedCompletionTypes(h, "c-source-state-error"), [COMPLETION_EVENT_TYPE.STARTED]);
     } finally {
       await h.stop();
     }
@@ -351,6 +415,62 @@ test.describe("completion.start/cancel no daemon (TAB-01)", { concurrency: 1 }, 
         eventsBeforeReplay.filter((type) => type === COMPLETION_EVENT_TYPE.COMPLETED).length,
         1,
       );
+    } finally {
+      await h.stop();
+    }
+  });
+
+  test("[PRV-02] 401 com credencial ecoada não vaza para evento CAS nem cliente; erro sem eco mantém causa útil", async () => {
+    const echoedSecret = "sk-echoed-secret-123456789";
+    const cause = `Incorrect API key provided: ${echoedSecret}`;
+    const source: CompletionTextSource = () => ({
+      async *[Symbol.asyncIterator]() {
+        await Promise.resolve();
+        throw new ProtocolError("PROVIDER_TIMEOUT", cause, [cause], { providerCause: cause });
+      },
+    });
+    const h = await setup(source);
+    try {
+      const stream = h.client.startCompletion({
+        sessionId: h.sessionId,
+        runId: h.runId,
+        completionId: "c-credential-echo",
+        prefix: "x",
+      });
+      h.source.push("c-credential-echo", new ProtocolError("PROVIDER_TIMEOUT", cause, [cause], { providerCause: cause }));
+      const events = await collect(stream);
+      const terminal = events.at(-1)?.payload;
+      assert.equal(terminal?.type, COMPLETION_EVENT_TYPE.INCOMPLETE);
+      if (terminal?.type === COMPLETION_EVENT_TYPE.INCOMPLETE) {
+        assert.equal(terminal.code, "PROVIDER_TIMEOUT");
+        assert.equal(terminal.reason, "Falha do provedor (PROVIDER_TIMEOUT).");
+      }
+      const persisted = persistedCompletionPayloads(h, "c-credential-echo");
+      const serialized = JSON.stringify({ events, persisted });
+      assert.ok(!serialized.includes(echoedSecret));
+      assert.ok(!serialized.includes("Incorrect API key"));
+      assert.match(terminal?.type === COMPLETION_EVENT_TYPE.INCOMPLETE ? terminal.reason : "", /PROVIDER_TIMEOUT/);
+
+      const noEchoSource: CompletionTextSource = () => ({
+        async *[Symbol.asyncIterator]() {
+          await Promise.resolve();
+          throw new ProtocolError("PROVIDER_RATE_LIMIT", "rate limit exceeded", [], { providerCause: "rate limit exceeded" });
+        },
+      });
+      const noEchoHarness = await setup(noEchoSource);
+      try {
+        const noEchoStream = noEchoHarness.client.startCompletion({
+          sessionId: noEchoHarness.sessionId,
+          runId: noEchoHarness.runId,
+          completionId: "c-no-echo",
+          prefix: "y",
+        });
+        const noEchoEvents = await collect(noEchoStream);
+        const noEchoTerminal = noEchoEvents.at(-1)?.payload;
+        assert.equal(noEchoTerminal?.type === COMPLETION_EVENT_TYPE.INCOMPLETE && noEchoTerminal.reason, "Falha do provedor (PROVIDER_RATE_LIMIT).");
+      } finally {
+        await noEchoHarness.stop();
+      }
     } finally {
       await h.stop();
     }
