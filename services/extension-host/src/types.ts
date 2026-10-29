@@ -13,7 +13,7 @@ export interface ExtensionRegistration {
   readonly id: string;
   readonly extensionPath: string;
   readonly manifest: ExtensionManifest;
-  readonly mainAbsolutePath: string;
+  readonly mainAbsolutePath?: string;
   state: ExtensionLifecycleState;
   activatedAt?: number;
   deactivatedAt?: number;

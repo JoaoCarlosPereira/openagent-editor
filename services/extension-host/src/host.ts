@@ -4,8 +4,10 @@ import { fileURLToPath } from "node:url";
 import { Worker } from "node:worker_threads";
 
 import {
+  FROZEN_EXTENSION_API_VERSION,
   formatExtensionIdentifier,
   validateExtensionManifest,
+  validateVsixManifest,
 } from "@openagent/extension-api";
 import { isAbsolutePathInsideRoot } from "@openagent/policy";
 import {
@@ -13,6 +15,8 @@ import {
   PROTOCOL_ERROR_CODES,
   ProtocolError,
 } from "@openagent/protocol";
+
+import { installVsixPackage } from "./vsix-installer.js";
 
 import type {
   ExtensionHostConfig,
@@ -26,6 +30,36 @@ const DEFAULT_WORKER_ENTRY = fileURLToPath(
   new URL("./worker-entry.mjs", import.meta.url),
 );
 
+function compareSemverPrecedence(a: string, b: string): number {
+  const [, coreA = "", preA] = /^([^-+]+)(?:-([^+]+))?/.exec(a) ?? [];
+  const [, coreB = "", preB] = /^([^-+]+)(?:-([^+]+))?/.exec(b) ?? [];
+  const compareNumber = (x: string, y: string) => x.length - y.length || (x < y ? -1 : x > y ? 1 : 0);
+  const aa = coreA.split(".");
+  const bb = coreB.split(".");
+  for (let i = 0; i < 3; i++) {
+    const result = compareNumber(aa[i] ?? "0", bb[i] ?? "0");
+    if (result) return result;
+  }
+  if (preA === undefined || preB === undefined) return preA === preB ? 0 : preA === undefined ? 1 : -1;
+  const ap = preA.split(".");
+  const bp = preB.split(".");
+  for (let i = 0; i < Math.max(ap.length, bp.length); i++) {
+    const x = ap[i], y = bp[i];
+    if (x === undefined || y === undefined) return x === undefined ? -1 : 1;
+    if (x === y) continue;
+    const nx = /^\d+$/.test(x), ny = /^\d+$/.test(y);
+    if (nx && ny) return compareNumber(x, y);
+    if (nx !== ny) return nx ? -1 : 1;
+    return x < y ? -1 : 1;
+  }
+  return 0;
+}
+
+function compareVersions(a: string, b: string): number {
+  // Build metadata has no SemVer precedence; prefer the lexical first version on ties.
+  return compareSemverPrecedence(a, b) || (a < b ? 1 : a > b ? -1 : 0);
+}
+
 export interface IsolatedExtensionHostOptions {
   workerEntryPath?: string;
   execArgv?: string[];
@@ -37,6 +71,13 @@ export type ExtensionHostEventListener = (event: {
   eventType: string;
   payload: unknown;
 }) => void;
+
+export type VsixInstallResult = ExtensionRegistration & {
+  status?: "published_recovery_required";
+  publication?: { extensionId: string; version: string };
+  warning?: string;
+  recovery?: "restart_host";
+};
 
 /**
  * Extension host isolado que gerencia extensões e executa seu código
@@ -59,6 +100,7 @@ export class IsolatedExtensionHost {
   private terminated = false;
   private nextRequestId = 0;
   private readonly extensions = new Map<string, ExtensionRegistration>();
+  private readonly installing = new Set<string>();
   private readonly pending = new Map<
     string,
     {
@@ -81,6 +123,7 @@ export class IsolatedExtensionHost {
       if (!message || typeof message !== "object") {
         return;
       }
+      if (owner && this.extensionWorkers.get(owner) !== worker) return;
 
       if (message.kind === "editorRequest") {
         void (async () => {
@@ -219,6 +262,7 @@ export class IsolatedExtensionHost {
     const host = new IsolatedExtensionHost(config, worker, options);
     try {
       await host.initWorker();
+      host.restoreInstalledExtensions();
       return host;
     } catch (error) {
       await host.terminate();
@@ -288,6 +332,62 @@ export class IsolatedExtensionHost {
     await this.sendRequest({ kind: "init", config: this.config });
   }
 
+  private clearExtensionRegistrations(extensionId: string): void {
+    for (const [command, owner] of this.commands) {
+      if (owner === extensionId) this.commands.delete(command);
+    }
+    for (const [id, provider] of this.completionProviders) {
+      if (provider.extensionId === extensionId) this.completionProviders.delete(id);
+    }
+    for (const [id, provider] of this.hoverProviders) {
+      if (provider.extensionId === extensionId) this.hoverProviders.delete(id);
+    }
+  }
+
+  private async discardExtensionWorker(extensionId: string): Promise<void> {
+    const worker = this.extensionWorkers.get(extensionId);
+    if (worker) {
+      this.extensionWorkers.delete(extensionId);
+      for (const [id, request] of this.pending) {
+        if (request.worker !== worker) continue;
+        this.pending.delete(id);
+        request.reject(new ProtocolError(PROTOCOL_ERROR_CODES.CANCELLED, "Worker da extensão encerrado."));
+      }
+      await worker.terminate();
+    }
+    this.clearExtensionRegistrations(extensionId);
+  }
+
+  private restoreInstalledExtensions(): void {
+    if (!fs.existsSync(this.config.extensionsDirectory)) return;
+    const root = fs.realpathSync(this.config.extensionsDirectory);
+    for (const entry of fs.readdirSync(root, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name))) {
+      if (!entry.isFile() || entry.name.startsWith(".tmp-vsix-")) continue;
+      try {
+        const index = path.join(root, entry.name);
+        const stageName = fs.readFileSync(index, "utf8");
+        if (!/^\.tmp-vsix-[a-zA-Z0-9]+$/.test(stageName)) continue;
+        const directory = path.join(root, stageName);
+        if (!fs.lstatSync(directory).isDirectory()) continue;
+        const marker = fs.lstatSync(path.join(directory, ".publication"));
+        const indexStat = fs.lstatSync(index);
+        if (!marker.isFile() || marker.dev !== indexStat.dev || marker.ino !== indexStat.ino) continue;
+        const manifestPath = this.assertCanonicalPathInRoot(directory, path.join(directory, "package.json"));
+        if (!fs.lstatSync(manifestPath).isFile()) continue;
+        const validation = validateVsixManifest(JSON.parse(fs.readFileSync(manifestPath, "utf8")));
+        if (!validation.valid || !validation.manifest) continue;
+        const manifest = validation.manifest;
+        if (entry.name !== `${formatExtensionIdentifier(manifest.publisher, manifest.name)}-${manifest.version}`) continue;
+        const previous = this.extensions.get(formatExtensionIdentifier(manifest.publisher, manifest.name));
+        if (previous && compareVersions(previous.manifest.version, manifest.version) >= 0) continue;
+        const registration = this.inspectExtensionFromDirectory(directory, true);
+        this.extensions.set(registration.id, registration);
+      } catch {
+        // Incomplete or invalid installations are not added to the catalog.
+      }
+    }
+  }
+
   async ping(): Promise<{ pong: true }> {
     return this.sendRequest<{ pong: true }>({ kind: "ping" });
   }
@@ -333,6 +433,16 @@ export class IsolatedExtensionHost {
    * Registra uma extensão inspecionando o package.json no diretório fornecido.
    */
   registerExtensionFromDirectory(extensionDirectory: string): ExtensionRegistration {
+    const registration = this.inspectExtensionFromDirectory(extensionDirectory);
+    const existing = this.extensions.get(registration.id);
+    if (existing && !["unloaded", "deactivated", "failed"].includes(existing.state)) {
+      throw new ProtocolError(PROTOCOL_ERROR_CODES.CONFLICT, "Extensão em execução ou transição.");
+    }
+    this.extensions.set(registration.id, registration);
+    return registration;
+  }
+
+  private inspectExtensionFromDirectory(extensionDirectory: string, isVsix = false): ExtensionRegistration {
     if (typeof extensionDirectory !== "string" || !extensionDirectory.trim()) {
       throw new ProtocolError(
         PROTOCOL_ERROR_CODES.INVALID_STATE,
@@ -355,7 +465,8 @@ export class IsolatedExtensionHost {
 
     let manifestRaw: unknown;
     try {
-      const content = fs.readFileSync(packageJsonPath, "utf8");
+      const canonicalManifest = this.assertCanonicalPathInRoot(canonicalExtDir, packageJsonPath);
+      const content = fs.readFileSync(canonicalManifest, "utf8");
       manifestRaw = JSON.parse(content);
     } catch (err) {
       throw new ProtocolError(
@@ -376,12 +487,15 @@ export class IsolatedExtensionHost {
     const manifest = validation.manifest;
     const extensionId = formatExtensionIdentifier(manifest.publisher, manifest.name);
 
-    const mainRelative = manifest.main ?? "index.js";
-    const mainCandidate = path.resolve(canonicalExtDir, mainRelative);
-    const mainAbsolutePath = this.assertCanonicalPathInRoot(
-      canonicalExtDir,
-      mainCandidate,
-    );
+    let mainAbsolutePath: string | undefined;
+    const main = manifest.main ?? (isVsix ? undefined : "index.js");
+    if (main !== undefined) {
+      const mainCandidate = path.resolve(canonicalExtDir, main);
+      mainAbsolutePath = this.assertCanonicalPathInRoot(canonicalExtDir, mainCandidate);
+      if (!fs.statSync(mainAbsolutePath).isFile()) {
+        throw new ProtocolError(PROTOCOL_ERROR_CODES.INVALID_STATE, "Ponto de entrada não é arquivo regular.");
+      }
+    }
 
     const registration: ExtensionRegistration = {
       id: extensionId,
@@ -392,8 +506,83 @@ export class IsolatedExtensionHost {
       registeredCommands: manifest.contributes?.commands?.map((c) => c.command) ?? [],
     };
 
-    this.extensions.set(extensionId, registration);
     return registration;
+  }
+
+  /**
+   * Instala um pacote VSIX local na pasta de extensões configurada,
+   * valida a integridade do manifesto e do bundle, registra no catálogo e notifica os listeners.
+   * Retorna a versão selecionada no catálogo deste host, que pode ser superior à publicada.
+   * Outros hosts existentes não são sincronizados; ao iniciar, cada host seleciona o maior SemVer publicado.
+   * Falha operacional após commit retorna publicação e instrução de recuperação, sem rollback.
+   */
+  async installVsix(vsixPath: string): Promise<VsixInstallResult> {
+    if (this.terminated) {
+      throw new ProtocolError(
+        PROTOCOL_ERROR_CODES.INVALID_STATE,
+        "Extension host já foi encerrado.",
+      );
+    }
+
+    if (typeof vsixPath !== "string" || !vsixPath.trim()) {
+      throw new ProtocolError(
+        PROTOCOL_ERROR_CODES.INVALID_STATE,
+        "Caminho do arquivo VSIX é obrigatório.",
+      );
+    }
+
+    let installingId: string | undefined;
+    let candidate: ExtensionRegistration | undefined;
+    try {
+      const { registrationDir, manifest, extensionId, version } =
+        await installVsixPackage(vsixPath, this.config.extensionsDirectory, (directory) => {
+          candidate = this.inspectExtensionFromDirectory(directory, true);
+          const existing = this.extensions.get(candidate.id);
+          if (this.installing.has(candidate.id) ||
+              (existing && !["unloaded", "deactivated", "failed"].includes(existing.state))) {
+            throw new ProtocolError(PROTOCOL_ERROR_CODES.CONFLICT, "Extensão em execução ou transição.");
+          }
+          this.installing.add(candidate.id);
+          installingId = candidate.id;
+        });
+      try {
+        const previous = this.extensions.get(extensionId);
+        const registration = previous && compareVersions(previous.manifest.version, version) >= 0
+          ? previous
+          : candidate as ExtensionRegistration;
+        if (registration !== previous) {
+          this.extensions.set(extensionId, registration);
+        }
+
+        for (const listener of this.listeners) {
+          try {
+            listener({
+              eventType: "extensionInstalled",
+              payload: {
+                extensionId,
+                version,
+                extensionPath: registrationDir,
+                manifest,
+              },
+            });
+          } catch (error) {
+            process.emitWarning(`Falha ao notificar instalação de ${extensionId}: ${String(error)}`);
+          }
+        }
+
+        return registration;
+      } catch (error) {
+        return {
+          ...(candidate as ExtensionRegistration),
+          status: "published_recovery_required",
+          publication: { extensionId, version },
+          warning: `Pacote publicado; atualização local incompleta: ${error instanceof Error ? error.message : String(error)}`,
+          recovery: "restart_host",
+        };
+      }
+    } finally {
+      if (installingId) this.installing.delete(installingId);
+    }
   }
 
   getExtension(extensionId: string): ExtensionRegistration | undefined {
@@ -413,7 +602,13 @@ export class IsolatedExtensionHost {
     apiVersion: string;
     exports: unknown;
   }> {
+    if (this.terminated) {
+      throw new ProtocolError(PROTOCOL_ERROR_CODES.INVALID_STATE, "Extension host já foi encerrado.");
+    }
     const canonicalId = extensionId.toLowerCase();
+    if (this.installing.has(canonicalId)) {
+      throw new ProtocolError(PROTOCOL_ERROR_CODES.CONFLICT, "Instalação da extensão em andamento.");
+    }
     const registration = this.extensions.get(canonicalId);
     if (!registration) {
       throw new ProtocolError(
@@ -422,7 +617,7 @@ export class IsolatedExtensionHost {
       );
     }
 
-    if (registration.state === "active") {
+    if (["active", "loading", "deactivating"].includes(registration.state)) {
       throw new ProtocolError(
         PROTOCOL_ERROR_CODES.INVALID_STATE,
         `Extensão '${extensionId}' já está ativa.`,
@@ -430,6 +625,11 @@ export class IsolatedExtensionHost {
     }
 
     registration.state = "loading";
+    if (registration.mainAbsolutePath === undefined) {
+      registration.state = "active";
+      registration.activatedAt = Date.now();
+      return { extensionId: canonicalId, activated: true, apiVersion: FROZEN_EXTENSION_API_VERSION, exports: undefined };
+    }
     let worker = this.extensionWorkers.get(canonicalId);
     try {
       if (!worker) {
@@ -455,6 +655,7 @@ export class IsolatedExtensionHost {
       registration.activatedAt = Date.now();
       return result;
     } catch (err) {
+      await this.discardExtensionWorker(canonicalId);
       registration.state = "failed";
       registration.lastError = (err as Error).message;
       throw err;
@@ -493,7 +694,13 @@ export class IsolatedExtensionHost {
     extensionId: string;
     deactivated: true;
   }> {
+    if (this.terminated) {
+      throw new ProtocolError(PROTOCOL_ERROR_CODES.INVALID_STATE, "Extension host já foi encerrado.");
+    }
     const canonicalId = extensionId.toLowerCase();
+    if (this.installing.has(canonicalId)) {
+      throw new ProtocolError(PROTOCOL_ERROR_CODES.CONFLICT, "Instalação da extensão em andamento.");
+    }
     const registration = this.extensions.get(canonicalId);
     if (!registration) {
       throw new ProtocolError(
@@ -510,6 +717,11 @@ export class IsolatedExtensionHost {
     }
 
     registration.state = "deactivating";
+    if (registration.mainAbsolutePath === undefined) {
+      registration.state = "deactivated";
+      registration.deactivatedAt = Date.now();
+      return { extensionId: canonicalId, deactivated: true };
+    }
     try {
       const result = await this.sendRequest<{
         extensionId: string;
@@ -520,18 +732,11 @@ export class IsolatedExtensionHost {
       }, this.extensionWorkers.get(canonicalId));
 
       registration.state = "deactivated";
-      for (const [command, owner] of this.commands) {
-        if (owner === canonicalId) this.commands.delete(command);
-      }
-      for (const [id, reg] of Array.from(this.completionProviders.entries())) {
-        if (reg.extensionId === canonicalId) this.completionProviders.delete(id);
-      }
-      for (const [id, reg] of Array.from(this.hoverProviders.entries())) {
-        if (reg.extensionId === canonicalId) this.hoverProviders.delete(id);
-      }
+      this.clearExtensionRegistrations(canonicalId);
       registration.deactivatedAt = Date.now();
       return result;
     } catch (err) {
+      await this.discardExtensionWorker(canonicalId);
       registration.state = "failed";
       registration.lastError = (err as Error).message;
       throw err;

@@ -124,7 +124,15 @@ export interface ExtensionModule {
   deactivate?(): Promise<void> | void;
 }
 
-export function validateExtensionManifest(candidate: unknown): {
+export interface ValidateExtensionManifestOptions {
+  requireEngines?: boolean;
+  requireMain?: boolean;
+}
+
+export function validateExtensionManifest(
+  candidate: unknown,
+  options?: ValidateExtensionManifestOptions,
+): {
   valid: boolean;
   manifest?: ExtensionManifest;
   error?: ProtocolError;
@@ -140,6 +148,32 @@ export function validateExtensionManifest(candidate: unknown): {
   }
 
   const raw = candidate as Record<string, unknown>;
+  const isObject = (value: unknown): value is Record<string, unknown> =>
+    typeof value === "object" && value !== null && !Array.isArray(value);
+  const invalidField = (field: string) => ({
+    valid: false,
+    error: new ProtocolError(PROTOCOL_ERROR_CODES.INVALID_STATE, `Manifesto inválido: '${field}' possui formato inválido.`),
+  });
+  for (const field of ["displayName", "description", "main"] as const) {
+    if (raw[field] !== undefined && typeof raw[field] !== "string") return invalidField(field);
+  }
+  if (raw.activationEvents !== undefined &&
+      (!Array.isArray(raw.activationEvents) || raw.activationEvents.some((event) => typeof event !== "string"))) {
+    return invalidField("activationEvents");
+  }
+  if (raw.engines !== undefined && (!isObject(raw.engines) ||
+      ["vscode", "openagent"].some((key) => raw.engines !== undefined &&
+        isObject(raw.engines) && raw.engines[key] !== undefined && typeof raw.engines[key] !== "string"))) {
+    return invalidField("engines");
+  }
+  if (raw.contributes !== undefined) {
+    if (!isObject(raw.contributes)) return invalidField("contributes");
+    const commands = raw.contributes.commands;
+    if (commands !== undefined && (!Array.isArray(commands) ||
+        commands.some((entry) => !isObject(entry) || typeof entry.command !== "string" || !entry.command.trim()))) {
+      return invalidField("contributes.commands");
+    }
+  }
   const name = typeof raw.name === "string" ? raw.name.trim() : "";
   const publisher = typeof raw.publisher === "string" ? raw.publisher.trim() : "";
   const version = typeof raw.version === "string" ? raw.version.trim() : "";
@@ -154,6 +188,53 @@ export function validateExtensionManifest(candidate: unknown): {
     };
   }
 
+  const enginesRaw =
+    typeof raw.engines === "object" && raw.engines !== null
+      ? (raw.engines as Record<string, unknown>)
+      : undefined;
+  const engines = enginesRaw
+    ? {
+        vscode:
+          typeof enginesRaw.vscode === "string" && enginesRaw.vscode.trim()
+            ? enginesRaw.vscode.trim()
+            : undefined,
+        openagent:
+          typeof enginesRaw.openagent === "string" && enginesRaw.openagent.trim()
+            ? enginesRaw.openagent.trim()
+            : undefined,
+      }
+    : undefined;
+
+  if (options?.requireEngines) {
+    if (!engines || (!engines.vscode && !engines.openagent)) {
+      return {
+        valid: false,
+        error: new ProtocolError(
+          PROTOCOL_ERROR_CODES.INVALID_STATE,
+          "Manifesto inválido: 'engines' deve especificar compatibilidade com 'vscode' ou 'openagent'.",
+        ),
+      };
+    }
+  }
+
+  const main = typeof raw.main === "string" && raw.main.trim() ? raw.main.trim() : undefined;
+  if (raw.main !== undefined && !main) return invalidField("main");
+  if (main?.includes("\0")) {
+    return {
+      valid: false,
+      error: new ProtocolError(PROTOCOL_ERROR_CODES.INVALID_STATE, "Manifesto inválido: 'main' contém caractere nulo."),
+    };
+  }
+  if (options?.requireMain && !main) {
+    return {
+      valid: false,
+      error: new ProtocolError(
+        PROTOCOL_ERROR_CODES.INVALID_STATE,
+        "Manifesto inválido: campo 'main' é obrigatório.",
+      ),
+    };
+  }
+
   const activationEvents = Array.isArray(raw.activationEvents)
     ? raw.activationEvents.filter((item): item is string => typeof item === "string")
     : undefined;
@@ -164,14 +245,36 @@ export function validateExtensionManifest(candidate: unknown): {
     version,
     displayName: typeof raw.displayName === "string" ? raw.displayName : undefined,
     description: typeof raw.description === "string" ? raw.description : undefined,
-    main: typeof raw.main === "string" ? raw.main : undefined,
+    main,
     activationEvents,
-    contributes: typeof raw.contributes === "object" && raw.contributes !== null
-      ? (raw.contributes as ExtensionManifestContributions)
-      : undefined,
+    contributes:
+      typeof raw.contributes === "object" && raw.contributes !== null
+        ? (raw.contributes as ExtensionManifestContributions)
+        : undefined,
+    engines,
   };
 
   return { valid: true, manifest };
+}
+
+export function validateVsixManifest(
+  candidate: unknown,
+  options?: ValidateExtensionManifestOptions,
+): {
+  valid: boolean;
+  manifest?: ExtensionManifest;
+  error?: ProtocolError;
+} {
+  const result = validateExtensionManifest(candidate, {
+    requireEngines: options?.requireEngines ?? true,
+    requireMain: options?.requireMain ?? false,
+  });
+  if (result.manifest && (!/^[a-z0-9][a-z0-9-]*$/i.test(result.manifest.name) ||
+      !/^[a-z0-9][a-z0-9-]*$/i.test(result.manifest.publisher) ||
+      !/^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-(?:0|[1-9]\d*|\d*[A-Za-z-][0-9A-Za-z-]*)(?:\.(?:0|[1-9]\d*|\d*[A-Za-z-][0-9A-Za-z-]*))*)?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/.test(result.manifest.version))) {
+    return { valid: false, error: new ProtocolError(PROTOCOL_ERROR_CODES.INVALID_STATE, "Identidade ou versão da extensão inválida.") };
+  }
+  return result;
 }
 
 export function formatExtensionIdentifier(publisher: string, name: string): string {
