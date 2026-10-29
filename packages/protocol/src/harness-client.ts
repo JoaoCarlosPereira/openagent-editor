@@ -84,6 +84,7 @@ export interface HarnessClient {
   createSession(input: CreateSession): Promise<Session>;
   startRun(input: StartRun): AsyncIterable<HarnessEvent>;
   enqueue(runId: string, input: UserInput): Promise<QueueItem>;
+  invokeTool?(runId: string, input: RpcParamsMap[typeof RPC_METHOD.TOOL_INVOKE]): Promise<RpcResultMap[typeof RPC_METHOD.TOOL_INVOKE]>;
   decide(requestId: string, decision: GrantDecision): Promise<void>;
   cancel(runId: string, agentId?: string): Promise<void>;
   restore(checkpointId: string): Promise<RestoreResult>;
@@ -278,6 +279,8 @@ class TransportHarnessClient implements HarnessClient {
   }
 
   private async *iterateRunStart(input: StartRun): AsyncGenerator<HarnessEvent> {
+    this.activeSessionId = input.sessionId;
+    this.activeRunId = input.runId;
     const requestId = randomUUID();
     await this.sendRpcEnvelope(
       RPC_METHOD.RUN_START,
@@ -336,6 +339,12 @@ class TransportHarnessClient implements HarnessClient {
       { permissionRequestId: requestId, decision },
       { requestId },
     );
+  }
+
+  async invokeTool(runId: string, input: RpcParamsMap[typeof RPC_METHOD.TOOL_INVOKE]): Promise<RpcResultMap[typeof RPC_METHOD.TOOL_INVOKE]> {
+    const result = await this.callRpc(RPC_METHOD.TOOL_INVOKE, input, { runId });
+    this.activeRunId = runId;
+    return result;
   }
 
   async cancel(runId: string, agentId?: string): Promise<void> {

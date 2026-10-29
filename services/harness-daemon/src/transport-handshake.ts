@@ -16,6 +16,7 @@ import { RunMessageQueue } from "./queue/run-message-queue.js";
 import { RunStateMachine } from "./state/run-state-machine.js";
 import { serveRpcOnConnection } from "./rpc-connection.js";
 import { createWorkspaceCustomizationRules } from "./customization/session-rules-loader.js";
+import { BrowserSessionRegistry } from "./runs/browser-session-registry.js";
 import type { DaemonRpcContext } from "./runs/run-rpc-handler.js";
 
 export async function performServerTransportHandshake(
@@ -98,6 +99,7 @@ export async function performServerTransportHandshake(
     customizationRules: createWorkspaceCustomizationRules(),
     runMachines: new Map<string, RunStateMachine>(),
     runQueues: new Map<string, RunMessageQueue>(),
+    browserSessions: new BrowserSessionRegistry(),
   };
   await serveRpcOnConnection(socket, rpcContext);
 }
