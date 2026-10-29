@@ -26,6 +26,7 @@ export interface ExtensionManifest {
   version: string;
   displayName?: string;
   description?: string;
+  icon?: string;
   main?: string;
   activationEvents?: string[];
   contributes?: ExtensionManifestContributions;
@@ -154,7 +155,7 @@ export function validateExtensionManifest(
     valid: false,
     error: new ProtocolError(PROTOCOL_ERROR_CODES.INVALID_STATE, `Manifesto inválido: '${field}' possui formato inválido.`),
   });
-  for (const field of ["displayName", "description", "main"] as const) {
+  for (const field of ["displayName", "description", "icon", "main"] as const) {
     if (raw[field] !== undefined && typeof raw[field] !== "string") return invalidField(field);
   }
   if (raw.activationEvents !== undefined &&
@@ -245,6 +246,7 @@ export function validateExtensionManifest(
     version,
     displayName: typeof raw.displayName === "string" ? raw.displayName : undefined,
     description: typeof raw.description === "string" ? raw.description : undefined,
+    icon: typeof raw.icon === "string" ? raw.icon : undefined,
     main,
     activationEvents,
     contributes:

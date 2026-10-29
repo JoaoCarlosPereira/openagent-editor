@@ -129,3 +129,11 @@ test("validação preserva contribuições adicionais e títulos localizados", (
   assert.equal(result.valid, true);
   assert.deepEqual(result.manifest?.contributes, contributes);
 });
+
+test("[LOC-01] validateExtensionManifest preserva icon e recusa icon nao textual", () => {
+  const base = { name: "sample", publisher: "openagent", version: "1.0.0" };
+  assert.equal(validateExtensionManifest({ ...base, icon: "media/icon.svg" }).manifest?.icon, "media/icon.svg");
+  const invalid = validateExtensionManifest({ ...base, icon: 42 });
+  assert.equal(invalid.valid, false);
+  assert.equal(invalid.error?.code, PROTOCOL_ERROR_CODES.INVALID_STATE);
+});
