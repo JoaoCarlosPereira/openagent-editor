@@ -17,6 +17,7 @@ import {
 } from "@openagent/protocol";
 
 import { installVsixPackage } from "./vsix-installer.js";
+import { withGalleryVsix } from "./gallery.js";
 
 import type {
   ExtensionHostConfig,
@@ -583,6 +584,11 @@ export class IsolatedExtensionHost {
     } finally {
       if (installingId) this.installing.delete(installingId);
     }
+  }
+
+  async installFromGallery(identifier: string, options: { version?: string; galleryUrl?: string } = {}): Promise<VsixInstallResult> {
+    if (this.terminated) throw new ProtocolError(PROTOCOL_ERROR_CODES.INVALID_STATE, "Extension host já foi encerrado.");
+    return withGalleryVsix(identifier, options.version, options.galleryUrl, (file) => this.installVsix(file));
   }
 
   getExtension(extensionId: string): ExtensionRegistration | undefined {
