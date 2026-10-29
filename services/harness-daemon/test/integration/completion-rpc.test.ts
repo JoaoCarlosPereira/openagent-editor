@@ -274,6 +274,82 @@ test.describe("completion.start/cancel no daemon (TAB-01)", { concurrency: 1 }, 
     }
   });
 
+  test("[TAB-01] cancel com workspace divergente não aborta geração ativa", async () => {
+    const h = await setup();
+    try {
+      const stream = h.client.startCompletion({
+        sessionId: h.sessionId,
+        runId: h.runId,
+        completionId: "c-wrong-workspace",
+        prefix: "x",
+      });
+      const collected = collect(stream);
+      await waitFor(() => persistedCompletionTypes(h, "c-wrong-workspace").includes(COMPLETION_EVENT_TYPE.STARTED));
+
+      const otherWorkspace = await connectHarnessClient({
+        address: h.address,
+        workspaceHello: { ...WORKSPACE, workspaceId: "ws-divergente" },
+      });
+      try {
+        await assert.rejects(
+          otherWorkspace.cancelCompletion({
+            sessionId: h.sessionId,
+            runId: h.runId,
+            completionId: "c-wrong-workspace",
+          }),
+          { code: PROTOCOL_ERROR_CODES.INVALID_STATE },
+        );
+      } finally {
+        otherWorkspace.close();
+      }
+      assert.equal(h.source.calls[0]?.signal.aborted, false);
+      assert.deepEqual(persistedCompletionTypes(h, "c-wrong-workspace"), [COMPLETION_EVENT_TYPE.STARTED]);
+
+      h.source.push("c-wrong-workspace", "ok");
+      h.source.push("c-wrong-workspace", "end");
+      assert.equal((await collected).at(-1)?.payload.type, COMPLETION_EVENT_TYPE.COMPLETED);
+      assert.equal(h.source.calls[0]?.signal.aborted, true);
+    } finally {
+      await h.stop();
+    }
+  });
+
+  test("[TAB-01] cancel com run divergente não aborta geração ativa", async () => {
+    const h = await setup();
+    try {
+      const stream = h.client.startCompletion({
+        sessionId: h.sessionId,
+        runId: h.runId,
+        completionId: "c-wrong-run",
+        prefix: "x",
+      });
+      const collected = collect(stream);
+      await waitFor(() => persistedCompletionTypes(h, "c-wrong-run").includes(COMPLETION_EVENT_TYPE.STARTED));
+
+      await assert.rejects(
+        h.client.cancelCompletion({
+          sessionId: h.sessionId,
+          runId: "run-divergente",
+          completionId: "c-wrong-run",
+        }),
+        { code: PROTOCOL_ERROR_CODES.INVALID_STATE },
+      );
+      assert.equal(h.source.calls[0]?.signal.aborted, false);
+      assert.deepEqual(persistedCompletionTypes(h, "c-wrong-run"), [COMPLETION_EVENT_TYPE.STARTED]);
+
+      h.source.push("c-wrong-run", "ok");
+      h.source.push("c-wrong-run", "end");
+      assert.equal((await collected).at(-1)?.payload.type, COMPLETION_EVENT_TYPE.COMPLETED);
+      assert.deepEqual(persistedCompletionTypes(h, "c-wrong-run"), [
+        COMPLETION_EVENT_TYPE.STARTED,
+        COMPLETION_EVENT_TYPE.DELTA,
+        COMPLETION_EVENT_TYPE.COMPLETED,
+      ]);
+    } finally {
+      await h.stop();
+    }
+  });
+
   test("[TAB-01] erro de estado da fonte não vira incomplete retryable", async () => {
     const h = await setup();
     try {
