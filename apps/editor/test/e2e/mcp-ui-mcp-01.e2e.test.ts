@@ -1,11 +1,14 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-
-import { execPath } from "node:process";
+import { fileURLToPath } from "node:url";
 
 import { ProtocolError } from "@openagent/protocol";
 import { McpToolController } from "../../src/index.js";
 import type { McpToolView } from "../../src/mcp/mcp-tool-list-view.js";
+
+const fixturePath = fileURLToPath(
+  new URL("../fixtures/mcp-stdio-discovery-server.mjs", import.meta.url),
+);
 
 describe("MCP-01 e2e — MCP pela UI: configurar, listar ferramentas e ver resultado", () => {
   it("[MCP-01] QUANDO configura servidor MCP stdio ENTÃO view de configuração é criada", () => {
@@ -101,7 +104,8 @@ describe("MCP-01 e2e — MCP pela UI: configurar, listar ferramentas e ver resul
     controller.configure({
       kind: "stdio",
       serverId: "ui-fixture-stdio",
-      command: execPath,
+      command: "node",
+      args: [fixturePath],
     });
 
     // Descobrir (fixtures real server via stdio)
@@ -154,7 +158,8 @@ describe("MCP-01 e2e — MCP pela UI: configurar, listar ferramentas e ver resul
     controller.configure({
       kind: "stdio",
       serverId: "ui-fixture-stdio-2",
-      command: execPath,
+      command: "node",
+      args: [fixturePath],
     });
 
     // Descobrir
@@ -195,7 +200,8 @@ describe("MCP-01 e2e — MCP pela UI: configurar, listar ferramentas e ver resul
     controller.configure({
       kind: "stdio",
       serverId: "ui-fixture-stdio-3",
-      command: execPath,
+      command: "node",
+      args: [fixturePath],
     });
     await controller.discoverTools();
 
@@ -211,12 +217,13 @@ describe("MCP-01 e2e — MCP pela UI: configurar, listar ferramentas e ver resul
     assert.equal(result.displayText, "8");
   });
 
-  it("[MCP-01] caminho de erro: entrada inválida retorna INVALID_STATE sem efeito colateral", () => {
+  it("[MCP-01] caminho de erro: entrada inválida retorna INVALID_STATE sem efeito colateral", async () => {
     const controller = new McpToolController();
     controller.configure({
       kind: "stdio",
       serverId: "err-server",
-      command: "echo",
+      command: "node",
+      args: [],
     });
 
     // Tool inválida (não lista)
@@ -227,8 +234,8 @@ describe("MCP-01 e2e — MCP pela UI: configurar, listar ferramentas e ver resul
     );
 
     // Sem permissão pendente
-    assert.throws(
-      () => controller.decideAndRun({ decision: "allow" }),
+    await assert.rejects(
+      controller.decideAndRun({ decision: "allow" }),
       (error: unknown) =>
         error instanceof ProtocolError && error.code === "INVALID_STATE",
     );
