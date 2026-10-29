@@ -16,12 +16,13 @@ import { RunMessageQueue } from "./queue/run-message-queue.js";
 import { RunStateMachine } from "./state/run-state-machine.js";
 import { serveRpcOnConnection } from "./rpc-connection.js";
 import { createWorkspaceCustomizationRules } from "./customization/session-rules-loader.js";
+import type { CompletionTextSource } from "./completion/completion-source.js";
 import type { DaemonRpcContext } from "./runs/run-rpc-handler.js";
 
 export async function performServerTransportHandshake(
   socket: net.Socket,
   resolveWorkspace: (hello: WorkspaceTransportHello) => WorkspaceBindingState,
-  options: { dataRoot: string },
+  options: { dataRoot: string; completionSource?: CompletionTextSource },
 ): Promise<void> {
   const versionFrame = await readProtocolFrame(socket);
   const versionParsed = JSON.parse(versionFrame.toString("utf8")) as unknown;
@@ -98,6 +99,7 @@ export async function performServerTransportHandshake(
     customizationRules: createWorkspaceCustomizationRules(),
     runMachines: new Map<string, RunStateMachine>(),
     runQueues: new Map<string, RunMessageQueue>(),
+    ...(options.completionSource ? { completionSource: options.completionSource } : {}),
   };
   await serveRpcOnConnection(socket, rpcContext);
 }

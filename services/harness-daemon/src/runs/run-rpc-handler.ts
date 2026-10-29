@@ -27,12 +27,15 @@ import {
 import { RunStateMachine } from "../state/run-state-machine.js";
 import type { RunLifecycleState } from "../state/run-state.js";
 import type { SessionRpcContext } from "../sessions/session-rpc-handler.js";
+import type { CompletionTextSource } from "../completion/completion-source.js";
 
 export type DaemonRpcContext = SessionRpcContext & {
   /** Máquinas de estado por runId na conexão (STA-01). */
   runMachines: Map<string, RunStateMachine>;
   /** Filas em memória por runId (AGT-06), sincronizadas com SQLite. */
   runQueues: Map<string, RunMessageQueue>;
+  /** Fonte de texto do completion (TAB-01); omitida usa o CLIProxyAPI do perfil do workspace. */
+  completionSource?: CompletionTextSource;
 };
 
 export { consumePendingRunQueueAtRunEnd };

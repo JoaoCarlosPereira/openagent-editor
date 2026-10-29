@@ -87,3 +87,14 @@ export {
   invokeWorkspaceLocalCustomization,
   type InvokeWorkspaceLocalCustomizationInput,
 } from "./customization/local-customization-invocation.js";
+
+export {
+  abortAllCompletions,
+  createCliProxyCompletionSource,
+  readCompletionSnapshot,
+  runCompletionCancel,
+  runCompletionStart,
+  type CompletionSnapshot,
+  type CompletionSourceInput,
+  type CompletionTextSource,
+} from "./completion/index.js";

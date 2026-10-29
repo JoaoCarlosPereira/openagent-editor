@@ -9,6 +9,7 @@ import {
   buildProtocolTransportErrorFrame,
   buildWorkspaceTransportAck,
   connectLocalTransport,
+  encodeProtocolFrame,
   listenLocalTransport,
   readProtocolFrame,
   resolveLocalTransportAddress,
@@ -26,6 +27,49 @@ const SAMPLE_HELLO = {
   mcpServerIds: ["mem0-local", "filesystem"],
   sessionIds: ["ses-main", "ses-side"],
 };
+
+test("frames agrupados e fragmentados são preservados entre leituras", async () => {
+  const runtimeDir = await mkdtemp(path.join(os.tmpdir(), "openagent-frames-"));
+  const address = resolveLocalTransportAddress(runtimeDir, "frames");
+  const server = await listenLocalTransport(address, async (socket) => {
+    const frames = Buffer.concat([
+      encodeProtocolFrame(Buffer.from("um")),
+      encodeProtocolFrame(Buffer.from("dois")),
+      encodeProtocolFrame(Buffer.from("três")),
+    ]);
+    socket.write(frames.subarray(0, frames.length - 2));
+    socket.end(frames.subarray(frames.length - 2));
+  });
+  const client = await connectLocalTransport(address);
+  try {
+    const first = await readProtocolFrame(client);
+    const second = await readProtocolFrame(client);
+    const third = await readProtocolFrame(client);
+    assert.deepEqual([first.toString(), second.toString(), third.toString()], ["um", "dois", "três"]);
+  } finally {
+    client.destroy();
+    await server.close();
+    await rm(runtimeDir, { recursive: true, force: true });
+  }
+});
+
+test("leituras concorrentes recebem frames na ordem e rejeitam no fechamento", async () => {
+  const runtimeDir = await mkdtemp(path.join(os.tmpdir(), "openagent-frames-"));
+  const address = resolveLocalTransportAddress(runtimeDir, "concurrent");
+  const server = await listenLocalTransport(address, (socket) => {
+    socket.end(Buffer.concat([encodeProtocolFrame(Buffer.from("a")), encodeProtocolFrame(Buffer.from("b"))]));
+  });
+  const client = await connectLocalTransport(address);
+  try {
+    const [first, second] = await Promise.all([readProtocolFrame(client), readProtocolFrame(client)]);
+    assert.deepEqual([first.toString(), second.toString()], ["a", "b"]);
+    await assert.rejects(readProtocolFrame(client), { code: PROTOCOL_ERROR_CODES.INVALID_STATE });
+  } finally {
+    client.destroy();
+    await server.close();
+    await rm(runtimeDir, { recursive: true, force: true });
+  }
+});
 
 test("[CLI-01] transporte local com framing reutiliza provedor, modo, regras, MCP e sessões do workspace", async () => {
   const runtimeDir = await mkdtemp(path.join(os.tmpdir(), "openagent-transport-"));

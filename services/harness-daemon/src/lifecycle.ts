@@ -1,3 +1,4 @@
+import type { CompletionTextSource } from "./completion/completion-source.js";
 import type { UserDaemonLock } from "./user-lock.js";
 import { acquireUserDaemonLock } from "./user-lock.js";
 import {
@@ -23,6 +24,8 @@ export type StartHarnessDaemonOptions = {
   runtimeDirectory?: string;
   instanceId?: string;
   drainTimeoutMs?: number;
+  /** Fonte de texto do completion (TAB-01); testes injetam uma fonte controlada. */
+  completionSource?: CompletionTextSource;
 };
 
 export async function startHarnessDaemon(
@@ -37,6 +40,7 @@ export async function startHarnessDaemon(
     dataRoot,
     instanceId: options.instanceId,
     drainTimeoutMs: options.drainTimeoutMs,
+    completionSource: options.completionSource,
   });
 
   let stopped = false;

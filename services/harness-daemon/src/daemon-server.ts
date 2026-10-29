@@ -1,5 +1,6 @@
 import type net from "node:net";
 import { listenLocalTransport, type LocalTransportServer } from "@openagent/protocol";
+import type { CompletionTextSource } from "./completion/completion-source.js";
 import { performServerTransportHandshake } from "./transport-handshake.js";
 import { WorkspaceStateRegistry } from "./workspace-state.js";
 import { resolveHarnessDaemonAddress } from "./runtime-paths.js";
@@ -14,6 +15,7 @@ export type StartHarnessDaemonServerOptions = {
   dataRoot: string;
   instanceId?: string;
   drainTimeoutMs?: number;
+  completionSource?: CompletionTextSource;
 };
 
 const DEFAULT_DRAIN_TIMEOUT_MS = 2_000;
@@ -47,7 +49,7 @@ export async function startHarnessDaemonServer(
         await performServerTransportHandshake(
           socket,
           (hello) => registry.upsertFromHello(hello),
-          { dataRoot: options.dataRoot },
+          { dataRoot: options.dataRoot, completionSource: options.completionSource },
         );
       } catch {
         socket.destroy();

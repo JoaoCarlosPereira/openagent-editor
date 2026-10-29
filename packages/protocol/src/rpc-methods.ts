@@ -33,6 +33,8 @@ export const RPC_METHOD = {
   CONTEXT_INDEX: "context.index",
   CONTEXT_SEARCH: "context.search",
   CONTEXT_CLEAR: "context.clear",
+  COMPLETION_START: "completion.start",
+  COMPLETION_CANCEL: "completion.cancel",
   EXTENSION_INSTALL: "extension.install",
   EXTENSION_ENABLE: "extension.enable",
   EXTENSION_DISABLE: "extension.disable",
@@ -239,6 +241,43 @@ export interface ContextClearResult {
   size: ContextClearIndexSize;
 }
 
+export type CompletionKind = "line" | "block";
+
+/** Estado observável de um pedido de completion no daemon (TAB-01). */
+export type CompletionState = "running" | "completed" | "cancelled" | "incomplete";
+
+/**
+ * Pedido de completion por stream (TAB-01). `completionId` é a identidade estável do pedido:
+ * repetir o mesmo id após `incomplete` é retry idempotente; após `completed`, replay sem regerar.
+ */
+export interface CompletionStartParams {
+  completionId: string;
+  prefix: string;
+  suffix?: string;
+  language?: string;
+  kind?: CompletionKind;
+}
+
+export interface CompletionCancelParams {
+  completionId: string;
+}
+
+/** Resultado entregue em `rpc.stream.end` ao encerrar o stream de completion. */
+export interface CompletionStartResult {
+  completionId: string;
+  state: CompletionState;
+  attempt: number;
+  /** true quando o resultado terminal persistido foi reapresentado sem nova geração. */
+  replayed?: boolean;
+}
+
+export interface CompletionCancelResult {
+  completionId: string;
+  state: CompletionState;
+  /** true somente quando esta chamada interrompeu uma geração em andamento. */
+  cancelled: boolean;
+}
+
 export interface ExtensionInstallParams {
   packageRef: string;
 }
@@ -276,6 +315,8 @@ export interface RpcParamsMap {
   [RPC_METHOD.CONTEXT_INDEX]: ContextIndexParams;
   [RPC_METHOD.CONTEXT_SEARCH]: ContextSearchParams;
   [RPC_METHOD.CONTEXT_CLEAR]: ContextClearParams;
+  [RPC_METHOD.COMPLETION_START]: CompletionStartParams;
+  [RPC_METHOD.COMPLETION_CANCEL]: CompletionCancelParams;
   [RPC_METHOD.EXTENSION_INSTALL]: ExtensionInstallParams;
   [RPC_METHOD.EXTENSION_ENABLE]: ExtensionEnableParams;
   [RPC_METHOD.EXTENSION_DISABLE]: ExtensionDisableParams;
@@ -312,6 +353,8 @@ export interface RpcResultMap {
   [RPC_METHOD.CONTEXT_INDEX]: { indexed: number };
   [RPC_METHOD.CONTEXT_SEARCH]: { hits: Array<{ ref: string; score: number }> };
   [RPC_METHOD.CONTEXT_CLEAR]: ContextClearResult;
+  [RPC_METHOD.COMPLETION_START]: CompletionStartResult;
+  [RPC_METHOD.COMPLETION_CANCEL]: CompletionCancelResult;
   [RPC_METHOD.EXTENSION_INSTALL]: { extensionId: string };
   [RPC_METHOD.EXTENSION_ENABLE]: { enabled: true };
   [RPC_METHOD.EXTENSION_DISABLE]: { disabled: true };
@@ -444,6 +487,16 @@ export const RPC_METHOD_SPECS: Record<RpcMethod, RpcMethodSpec> = {
   [RPC_METHOD.CONTEXT_CLEAR]: {
     method: RPC_METHOD.CONTEXT_CLEAR,
     capability: "context.write",
+    workspaceBindings: ["sessions"],
+  },
+  [RPC_METHOD.COMPLETION_START]: {
+    method: RPC_METHOD.COMPLETION_START,
+    capability: "completion.stream",
+    workspaceBindings: ["provider", "rules", "sessions"],
+  },
+  [RPC_METHOD.COMPLETION_CANCEL]: {
+    method: RPC_METHOD.COMPLETION_CANCEL,
+    capability: "completion.cancel",
     workspaceBindings: ["sessions"],
   },
   [RPC_METHOD.EXTENSION_INSTALL]: {

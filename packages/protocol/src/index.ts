@@ -50,6 +50,22 @@ export {
 export { assertUserInput, validateUserInput } from "./user-input-validator.js";
 
 export {
+  COMPLETION_CANCEL_DEADLINE_MS,
+  COMPLETION_EVENT_TYPE,
+  isCompletionEventType,
+  validateCompletionEventPayload,
+  type CompletionCancelledPayload,
+  type CompletionCompletedPayload,
+  type CompletionDeltaPayload,
+  type CompletionEventPayload,
+  type CompletionEventType,
+  type CompletionIncompletePayload,
+  type CompletionPayloadValidation,
+  type CompletionStartedPayload,
+  type CompletionTerminalState,
+} from "./completion-events.js";
+
+export {
   ALL_RPC_METHODS,
   RPC_METHOD,
   RPC_METHOD_SPECS,
@@ -61,6 +77,12 @@ export {
   type CheckpointRestoreConflictEntry,
   type CheckpointRestoreParams,
   type CheckpointRestoreRpcResult,
+  type CompletionCancelParams,
+  type CompletionCancelResult,
+  type CompletionKind,
+  type CompletionStartParams,
+  type CompletionStartResult,
+  type CompletionState,
   type ContextAttachParams,
   type ContextAttachResult,
   type ContextAttachSource,
@@ -161,9 +183,17 @@ export {
 } from "./protocol-version.js";
 
 export {
+  buildHarnessEventFrame,
   buildHarnessRpcOkFrame,
+  buildRpcStreamEndFrame,
   connectHarnessClient,
+  type CancelCompletion,
+  type CompletionStream,
+  type CompletionStreamEvent,
   type ConnectHarnessClientOptions,
+  type HarnessEventFrame,
+  type RpcStreamEndFrame,
+  type StartCompletion,
   type CreateSession,
   type GrantDecision,
   type HarnessClient,

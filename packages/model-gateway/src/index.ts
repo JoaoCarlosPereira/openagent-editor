@@ -90,3 +90,8 @@ export {
   type IncompleteStreamRetryOutcome,
   type IncompleteStreamRunState,
 } from "./cliproxy-incomplete-stream.js";
+export {
+  streamCliProxyChatText,
+  type CliProxyChatMessage,
+  type StreamCliProxyChatTextInput,
+} from "./cliproxy-chat-text-stream.js";

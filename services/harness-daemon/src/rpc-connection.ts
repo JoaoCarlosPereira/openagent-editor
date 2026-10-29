@@ -13,6 +13,11 @@ import {
   type RpcRequestEnvelope,
 } from "@openagent/protocol";
 import { dispatchCheckpointRpc } from "./checkpoints/checkpoint-rpc-handler.js";
+import {
+  COMPLETION_RPC_METHODS,
+  abortAllCompletions,
+  dispatchCompletionRpc,
+} from "./completion/index.js";
 import { dispatchContextRpc } from "./context/context-rpc-handler.js";
 import { dispatchRunRpc, type DaemonRpcContext } from "./runs/run-rpc-handler.js";
 import { dispatchSessionRpc } from "./sessions/session-rpc-handler.js";
@@ -49,6 +54,24 @@ function writeProtocolError(socket: net.Socket, code: ProtocolErrorCode, message
 export async function serveRpcOnConnection(
   socket: net.Socket,
   context: DaemonRpcContext,
+): Promise<void> {
+  const inFlightCompletions = new Set<Promise<void>>();
+  // Conexão caiu: aborta geração em voo para liberar o provedor e fechar o estado terminal.
+  const abortOnClose = (): void => abortAllCompletions(context);
+  socket.once("close", abortOnClose);
+  try {
+    await serveFrames(socket, context, inFlightCompletions);
+  } finally {
+    abortOnClose();
+    await Promise.allSettled(inFlightCompletions);
+    socket.off("close", abortOnClose);
+  }
+}
+
+async function serveFrames(
+  socket: net.Socket,
+  context: DaemonRpcContext,
+  inFlightCompletions: Set<Promise<void>>,
 ): Promise<void> {
   while (!socket.destroyed) {
     let frame: Buffer;
@@ -90,6 +113,13 @@ export async function serveRpcOnConnection(
     const isRun = RUN_RPC_METHODS.has(request.method);
     const isCheckpoint = CHECKPOINT_RPC_METHODS.has(request.method);
     const isContext = CONTEXT_RPC_METHODS.has(request.method);
+    if (COMPLETION_RPC_METHODS.has(request.method)) {
+      const operation = dispatchCompletionRpc(socket, context, request).finally(() =>
+        inFlightCompletions.delete(operation),
+      );
+      inFlightCompletions.add(operation);
+      continue;
+    }
     if (!isSession && !isRun && !isCheckpoint && !isContext) {
       writeProtocolError(
         socket,

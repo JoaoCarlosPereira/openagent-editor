@@ -232,6 +232,32 @@ function validateParamsForMethod(method: RpcMethod, params: unknown): string[] {
         errors.push("Campo 'scope' deve ser 'session' ou 'workspace' quando presente.");
       }
       break;
+    case RPC_METHOD.COMPLETION_START:
+      if (!isNonEmptyString(params["completionId"])) {
+        errors.push("Campo obrigatório 'completionId' ausente ou inválido.");
+      }
+      if (typeof params["prefix"] !== "string") {
+        errors.push("Campo obrigatório 'prefix' deve ser string.");
+      }
+      if (params["suffix"] !== undefined && typeof params["suffix"] !== "string") {
+        errors.push("Campo 'suffix' deve ser string quando presente.");
+      }
+      if (params["language"] !== undefined && !isNonEmptyString(params["language"])) {
+        errors.push("Campo 'language' deve ser string não-vazia quando presente.");
+      }
+      if (
+        params["kind"] !== undefined &&
+        params["kind"] !== "line" &&
+        params["kind"] !== "block"
+      ) {
+        errors.push("Campo 'kind' deve ser 'line' ou 'block' quando presente.");
+      }
+      break;
+    case RPC_METHOD.COMPLETION_CANCEL:
+      if (!isNonEmptyString(params["completionId"])) {
+        errors.push("Campo obrigatório 'completionId' ausente ou inválido.");
+      }
+      break;
     case RPC_METHOD.EXTENSION_INSTALL:
       if (!isNonEmptyString(params["packageRef"])) {
         errors.push("Campo obrigatório 'packageRef' ausente ou inválido.");
