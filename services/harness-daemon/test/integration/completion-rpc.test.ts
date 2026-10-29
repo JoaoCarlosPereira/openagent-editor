@@ -77,6 +77,8 @@ class ControlledSource {
 
 type Harness = {
   dataRoot: string;
+  address: string;
+  daemon: Awaited<ReturnType<typeof startHarnessDaemon>>;
   client: HarnessClient;
   sessionId: string;
   runId: string;
@@ -91,6 +93,7 @@ async function setup(): Promise<Harness> {
     dataRoot,
     runtimeDirectory: path.join(dataRoot, "runtime"),
     completionSource: source.source,
+    drainTimeoutMs: 50,
   });
   const client = await connectHarnessClient({ address: daemon.address, workspaceHello: WORKSPACE });
   const session = await client.createSession({ mode: "agent" });
@@ -104,6 +107,8 @@ async function setup(): Promise<Harness> {
   }
   return {
     dataRoot,
+    address: daemon.address,
+    daemon,
     client,
     sessionId: session.sessionId,
     runId,
@@ -474,6 +479,138 @@ test.describe("completion.start/cancel no daemon (TAB-01)", { concurrency: 1 }, 
       );
     } finally {
       await h.stop();
+    }
+  });
+
+  test("[TAB-01] erro de RPC concorrente não derruba a completion em voo nem pendura a chamada", async () => {
+    const h = await setup();
+    try {
+      const stream = h.client.startCompletion({
+        sessionId: h.sessionId,
+        runId: h.runId,
+        completionId: "c-mixed",
+        prefix: "a",
+      });
+      const collected = collect(stream);
+      await waitFor(() => persistedCompletionTypes(h, "c-mixed").includes(COMPLETION_EVENT_TYPE.STARTED));
+
+      await assert.rejects(
+        Promise.race([
+          h.client.enqueue("run-inexistente", { text: "x" }),
+          new Promise((_, reject) => setTimeout(() => reject(new Error("chamada pendurada")), 1_500)),
+        ]),
+        (error: unknown) => {
+          assert.ok(error instanceof ProtocolError, String(error));
+          assert.equal(error.code, PROTOCOL_ERROR_CODES.INVALID_STATE);
+          return true;
+        },
+      );
+
+      h.source.push("c-mixed", "ok");
+      h.source.push("c-mixed", "end");
+      const events = await collected;
+      assert.equal(events.at(-1)?.payload.type, COMPLETION_EVENT_TYPE.COMPLETED);
+    } finally {
+      await h.stop();
+    }
+  });
+
+  test("[TAB-01] mesmo completionId em duas conexões: uma geração, conflito na outra e cancel cruzado", async () => {
+    const h = await setup();
+    const other = await connectHarnessClient({
+      address: h.address,
+      workspaceHello: WORKSPACE,
+    });
+    try {
+      const first = h.client.startCompletion({
+        sessionId: h.sessionId,
+        runId: h.runId,
+        completionId: "c-shared",
+        prefix: "a",
+      });
+      const firstEvents = collect(first);
+      h.source.push("c-shared", "p");
+      await waitFor(() => persistedCompletionTypes(h, "c-shared").includes(COMPLETION_EVENT_TYPE.DELTA));
+
+      const second = other.startCompletion({
+        sessionId: h.sessionId,
+        runId: h.runId,
+        completionId: "c-shared",
+        prefix: "a",
+      });
+      await assert.rejects(collect(second), { code: PROTOCOL_ERROR_CODES.CONFLICT });
+      assert.equal(h.source.calls.length, 1);
+
+      const cancel = await other.cancelCompletion({
+        sessionId: h.sessionId,
+        runId: h.runId,
+        completionId: "c-shared",
+      });
+      assert.deepEqual(cancel, { completionId: "c-shared", state: "cancelled", cancelled: true });
+      assert.equal((await firstEvents).at(-1)?.payload.type, COMPLETION_EVENT_TYPE.CANCELLED);
+
+      const terminals = persistedCompletionTypes(h, "c-shared").filter(
+        (type) => type !== COMPLETION_EVENT_TYPE.STARTED && type !== COMPLETION_EVENT_TYPE.DELTA,
+      );
+      assert.deepEqual(terminals, [COMPLETION_EVENT_TYPE.CANCELLED]);
+    } finally {
+      other.close();
+      await h.stop();
+    }
+  });
+
+  test("[TAB-01] fechar outra conexão não aborta a completion de quem ainda está conectado", async () => {
+    const h = await setup();
+    const other = await connectHarnessClient({
+      address: h.address,
+      workspaceHello: WORKSPACE,
+    });
+    try {
+      const stream = h.client.startCompletion({
+        sessionId: h.sessionId,
+        runId: h.runId,
+        completionId: "c-survive",
+        prefix: "a",
+      });
+      const collected = collect(stream);
+      h.source.push("c-survive", "x");
+      await waitFor(() => persistedCompletionTypes(h, "c-survive").includes(COMPLETION_EVENT_TYPE.DELTA));
+      other.close();
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      assert.equal(h.source.calls[0]?.signal.aborted, false);
+      h.source.push("c-survive", "end");
+      assert.equal((await collected).at(-1)?.payload.type, COMPLETION_EVENT_TYPE.COMPLETED);
+    } finally {
+      await h.stop();
+    }
+  });
+
+  test("[TAB-01] após a queda do daemon, novas chamadas falham em vez de ficar penduradas", async () => {
+    const h = await setup();
+    const stopping = h.daemon.stop();
+    try {
+      await stopping;
+      await new Promise((resolve) => setTimeout(resolve, 200));
+      await assert.rejects(
+        Promise.race([
+          h.client.createSession({ mode: "agent" }),
+          new Promise((_, reject) => setTimeout(() => reject(new Error("chamada pendurada")), 1_500)),
+        ]),
+        (error: unknown) => {
+          assert.ok(error instanceof ProtocolError, String(error));
+          return true;
+        },
+      );
+      const stream = h.client.startCompletion({
+        sessionId: h.sessionId,
+        runId: h.runId,
+        completionId: "c-after-drop",
+        prefix: "a",
+      });
+      await assert.rejects(collect(stream), { code: PROTOCOL_ERROR_CODES.INCOMPLETE_STREAM });
+    } finally {
+      h.client.close();
+      await rm(h.dataRoot, { recursive: true, force: true });
     }
   });
 });

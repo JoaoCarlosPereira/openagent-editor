@@ -44,11 +44,24 @@ const CHECKPOINT_RPC_METHODS = new Set<string>([
 
 const CONTEXT_RPC_METHODS = new Set<string>([RPC_METHOD.CONTEXT_ATTACH]);
 
-function writeProtocolError(socket: net.Socket, code: ProtocolErrorCode, message: string): void {
+function writeProtocolError(
+  socket: net.Socket,
+  code: ProtocolErrorCode,
+  message: string,
+  requestId?: string,
+): void {
   writeProtocolFrame(
     socket,
-    Buffer.from(JSON.stringify(buildProtocolTransportErrorFrame(code, message)), "utf8"),
+    Buffer.from(
+      JSON.stringify(buildProtocolTransportErrorFrame(code, message, requestId)),
+      "utf8",
+    ),
   );
+}
+
+function requestIdOf(parsed: unknown): string | undefined {
+  const value = (parsed as { requestId?: unknown } | null)?.requestId;
+  return typeof value === "string" && value.length > 0 ? value : undefined;
 }
 
 export async function serveRpcOnConnection(
@@ -95,7 +108,7 @@ async function serveFrames(
 
     const validation = validateRpcRequest(parsed);
     if (!validation.valid) {
-      writeProtocolError(socket, validation.code, validation.errors.join(" "));
+      writeProtocolError(socket, validation.code, validation.errors.join(" "), requestIdOf(parsed));
       continue;
     }
 
@@ -105,6 +118,7 @@ async function serveFrames(
         socket,
         PROTOCOL_ERROR_CODES.INVALID_STATE,
         `Método RPC não suportado nesta conexão: ${String(request.method)}`,
+        request.requestId,
       );
       continue;
     }
@@ -125,6 +139,7 @@ async function serveFrames(
         socket,
         PROTOCOL_ERROR_CODES.INVALID_STATE,
         `Método RPC não suportado nesta conexão: ${String(request.method)}`,
+        request.requestId,
       );
       continue;
     }
@@ -150,7 +165,7 @@ async function serveFrames(
           ? error.code
           : PROTOCOL_ERROR_CODES.INVALID_STATE;
       const message = error instanceof Error ? error.message : String(error);
-      writeProtocolError(socket, code, message);
+      writeProtocolError(socket, code, message, request.requestId);
     }
   }
 }

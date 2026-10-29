@@ -363,6 +363,8 @@ class TransportHarnessClient implements HarnessClient {
   private activeRunId: string;
   private expectedVersion = 0;
   private closed = false;
+  /** Falha terminal da conexão; novas chamadas são recusadas em vez de ficarem penduradas. */
+  private connectionFailure: Error | undefined;
   /** Requisições em voo; um único leitor de frames as despacha por requestId. */
   private readonly pending = new Map<string, PendingRequest>();
 
@@ -601,7 +603,7 @@ class TransportHarnessClient implements HarnessClient {
       if (this.closed) {
         return;
       }
-      this.failAll(
+      this.failConnection(
         error instanceof ProtocolError && error.code !== PROTOCOL_ERROR_CODES.INVALID_STATE
           ? error
           : incompleteStreamError(),
@@ -613,16 +615,19 @@ class TransportHarnessClient implements HarnessClient {
     switch (frame.type) {
       case "protocol.error": {
         const error = new ProtocolError(frame.code, frame.message, [frame.message]);
-        // Erro sem requestId (legado): atribui à requisição mais antiga em voo.
-        const key = frame.requestId ?? this.pending.keys().next().value;
-        const target = key !== undefined ? this.pending.get(key) : undefined;
-        if (target && key !== undefined) {
-          this.pending.delete(key);
+        const target = frame.requestId !== undefined ? this.pending.get(frame.requestId) : undefined;
+        if (frame.requestId !== undefined && target) {
+          this.pending.delete(frame.requestId);
           if (target.kind === "call") {
             target.reject(error);
           } else {
             target.onError(error);
           }
+          return;
+        }
+        // Sem requestId não há dono confiável: encerra a conexão em vez de culpar outra requisição.
+        if (frame.requestId === undefined) {
+          this.failConnection(error);
         }
         return;
       }
@@ -634,7 +639,11 @@ class TransportHarnessClient implements HarnessClient {
         } else if (target?.kind === "stream") {
           // run.start responde com um único rpc.ok (o evento run.started): entrega e encerra.
           this.pending.delete(frame.requestId);
-          target.onEvent({ type: "harness.event", requestId: frame.requestId, event: frame.result as HarnessEvent });
+          target.onEvent({
+            type: "harness.event",
+            requestId: frame.requestId,
+            event: frame.result as HarnessEvent,
+          });
           target.onEnd({ type: "rpc.stream.end", requestId: frame.requestId });
         }
         return;
@@ -668,6 +677,11 @@ class TransportHarnessClient implements HarnessClient {
     return streams.length === 1 ? streams[0] : undefined;
   }
 
+  private failConnection(error: Error): void {
+    this.connectionFailure ??= error;
+    this.failAll(error);
+  }
+
   private failAll(error: Error): void {
     const entries = [...this.pending.values()];
     this.pending.clear();
@@ -695,6 +709,9 @@ class TransportHarnessClient implements HarnessClient {
         PROTOCOL_ERROR_CODES.INVALID_STATE,
         "Cliente já foi fechado.",
       );
+    }
+    if (this.connectionFailure) {
+      throw this.connectionFailure;
     }
 
     const spec = getRpcMethodSpec(method);

@@ -23,36 +23,29 @@ export type CompletionEmit = (event: HarnessEvent, payload: CompletionEventPaylo
 
 type ActiveCompletion = {
   controller: AbortController;
+  /** Conexão que iniciou a geração; só ela é abortada quando fecha. */
+  owner: object;
   /** Resolve quando o estado terminal já foi persistido. */
   done: Promise<CompletionStartResult>;
 };
 
-/** Registro dos pedidos em voo por conexão; chave: runId + completionId. */
-export type CompletionRegistry = {
-  active: Map<string, ActiveCompletion>;
-  defaultSource?: CompletionTextSource;
-};
+/**
+ * Gerações em voo compartilhadas por todas as conexões do daemon: a unicidade e o cancelamento
+ * valem por workspace + run + completionId, não por conexão.
+ */
+const activeCompletions = new Map<string, ActiveCompletion>();
 
-const registries = new WeakMap<object, CompletionRegistry>();
-
-export function completionRegistryFor(context: DaemonRpcContext): CompletionRegistry {
-  let registry = registries.get(context);
-  if (!registry) {
-    registry = { active: new Map() };
-    registries.set(context, registry);
-  }
-  return registry;
-}
-
-/** Cancela tudo que ainda está em voo (conexão encerrada ou daemon em shutdown). */
+/** Aborta as gerações iniciadas por esta conexão (conexão encerrada ou daemon em shutdown). */
 export function abortAllCompletions(context: DaemonRpcContext): void {
-  for (const entry of completionRegistryFor(context).active.values()) {
-    entry.controller.abort();
+  for (const entry of activeCompletions.values()) {
+    if (entry.owner === context) {
+      entry.controller.abort();
+    }
   }
 }
 
-function activeKey(runId: string, completionId: string): string {
-  return `${runId}\u0000${completionId}`;
+function activeKey(context: DaemonRpcContext, runId: string, completionId: string): string {
+  return [context.dataRoot, context.binding.workspaceId, runId, completionId].join("\u0000");
 }
 
 function withSqlite<T>(db: WorkspaceDatabase, run: (sqlite: DatabaseSync) => T): T {
@@ -128,7 +121,7 @@ function resultFor(snapshot: CompletionSnapshot, replayed: boolean): CompletionS
   };
 }
 
-function rejectOnAbort(signal: AbortSignal): Promise<"aborted"> {
+function abortSignalPromise(signal: AbortSignal): Promise<"aborted"> {
   return new Promise((resolve) => {
     if (signal.aborted) {
       resolve("aborted");
@@ -154,13 +147,18 @@ export type StartCompletionInput = {
   emit: CompletionEmit;
 };
 
+const defaultSources = new Map<string, CompletionTextSource>();
+
 function resolveSource(context: DaemonRpcContext): CompletionTextSource {
   if (context.completionSource) {
     return context.completionSource;
   }
-  const registry = completionRegistryFor(context);
-  registry.defaultSource ??= createCliProxyCompletionSource({ dataRoot: context.dataRoot });
-  return registry.defaultSource;
+  let source = defaultSources.get(context.dataRoot);
+  if (!source) {
+    source = createCliProxyCompletionSource({ dataRoot: context.dataRoot });
+    defaultSources.set(context.dataRoot, source);
+  }
+  return source;
 }
 
 /**
@@ -172,8 +170,7 @@ export async function runCompletionStart(input: StartCompletionInput): Promise<C
   const { context, request, emit } = input;
   const params = (request.payload ?? {}) as RpcParamsMap[typeof RPC_METHOD.COMPLETION_START];
   const kind: CompletionKind = params.kind ?? "line";
-  const registry = completionRegistryFor(context);
-  const key = activeKey(request.runId, params.completionId);
+  const key = activeKey(context, request.runId, params.completionId);
 
   const db = openWorkspaceDatabase({
     dataRoot: context.dataRoot,
@@ -182,7 +179,7 @@ export async function runCompletionStart(input: StartCompletionInput): Promise<C
   try {
     assertRunBinding(context, db, request);
 
-    if (registry.active.has(key)) {
+    if (activeCompletions.has(key)) {
       throw new ProtocolError(
         PROTOCOL_ERROR_CODES.CONFLICT,
         "completionId já está em geração; apenas uma completion por pedido.",
@@ -214,7 +211,7 @@ export async function runCompletionStart(input: StartCompletionInput): Promise<C
     const done = new Promise<CompletionStartResult>((resolve) => {
       finish = resolve;
     });
-    registry.active.set(key, { controller, done });
+    activeCompletions.set(key, { controller, owner: context, done });
 
     let text = resumeText;
     let terminal: CompletionStartResult | undefined;
@@ -247,7 +244,7 @@ export async function runCompletionStart(input: StartCompletionInput): Promise<C
         resumeOffset: resumeText.length,
       });
 
-      const aborted = rejectOnAbort(controller.signal);
+      const aborted = abortSignalPromise(controller.signal);
       let iterator: AsyncIterator<string> | undefined;
       try {
         const iterable = await Promise.race([
@@ -342,10 +339,10 @@ export async function runCompletionStart(input: StartCompletionInput): Promise<C
       controller.abort();
       throw error;
     } finally {
-      registry.active.delete(key);
+      activeCompletions.delete(key);
       finish(terminal ?? { completionId: params.completionId, state: "incomplete", attempt });
     }
-    return terminal ?? { completionId: params.completionId, state: "incomplete", attempt };
+    return done;
   } finally {
     db.close();
   }
@@ -360,8 +357,7 @@ export async function runCompletionCancel(
   request: RpcRequestEnvelope<typeof RPC_METHOD.COMPLETION_CANCEL>,
 ): Promise<CompletionCancelResult> {
   const params = (request.payload ?? {}) as RpcParamsMap[typeof RPC_METHOD.COMPLETION_CANCEL];
-  const registry = completionRegistryFor(context);
-  const entry = registry.active.get(activeKey(request.runId, params.completionId));
+  const entry = activeCompletions.get(activeKey(context, request.runId, params.completionId));
   if (entry) {
     entry.controller.abort();
     const result = await entry.done;
