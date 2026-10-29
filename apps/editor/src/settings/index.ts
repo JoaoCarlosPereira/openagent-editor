@@ -13,3 +13,4 @@ export {
   type SettingsViewInput,
   type SettingsViewSnapshot,
 } from "./settings-view.js";
+export { createSettingsRpcPort } from "./settings-rpc-port.js";

@@ -19,7 +19,7 @@ export function describeContextIndexSize(database: DatabaseSync): ContextIndexSi
     .prepare("SELECT COUNT(*) AS count FROM context_file_fts")
     .get() as { count: number };
   const bytesRow = database
-    .prepare("SELECT COALESCE(SUM(length(lexical_text)), 0) AS bytes FROM context_file_fts")
+    .prepare("SELECT COALESCE(SUM(length(CAST(lexical_text AS BLOB))), 0) AS bytes FROM context_file_fts")
     .get() as { bytes: number };
 
   return {
