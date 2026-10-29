@@ -20,11 +20,8 @@ export function redactProviderCredentials(input: string, credential?: string): s
     result = result.replaceAll(credential, "[REDACTED]");
   }
   const patterns: Array<[RegExp, string]> = [
-    // sk-<alphanumerics> (OpenAI/Claude/Gemini-style)
-    [/sk-[A-Za-z0-9]{8,}/g, "[REDACTED]"],
-    // Bearer <token>
+    [/sk-[A-Za-z0-9_-]{8,}/g, "[REDACTED]"],
     [/Bearer\s+[^\s,;"'<>]+/gi, "Bearer [REDACTED]"],
-    // token: <value> (JSON-style)
     [/token["']?\s*[:=]\s*["']?[A-Za-z0-9\-._~+/]{8,}/gi, 'token: "[REDACTED]"'],
   ];
   for (const [pattern, replacement] of patterns) {
