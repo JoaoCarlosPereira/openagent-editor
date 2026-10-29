@@ -209,7 +209,6 @@ export {
 } from "./mcp/mcp-http-config.js";
 
 export {
-export {
   assertMcpAuthSecretRef,
   mcpAuthMaterialToHttpHeaders,
   resolveMcpHttpHeaders,

@@ -1,4 +1,13 @@
 export {
+  McpToolController,
+  type McpExecutionOutcome,
+  type McpPendingPermission,
+  type McpRunError,
+  type McpRunResult,
+  type McpToolControllerOptions,
+} from "./mcp/index.js";
+
+export {
   AgentPanelController,
   buildAgentPanelView,
   USER_INPUT_EMPTY_MESSAGE,
