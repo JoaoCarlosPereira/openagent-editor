@@ -67,6 +67,13 @@ export type ExtensionWorkerRequestPayload =
 
 export type ExtensionWorkerResponse =
   | {
+      kind: "editorRequest";
+      requestId: string;
+      extensionId: string;
+      operation: string;
+      args: unknown[];
+    }
+  | {
       kind: "result";
       requestId: string;
       output: unknown;

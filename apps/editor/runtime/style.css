@@ -1,0 +1,13 @@
+:root { color-scheme: dark; font-family: sans-serif; }
+body { margin: 0; background: #1b1d21; color: #eee; }
+header { display: flex; align-items: center; gap: 1rem; padding: 0 1rem; }
+h1 { font-size: 1.2rem; margin-right: auto; }
+button { cursor: pointer; padding: .4rem; }
+#workspace, #error { margin: .5rem 1rem; }
+#error { color: #ff9a9a; }
+main { display: flex; height: calc(100vh - 8rem); }
+nav { width: 260px; overflow: auto; border-right: 1px solid #555; }
+ul { list-style: none; padding: .5rem; }
+li button { background: transparent; color: inherit; border: 0; text-align: left; width: 100%; }
+section { display: flex; flex: 1; flex-direction: column; padding: 0 1rem 1rem; }
+textarea { flex: 1; resize: none; background: #24262b; color: #eee; font: 14px monospace; padding: 1rem; }

@@ -72,6 +72,7 @@ export function createWorkspaceNamespace(
   adapter: WorkspaceAdapter = { files: [], contents: {} }
 ): WorkspaceNamespace {
   const documents = new Map<string, TextDocumentData>();
+  const documentStates = new Map<string, { content: string; version: number }>();
   const config = new Map<string, unknown>();
   for (const [section, value] of Object.entries(adapter.configuration ?? {})) {
     if (value && typeof value === "object" && !Array.isArray(value)) {
@@ -90,13 +91,15 @@ export function createWorkspaceNamespace(
       const current = documents.get(uri);
       if (current) return current;
       if (!Object.prototype.hasOwnProperty.call(adapter.contents, uri)) throw invalid(`Documento '${uri}' não disponível no workspace adapter.`);
-      const content = adapter.contents[uri] ?? "";
+      const state = { content: adapter.contents[uri] ?? "", version: 1 };
       const document: TextDocumentData = {
-        uri, version: 1,
-        get lineCount() { return content.length === 0 ? 1 : content.split("\n").length; },
-        text() { return content; },
+        uri,
+        get version() { return state.version; },
+        get lineCount() { return state.content.split("\n").length; },
+        text() { return state.content; },
       };
       documents.set(uri, document);
+      documentStates.set(uri, state);
       return document;
     },
     openTextDocuments() { return Array.from(documents.values()); },
@@ -106,6 +109,30 @@ export function createWorkspaceNamespace(
       if (!adapter.save) return false;
       const success = await adapter.save(uri, doc.text());
       return success;
+    },
+    applyTextEdits(uri, expectedVersion, edits) {
+      const state = documentStates.get(uri);
+      if (!state || !Number.isSafeInteger(expectedVersion) || !Array.isArray(edits)) throw invalid("Edição de documento inválida.");
+      if (state.version !== expectedVersion) throw new ProtocolError(PROTOCOL_ERROR_CODES.CONFLICT, "Versão do documento divergente.");
+      const ordered = [...edits];
+      for (const edit of ordered) {
+        if (!edit || !Number.isSafeInteger(edit.start) || !Number.isSafeInteger(edit.end) ||
+            edit.start < 0 || edit.end < edit.start || edit.end > state.content.length || typeof edit.text !== "string") {
+          throw invalid("Intervalo de edição inválido.");
+        }
+      }
+      ordered.sort((a, b) => a.start - b.start || a.end - b.end);
+      for (let index = 1; index < ordered.length; index += 1) {
+        const previous = ordered[index - 1];
+        const current = ordered[index];
+        if (previous && current && (current.start < previous.end || current.start === previous.start)) throw invalid("Edições sobrepostas.");
+      }
+      if (!ordered.length) return true;
+      let result = state.content;
+      for (const edit of ordered.reverse()) result = result.slice(0, edit.start) + edit.text + result.slice(edit.end);
+      state.content = result;
+      state.version += 1;
+      return true;
     },
     async findFiles(includePattern, excludePattern, maxResults) {
       const validatePattern = (pattern: unknown, label: string): string => {

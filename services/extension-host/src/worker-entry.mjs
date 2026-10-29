@@ -15,6 +15,17 @@ const commandRegistry = new Map();
 /** @type {Map<string, string[]>} */
 const outputChannels = new Map();
 
+let nextEditorRequestId = 0;
+const pendingEditorRequests = new Map();
+
+function requestEditor(extensionId, operation, args) {
+  const requestId = `editor-${nextEditorRequestId++}`;
+  return new Promise((resolve, reject) => {
+    pendingEditorRequests.set(requestId, { resolve, reject });
+    post({ kind: "editorRequest", requestId, extensionId, operation, args });
+  });
+}
+
 /** @param {import('./types.js').ExtensionWorkerResponse} message */
 function post(message) {
   parentPort?.postMessage(message);
@@ -139,6 +150,15 @@ function createExtensionApi(extensionId, extensionPath, subscriptions) {
     get name() {
       return currentConfig?.workspaceRoot ? currentConfig.workspaceRoot.split("/").pop() : undefined;
     },
+    openTextDocument(uri) {
+      return requestEditor(extensionId, "openTextDocument", [uri]);
+    },
+    applyTextEdits(uri, expectedVersion, edits) {
+      return requestEditor(extensionId, "applyTextEdits", [uri, expectedVersion, edits]);
+    },
+    setDecorations(uri, decoration, ranges) {
+      return requestEditor(extensionId, "setDecorations", [uri, decoration, ranges]);
+    },
     getConfiguration(section) {
       const configStore = new Map();
       return {
@@ -168,6 +188,18 @@ function createExtensionApi(extensionId, extensionPath, subscriptions) {
 
 parentPort?.on("message", async (message) => {
   if (!message || typeof message !== "object") {
+    return;
+  }
+
+  if (message.kind === "editorResponse") {
+    const pending = pendingEditorRequests.get(message.requestId);
+    if (!pending) return;
+    pendingEditorRequests.delete(message.requestId);
+    if (message.error) {
+      const error = new Error(message.error.message);
+      error.code = message.error.code;
+      pending.reject(error);
+    } else pending.resolve(message.output);
     return;
   }
 
@@ -238,7 +270,7 @@ parentPort?.on("message", async (message) => {
       post({
         kind: "error",
         requestId,
-        code: "INVALID_STATE",
+        code: err?.code || "INVALID_STATE",
         message: err instanceof Error ? err.message : String(err),
       });
     }
@@ -264,7 +296,7 @@ parentPort?.on("message", async (message) => {
       post({
         kind: "error",
         requestId,
-        code: "INVALID_STATE",
+        code: err?.code || "INVALID_STATE",
         message: err instanceof Error ? err.message : String(err),
       });
     }

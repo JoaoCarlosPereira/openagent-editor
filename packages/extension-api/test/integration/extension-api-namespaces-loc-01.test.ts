@@ -415,10 +415,36 @@ test("[LOC-01] workspace: decorações validadas são observáveis e inválidas 
   assert.equal(next.opacity, 0.25);
 });
 
-// SPEC_DEVIATION: A fixture congelada 3.24.18 define TextDocumentData somente com
-// uri/version/lineCount/text() e WorkspaceNamespace não expõe edição nem editor.
-// Implementar mutação ou aplicação de decoração exigiria ampliar contrato sem
-// evidência diferencial; manter apenas os comportamentos representáveis na API.
+// SPEC_DEVIATION: O worker e o editor ainda não integram edição ou decorações.
+test("[LOC-01] edições atômicas atualizam documento e conteúdo salvo", async () => {
+  let saved = "";
+  const ns = createWorkspaceNamespace("/root", "ws", {
+    files: [], contents: { "file:///doc": "abc\ndef" },
+    save(_uri, content) { saved = content; return true; },
+  });
+  const doc = await ns.openTextDocument("file:///doc");
+  assert.equal(ns.applyTextEdits(doc.uri, 1, [
+    { start: 0, end: 3, text: "novo" },
+    { start: 4, end: 7, text: "texto\nfinal" },
+  ]), true);
+  assert.equal(doc.text(), "novo\ntexto\nfinal");
+  assert.equal(doc.version, 2);
+  assert.equal(doc.lineCount, 3);
+  assert.equal(await ns.saveTextDocument(doc.uri), true);
+  assert.equal(saved, doc.text());
+});
+
+test("[LOC-01] edição inválida ou concorrente preserva documento", async () => {
+  const ns = createWorkspaceNamespace("/root", "ws", { files: [], contents: { "file:///doc": "abcdef" } });
+  const doc = await ns.openTextDocument("file:///doc");
+  assert.throws(() => ns.applyTextEdits(doc.uri, 0, []),
+    (error: unknown) => error instanceof ProtocolError && error.code === PROTOCOL_ERROR_CODES.CONFLICT);
+  assert.throws(() => ns.applyTextEdits(doc.uri, 1, [
+    { start: 0, end: 3, text: "x" }, { start: 2, end: 5, text: "y" },
+  ]), (error: unknown) => error instanceof ProtocolError && error.code === PROTOCOL_ERROR_CODES.INVALID_STATE);
+  assert.equal(doc.text(), "abcdef");
+  assert.equal(doc.version, 1);
+});
 
 // ─── Frozen Surface ───────────────────────────────────────────────────────────────
 

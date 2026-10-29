@@ -83,9 +83,15 @@ export interface WindowNamespace {
 /** Documento aberto no editor */
 export interface TextDocumentData {
   uri: string;
-  version: number;
-  lineCount: number;
+  readonly version: number;
+  readonly lineCount: number;
   text(): string;
+}
+
+export interface TextEdit {
+  start: number;
+  end: number;
+  text: string;
 }
 
 /** Tipo de decoração aplicada a um editor de texto */
@@ -118,6 +124,7 @@ export interface WorkspaceNamespace {
   openTextDocument(uri: string): Promise<TextDocumentData>;
   openTextDocuments(): TextDocumentData[];
   saveTextDocument(uri: string): Promise<boolean>;
+  applyTextEdits(uri: string, expectedVersion: number, edits: readonly TextEdit[]): boolean;
   findFiles(
     includePattern: string,
     excludePattern?: string,

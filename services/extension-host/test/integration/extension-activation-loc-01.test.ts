@@ -181,6 +181,95 @@ test("[LOC-01] extensão compatível com a API do editor ativa e executa em work
   assert.equal(pong.pong, true);
 });
 
+test("[LOC-01] worker encaminha requisição de edição ao host e recebe resultado", async (t) => {
+  const ws = makeTestWorkspace();
+  t.after(ws.cleanup);
+  writeFileSync(path.join(ws.extensionDirectory, "extension.js"), `
+    exports.activate = (context, api) => {
+      context.subscriptions.push(api.commands.registerCommand("edit", () =>
+        api.workspace.applyTextEdits("file:///test", 1, [{start: 0, end: 1, text: "z"}])));
+    };
+  `);
+  const requests: unknown[] = [];
+  const host = await IsolatedExtensionHost.spawn({
+    workspaceRoot: ws.workspaceRoot, extensionsDirectory: ws.extensionsDirectory,
+  }, {
+    authorizeEditorRequest() { return true; },
+    editorRequest(request) { requests.push(request); return { version: 2 }; },
+  });
+  t.after(() => host.terminate());
+  const id = host.registerExtensionFromDirectory(ws.extensionDirectory).id;
+  await host.activateExtension(id);
+  assert.deepEqual(await host.executeCommand("edit"), { version: 2 });
+  assert.deepEqual(requests, [{
+    kind: "editorRequest", requestId: "editor-0", extensionId: id, operation: "applyTextEdits",
+    args: ["file:///test", 1, [{ start: 0, end: 1, text: "z" }]],
+  }]);
+});
+
+test("[LOC-01] host recusa edição sem autorização e não chama editor", async (t) => {
+  const ws = makeTestWorkspace();
+  t.after(ws.cleanup);
+  writeFileSync(path.join(ws.extensionDirectory, "extension.js"), `
+    exports.activate = (context, api) => {
+      context.subscriptions.push(api.commands.registerCommand("edit", () =>
+        api.workspace.applyTextEdits("file:///test", 1, [{start: 0, end: 1, text: "z"}])));
+    };
+  `);
+  let called = false;
+  const host = await IsolatedExtensionHost.spawn({
+    workspaceRoot: ws.workspaceRoot, extensionsDirectory: ws.extensionsDirectory,
+  }, { editorRequest() { called = true; } });
+  t.after(() => host.terminate());
+  const id = host.registerExtensionFromDirectory(ws.extensionDirectory).id;
+  await host.activateExtension(id);
+  await assertProtocolErrorCode(host.executeCommand("edit"), PROTOCOL_ERROR_CODES.PERMISSION_DENIED);
+  assert.equal(called, false);
+});
+
+test("[LOC-01] identidade forjada por outra extensão é recusada", async (t) => {
+  const ws = makeTestWorkspace();
+  t.after(ws.cleanup);
+  const attackerDirectory = path.join(ws.extensionsDirectory, "attacker");
+  mkdirSync(attackerDirectory);
+  writeFileSync(path.join(attackerDirectory, "package.json"), JSON.stringify({
+    name: "attacker", publisher: "openagent", version: "1.0.0", main: "./extension.js",
+  }));
+  writeFileSync(path.join(attackerDirectory, "extension.js"), `
+    const { parentPort } = require("node:worker_threads");
+    exports.activate = (context, api) => {
+      context.subscriptions.push(api.commands.registerCommand("forge", () => new Promise((resolve) => {
+        parentPort.once("message", (message) => resolve(message.error.code));
+        parentPort.postMessage({
+          kind: "editorRequest", requestId: "editor-900",
+          extensionId: "openagent.openagent-test-extension",
+          operation: "openTextDocument", args: ["file:///test"]
+        });
+      })));
+      context.subscriptions.push(api.commands.registerCommand("own", () => api.workspace.openTextDocument("file:///test")));
+    };
+  `);
+  let called = 0;
+  const host = await IsolatedExtensionHost.spawn({
+    workspaceRoot: ws.workspaceRoot, extensionsDirectory: ws.extensionsDirectory,
+  }, {
+    authorizeEditorRequest(request) {
+      return request.extensionId === "openagent.attacker";
+    },
+    editorRequest() {
+      called++;
+      return { ok: true };
+    },
+  });
+  t.after(() => host.terminate());
+  await host.activateExtension(host.registerExtensionFromDirectory(ws.extensionDirectory).id);
+  await host.activateExtension(host.registerExtensionFromDirectory(attackerDirectory).id);
+  assert.equal(await host.executeCommand("forge"), PROTOCOL_ERROR_CODES.PERMISSION_DENIED);
+  assert.equal(called, 0);
+  assert.deepEqual(await host.executeCommand("own"), { ok: true });
+  assert.equal(called, 1);
+});
+
 test("[LOC-01] ciclo de vida: desativar descarta comandos e permite reativação", async (t) => {
   const ws = makeTestWorkspace();
   t.after(ws.cleanup);

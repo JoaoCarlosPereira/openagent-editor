@@ -29,6 +29,8 @@ const DEFAULT_WORKER_ENTRY = fileURLToPath(
 export interface IsolatedExtensionHostOptions {
   workerEntryPath?: string;
   execArgv?: string[];
+  editorRequest?: (request: { extensionId: string; operation: string; args: unknown[] }) => unknown | Promise<unknown>;
+  authorizeEditorRequest?: (request: { extensionId: string; operation: string; args: unknown[] }) => boolean | Promise<boolean>;
 }
 
 export type ExtensionHostEventListener = (event: {
@@ -43,6 +45,9 @@ export type ExtensionHostEventListener = (event: {
 export class IsolatedExtensionHost {
   private readonly config: ExtensionHostConfig;
   private readonly worker: Worker;
+  private readonly options: IsolatedExtensionHostOptions;
+  private readonly extensionWorkers = new Map<string, Worker>();
+  private readonly commands = new Map<string, string>();
   private terminated = false;
   private nextRequestId = 0;
   private readonly extensions = new Map<string, ExtensionRegistration>();
@@ -51,20 +56,69 @@ export class IsolatedExtensionHost {
     {
       resolve: (value: unknown) => void;
       reject: (error: Error) => void;
+      worker: Worker;
     }
   >();
   private readonly listeners = new Set<ExtensionHostEventListener>();
 
-  private constructor(config: ExtensionHostConfig, worker: Worker) {
+  private constructor(config: ExtensionHostConfig, worker: Worker, options: IsolatedExtensionHostOptions) {
     this.config = config;
     this.worker = worker;
+    this.options = options;
+    this.attachWorker(worker);
+  }
 
-    this.worker.on("message", (message: ExtensionWorkerResponse) => {
+  private attachWorker(worker: Worker, owner?: string): void {
+    worker.on("message", (message: ExtensionWorkerResponse) => {
       if (!message || typeof message !== "object") {
         return;
       }
 
+      if (message.kind === "editorRequest") {
+        void (async () => {
+          try {
+            if (typeof message.requestId !== "string" || !/^editor-\d+$/.test(message.requestId) ||
+                typeof message.extensionId !== "string" || !Array.isArray(message.args)) {
+              throw new ProtocolError(PROTOCOL_ERROR_CODES.INVALID_STATE, "Requisição de editor inválida.");
+            }
+            if (!owner || message.extensionId !== owner) {
+              throw new ProtocolError(PROTOCOL_ERROR_CODES.PERMISSION_DENIED, "Identidade de extensão inválida.");
+            }
+            const extension = this.extensions.get(owner);
+            if (!extension || !["loading", "active"].includes(extension.state)) {
+              throw new ProtocolError(PROTOCOL_ERROR_CODES.INVALID_STATE, "Extensão não está ativa.");
+            }
+            const [uri, version, edits] = message.args;
+            if (!["openTextDocument", "applyTextEdits", "setDecorations"].includes(message.operation) ||
+                typeof uri !== "string" || !uri || uri.includes("\0") ||
+                (message.operation === "openTextDocument" && message.args.length !== 1) ||
+                (message.operation !== "openTextDocument" && message.args.length !== 3) ||
+                (message.operation === "applyTextEdits" && (!Number.isSafeInteger(version) || !Array.isArray(edits))) ||
+                (message.operation === "setDecorations" && (!version || typeof version !== "object" || !Array.isArray(edits)))) {
+              throw new ProtocolError(PROTOCOL_ERROR_CODES.INVALID_STATE, "Operação de editor inválida.");
+            }
+            if (!this.options.editorRequest) throw new ProtocolError(PROTOCOL_ERROR_CODES.INVALID_STATE, "Editor indisponível.");
+            if (!this.options.authorizeEditorRequest || !await this.options.authorizeEditorRequest(message)) {
+              throw new ProtocolError(PROTOCOL_ERROR_CODES.PERMISSION_DENIED, "Operação de editor não autorizada.");
+            }
+            const output = await this.options.editorRequest(message);
+            worker.postMessage({ kind: "editorResponse", requestId: message.requestId, output });
+          } catch (error) {
+            worker.postMessage({
+              kind: "editorResponse", requestId: message.requestId,
+              error: { code: error instanceof ProtocolError ? error.code : PROTOCOL_ERROR_CODES.INVALID_STATE,
+                message: error instanceof Error ? error.message : String(error) },
+            });
+          }
+        })();
+        return;
+      }
+
       if (message.kind === "event") {
+        if (owner && message.eventType === "commandRegistered" && message.payload && typeof message.payload === "object") {
+          const payload = message.payload as { command?: unknown };
+          if (typeof payload.command === "string") this.commands.set(payload.command, owner);
+        }
         for (const listener of this.listeners) {
           try {
             listener({ eventType: message.eventType, payload: message.payload });
@@ -76,7 +130,7 @@ export class IsolatedExtensionHost {
       }
 
       const pending = this.pending.get(message.requestId);
-      if (!pending) {
+      if (!pending || pending.worker !== worker) {
         return;
       }
       this.pending.delete(message.requestId);
@@ -97,11 +151,12 @@ export class IsolatedExtensionHost {
       }
     });
 
-    this.worker.on("error", (error) => {
-      for (const [, entry] of this.pending) {
+    worker.on("error", (error) => {
+      for (const [id, entry] of this.pending) {
+        if (entry.worker !== worker) continue;
         entry.reject(error);
+        this.pending.delete(id);
       }
-      this.pending.clear();
     });
   }
 
@@ -116,7 +171,7 @@ export class IsolatedExtensionHost {
       execArgv: options.execArgv,
     });
 
-    const host = new IsolatedExtensionHost(config, worker);
+    const host = new IsolatedExtensionHost(config, worker, options);
     try {
       await host.initWorker();
       return host;
@@ -157,6 +212,7 @@ export class IsolatedExtensionHost {
 
   private async sendRequest<T = unknown>(
     request: ExtensionWorkerRequestPayload,
+    worker: Worker = this.worker,
   ): Promise<T> {
     if (this.terminated) {
       throw new ProtocolError(
@@ -172,9 +228,10 @@ export class IsolatedExtensionHost {
       this.pending.set(requestId, {
         resolve: (v) => resolve(v as T),
         reject,
+        worker,
       });
       try {
-        this.worker.postMessage(fullRequest);
+        worker.postMessage(fullRequest);
       } catch (error) {
         this.pending.delete(requestId);
         reject(error instanceof Error ? error : new Error(String(error)));
@@ -328,7 +385,14 @@ export class IsolatedExtensionHost {
     }
 
     registration.state = "loading";
+    let worker = this.extensionWorkers.get(canonicalId);
     try {
+      if (!worker) {
+        worker = new Worker(this.options.workerEntryPath ?? DEFAULT_WORKER_ENTRY, { execArgv: this.options.execArgv });
+        this.extensionWorkers.set(canonicalId, worker);
+        this.attachWorker(worker, canonicalId);
+        await this.sendRequest({ kind: "init", config: this.config }, worker);
+      }
       const result = await this.sendRequest<{
         extensionId: string;
         activated: true;
@@ -340,7 +404,7 @@ export class IsolatedExtensionHost {
         mainAbsolutePath: registration.mainAbsolutePath,
         extensionPath: registration.extensionPath,
         manifest: registration.manifest,
-      });
+      }, worker);
 
       registration.state = "active";
       registration.activatedAt = Date.now();
@@ -366,12 +430,15 @@ export class IsolatedExtensionHost {
       );
     }
 
+    const owner = this.commands.get(command.trim());
+    const worker = owner ? this.extensionWorkers.get(owner) : undefined;
+    if (!worker) throw new ProtocolError(PROTOCOL_ERROR_CODES.INVALID_STATE, `Comando '${command}' não encontrado.`);
     return this.sendRequest<T>({
       kind: "executeCommand",
       extensionId: "*",
       command: command.trim(),
       args,
-    });
+    }, worker);
   }
 
   /**
@@ -405,9 +472,12 @@ export class IsolatedExtensionHost {
       }>({
         kind: "deactivate",
         extensionId: canonicalId,
-      });
+      }, this.extensionWorkers.get(canonicalId));
 
       registration.state = "deactivated";
+      for (const [command, owner] of this.commands) {
+        if (owner === canonicalId) this.commands.delete(command);
+      }
       registration.deactivatedAt = Date.now();
       return result;
     } catch (err) {
@@ -436,6 +506,6 @@ export class IsolatedExtensionHost {
       );
     }
     this.pending.clear();
-    await this.worker.terminate();
+    await Promise.all([this.worker, ...this.extensionWorkers.values()].map((worker) => worker.terminate()));
   }
 }
