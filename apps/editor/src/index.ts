@@ -136,3 +136,16 @@ export {
   type SettingsViewInput,
   type SettingsViewSnapshot,
 } from "./settings/index.js";
+export {
+  ProjectsLocalController,
+  LocalProjectCoordinator,
+  decomposeObjective,
+  buildProjectsLocalView,
+  PROJECT_OBJECTIVE_MAX_LENGTH,
+  type ProjectsLocalPort,
+  type ProjectTaskResult,
+  type ProjectLocalPhase,
+  type ProjectNodeStatus,
+  type ProjectNodeView,
+  type ProjectsLocalViewSnapshot,
+} from "./agents/index.js";
