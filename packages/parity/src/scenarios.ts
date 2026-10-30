@@ -25,6 +25,15 @@ import { CTX03_SCENARIO } from "../scenarios/ctx-03-excluded-path-omitted.js";
 import { CTX04_SCENARIO } from "../scenarios/ctx-04-index-cleanup.js";
 import { PRV01_SCENARIO } from "../scenarios/prv-01-explicit-external-send.js";
 import { PRV02_SCENARIO } from "../scenarios/prv-02-redacted-tool-log.js";
+import { TAB01_SCENARIO } from "../scenarios/tab-01-suggestion-controls.js";
+import { TAB02_SCENARIO } from "../scenarios/tab-02-next-point-jump.js";
+import { TAB03_SCENARIO } from "../scenarios/tab-03-cross-file-review.js";
+import { INL01_SCENARIO } from "../scenarios/inl-01-inline-edit-diff.js";
+import { INL02_SCENARIO } from "../scenarios/inl-02-whole-file-restore.js";
+import { AUT01_SCENARIO } from "../scenarios/aut-01-authorized-browser.js";
+import { AUT02_SCENARIO } from "../scenarios/aut-02-computer-action-at-a-time.js";
+import { DES01_SCENARIO } from "../scenarios/des-01-element-code-attach.js";
+import { CAN01_SCENARIO } from "../scenarios/can-01-canvas-persistent-panel.js";
 
 /** Requisitos cobertos pelo conjunto de cenários diferenciais do editor e agente. */
 export const EDITOR_REQUIREMENT_IDS = [
@@ -52,9 +61,18 @@ export const EDITOR_REQUIREMENT_IDS = [
   "CTX-04",
   "PRV-01",
   "PRV-02",
+  "TAB-01",
+  "TAB-02",
+  "TAB-03",
+  "INL-01",
+  "INL-02",
+  "AUT-01",
+  "AUT-02",
+  "DES-01",
+  "CAN-01",
 ] as const;
 
-/** Cenários diferenciais de editor, agente, permissão, estado, contexto e privacidade, dirigidos pelo driver dual (task_189). */
+/** Cenários diferenciais de editor, agente, permissão, estado, contexto, privacidade, Tab, Inline, navegador, desenho e canvas, dirigidos pelo driver dual. */
 export const EDITOR_SCENARIOS: readonly DualScenario[] = [
   LOC01_SCENARIO,
   UI01_SCENARIO,
@@ -80,6 +98,15 @@ export const EDITOR_SCENARIOS: readonly DualScenario[] = [
   CTX04_SCENARIO,
   PRV01_SCENARIO,
   PRV02_SCENARIO,
+  TAB01_SCENARIO,
+  TAB02_SCENARIO,
+  TAB03_SCENARIO,
+  INL01_SCENARIO,
+  INL02_SCENARIO,
+  AUT01_SCENARIO,
+  AUT02_SCENARIO,
+  DES01_SCENARIO,
+  CAN01_SCENARIO,
 ];
 
 export type EditorScenarioRun =

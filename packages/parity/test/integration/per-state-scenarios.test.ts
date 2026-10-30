@@ -195,8 +195,8 @@ test("cenários de permissão e estado são determinísticos e repetíveis", () 
   }
 });
 
-test("conjunto completo cobre os 24 requisitos com a única divergência declarada do LOC-01", () => {
-  assert.equal(EDITOR_SCENARIOS.length, 24);
+test("conjunto completo cobre os 33 requisitos com a única divergência declarada do LOC-01", () => {
+  assert.equal(EDITOR_SCENARIOS.length, 33);
   assert.equal(EDITOR_SCENARIOS.length, EDITOR_REQUIREMENT_IDS.length);
   assert.deepEqual(
     EDITOR_SCENARIOS.map((scenario) => scenario.requirementId).join(","),
@@ -205,7 +205,7 @@ test("conjunto completo cobre os 24 requisitos com a única divergência declara
 
   const coverage = editorScenarioCoverage();
   assert.deepEqual(coverage.missing, []);
-  assert.equal(coverage.covered.length, 24);
+  assert.equal(coverage.covered.length, 33);
 
   const runs = runAllEditorScenarios();
   for (const run of runs) {
@@ -228,5 +228,5 @@ test("relatório registra os cenários de permissão e estado por requisito", ()
   for (const scenario of PER_STATE_SCENARIOS) {
     assert.ok(report.includes(scenario.scenarioId), `cenário ausente do relatório: ${scenario.scenarioId}`);
   }
-  assert.ok(report.includes("Cobertura: 24/24"));
+  assert.ok(report.includes("Cobertura: 33/33"));
 });
