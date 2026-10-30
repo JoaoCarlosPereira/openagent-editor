@@ -4,6 +4,18 @@ Esta política vale para todo módulo do OpenAgent Editor que usa artefatos do C
 
 Cada módulo nessa situação tem um arquivo `provenance.json` na sua raiz, no formato de [`schemas/provenance.schema.json`](../schemas/provenance.schema.json) (JSON Schema draft 2020-12). Há exemplos em [`schemas/examples/`](../schemas/examples/).
 
+## Cobertura e limites do gate
+
+O ADR-002 exige rastreabilidade por módulo; o schema de artefatos Cursor se aplica aos módulos reconstruídos que usam tais artefatos como origem ou evidência, conforme a TechSpec. A lista `requiredManifests` em `scripts/check-provenance-gate.mjs` registra os módulos identificados por suas próprias declarações de reconstrução: `packages/extension-api` e `services/extension-host`. Novas evidências de uso exigem atualizar essa lista. Ela não é um inventário completo nem demonstra que outros módulos não usem artefatos Cursor; essa conclusão exige auditoria independente.
+
+O gate descobre `provenance.json` e `*.provenance.json` e valida todos os arquivos encontrados, inclusive os não listados. A ausência ou invalidade de um manifesto declarado bloqueia o gate. Um manifesto válido não prova que seus hashes ou alegações correspondem aos artefatos: fontes indisponíveis e divergências devem ser investigadas separadamente, sem inventar dados. Os arquivos de exemplo são ignorados por padrão.
+
+Com `--root`, a CLI verifica apenas os manifestos obrigatórios situados nessa raiz; a aprovação parcial não substitui o gate executado na raiz padrão do repositório.
+
+## Módulo sem artefatos Cursor
+
+Módulo que não usa artefatos do Cursor como origem ou evidência não exige `provenance.json`: a rastreabilidade geral (ADR-002) fica coberta pela origem atribuível no repositório — TechSpec, ADRs e histórico Git do módulo. O manifesto legado de `services/harness-daemon` foi removido em 30/10/2026: ele alegava `behavioral-reimplementation` via `techspec-and-adr-003`, sem artefato, hash ou localização alguma — impossível de validar sob o schema atual e insuficiente para declarar origem em artefatos. Se surgir evidência de que parte do módulo usa artefatos do Cursor, um manifesto novo deve registrá-la com hash e localização reais, e o módulo entra na lista `requiredManifests`. Um manifesto inválido no formato legado que reapareça no disco continua travando o gate, por descoberta.
+
 ## Estratégias
 
 Todo `provenance.json` declara exatamente uma estratégia no campo `strategy`.

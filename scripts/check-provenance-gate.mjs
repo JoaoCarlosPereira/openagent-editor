@@ -1,9 +1,13 @@
 #!/usr/bin/env node
-import { resolve } from "node:path";
+import { isAbsolute, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { runProvenanceGateCli } from "@openagent/provenance";
 
 const defaultRoot = resolve(fileURLToPath(new URL("..", import.meta.url)));
+const requiredManifests = [
+  "packages/extension-api/provenance.json",
+  "services/extension-host/provenance.json",
+];
 
 function parseArgs(argv) {
   const options = {};
@@ -32,5 +36,9 @@ function parseArgs(argv) {
 const options = parseArgs(process.argv.slice(2));
 const rootDir = options.rootDir ? resolve(options.rootDir) : defaultRoot;
 
-const exitCode = await runProvenanceGateCli({ ...options, rootDir });
+const scopedManifests = requiredManifests
+  .map((manifest) => relative(rootDir, resolve(defaultRoot, manifest)))
+  .filter((manifest) => manifest !== ".." && !manifest.startsWith(`..${sep}`) && !isAbsolute(manifest));
+
+const exitCode = await runProvenanceGateCli({ ...options, rootDir, requiredManifests: scopedManifests });
 process.exit(exitCode);

@@ -30,6 +30,45 @@ function sha256(content: string): string {
   return createHash("sha256").update(content, "utf8").digest("hex");
 }
 
+test("descobre ambos os nomes e rejeita manifesto inválido", async () => {
+  const { dir, cleanup } = await createFixtureDir();
+  try {
+    await mkdir(join(dir, "module"), { recursive: true });
+    await writeFile(join(dir, "module", "provenance.json"), "{}");
+    await writeFile(join(dir, "module", "extra.provenance.json"), "{");
+    const report = await checkProvenanceGate({ rootDir: dir });
+    assert.equal(report.filesScanned, 2);
+    assert.equal(report.ok, false);
+    assert.equal(report.violations.filter((v) => v.code === "INVALID_SCHEMA").length, 2);
+  } finally {
+    await cleanup();
+  }
+});
+
+test("cobertura declarada reprova ausência e não exige módulos não declarados", async () => {
+  const { dir, cleanup } = await createFixtureDir();
+  try {
+    const report = await checkProvenanceGate({
+      rootDir: dir,
+      requiredManifests: ["packages/required/provenance.json"],
+    });
+    assert.equal(report.ok, false);
+    assert.equal(report.violations[0]?.code, "MISSING_PROVENANCE");
+    assert.equal((await checkProvenanceGate({ rootDir: dir })).ok, true);
+  } finally {
+    await cleanup();
+  }
+});
+
+test("erro de leitura da raiz não resulta em sucesso silencioso", async () => {
+  const { dir, cleanup } = await createFixtureDir();
+  try {
+    await assert.rejects(checkProvenanceGate({ rootDir: join(dir, "inexistente") }));
+  } finally {
+    await cleanup();
+  }
+});
+
 test("gate aceita repositório com behavioral-reimplementation válido", async () => {
   const { dir, cleanup } = await createFixtureDir();
   try {
@@ -59,7 +98,10 @@ test("gate aceita repositório com behavioral-reimplementation válido", async (
       "utf8",
     );
 
-    const report = await checkProvenanceGate({ rootDir: dir });
+    const report = await checkProvenanceGate({
+      rootDir: dir,
+      requiredManifests: ["packages/feature/feature.provenance.json"],
+    });
     assert.equal(report.ok, true);
     assert.equal(report.filesScanned, 1);
     assert.equal(report.filesPassed, 1);
