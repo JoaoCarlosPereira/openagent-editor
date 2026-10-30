@@ -4,7 +4,15 @@ export type GhostTextPhase =
   | "suggesting"
   | "accepted"
   | "rejected"
-  | "cancelled";
+  | "cancelled"
+  | "jumped";
+
+/** Próximo ponto de edição indicado após aceitar uma sugestão com continuação (TAB-02); 1-based. */
+export interface GhostTextNextPoint {
+  offset: number;
+  line: number;
+  column: number;
+}
 
 export interface GhostTextViewInput {
   phase: GhostTextPhase;
@@ -13,6 +21,7 @@ export interface GhostTextViewInput {
   suggestion: string;
   completionId: string | null;
   errorCode: string | null;
+  nextEditPoint?: GhostTextNextPoint | null;
 }
 
 export interface GhostTextViewSnapshot {
@@ -28,6 +37,9 @@ export interface GhostTextViewSnapshot {
     canReject: boolean;
     canCancel: boolean;
     errorCode: string | null;
+    /** TAB-02: ponto indicado depois do aceite; null quando a sugestão não tem continuação. */
+    nextEditPoint: GhostTextNextPoint | null;
+    canJump: boolean;
   };
 }
 
@@ -53,6 +65,8 @@ export function ghostTextStatusLabel(phase: GhostTextPhase): string {
       return "Sugestao recusada";
     case "cancelled":
       return "Sugestao cancelada";
+    case "jumped":
+      return "Salto para proximo ponto";
   }
 }
 
@@ -60,6 +74,8 @@ export function buildGhostTextView(input: GhostTextViewInput): GhostTextViewSnap
   const canAccept = input.phase === "suggesting" && input.suggestion.length > 0;
   const canReject = canAccept;
   const canCancel = input.phase === "requesting" || input.phase === "suggesting";
+  const nextEditPoint = input.nextEditPoint ?? null;
+  const canJump = nextEditPoint !== null;
   const statusLabel = ghostTextStatusLabel(input.phase);
   const button = (testId: string, label: string, enabled: boolean, shortcut: string): string =>
     `<button type="button" data-testid="${testId}" aria-keyshortcuts="${shortcut}"${enabled ? "" : " disabled"}>${label}</button>`;
@@ -80,6 +96,10 @@ export function buildGhostTextView(input: GhostTextViewInput): GhostTextViewSnap
       button("ghost-text-reject", "Recusar", canReject, "Escape"),
       button("ghost-text-cancel", "Cancelar", canCancel, "Control+Escape"),
       `<p data-testid="ghost-text-status" role="status">${statusLabel}</p>`,
+      nextEditPoint !== null
+        ? `<p data-testid="ghost-text-next-point" role="status">Proximo ponto de edicao: linha ${nextEditPoint.line}, coluna ${nextEditPoint.column} (Tab para saltar)</p>`
+        : ``,
+      button("ghost-text-jump", "Ir para proximo ponto", canJump, "Tab"),
       input.errorCode !== null
         ? `<p role="alert" data-testid="ghost-text-error">${escapeHtml(input.errorCode)}</p>`
         : ``,
@@ -96,6 +116,8 @@ export function buildGhostTextView(input: GhostTextViewInput): GhostTextViewSnap
       canReject,
       canCancel,
       errorCode: input.errorCode,
+      nextEditPoint,
+      canJump,
     },
   };
 }

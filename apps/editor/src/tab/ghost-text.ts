@@ -19,11 +19,13 @@ import {
 
 import {
   buildGhostTextView,
+  type GhostTextNextPoint,
   type GhostTextPhase,
   type GhostTextViewSnapshot,
 } from "./ghost-text-view.js";
 
 export type {
+  GhostTextNextPoint,
   GhostTextPhase,
   GhostTextViewSnapshot,
 } from "./ghost-text-view.js";
@@ -32,6 +34,16 @@ export { buildGhostTextView, ghostTextStatusLabel } from "./ghost-text-view.js";
 /** Limites de contexto herdados do comportamento de extension/inline.js. */
 export const GHOST_TEXT_PREFIX_LIMIT = 1600;
 export const GHOST_TEXT_SUFFIX_LIMIT = 800;
+
+/**
+ * TAB-02: marcador de continuação dentro do texto sugerido. O protocolo
+ * completion.* entrega somente texto, então o próximo ponto de edição é
+ * convencionado no próprio texto: o que vem antes do marcador é inserido no
+ * aceite, e o que vem depois é a continuação reservada ao ponto seguinte,
+ * aplicada pelo salto por teclado (jump()). Linhas do buffer fora do trecho
+ * sugerido permanecem inalteradas.
+ */
+export const NEXT_EDIT_POINT_MARKER = "<OPENAGENT_NEXT/>";
 
 export type GhostTextStream = AsyncIterable<Pick<CompletionStreamEvent, "payload">> & {
   readonly result: Promise<CompletionStartResult>;
@@ -81,10 +93,24 @@ function errorCodeOf(error: unknown): string {
   return isProtocolError(error) ? error.code : PROTOCOL_ERROR_CODES.INCOMPLETE_STREAM;
 }
 
+/** TAB-02: ponto do buffer em offset, linha e coluna (1-based, padrão de editores). */
+function resolveNextPoint(bufferText: string, offset: number): GhostTextNextPoint {
+  const sliced = bufferText.slice(0, offset);
+  const lastBreak = sliced.lastIndexOf("\n");
+  return {
+    offset,
+    line: lastBreak < 0 ? 1 : sliced.slice(0, lastBreak).split("\n").length + 1,
+    column: offset - lastBreak,
+  };
+}
+
 /**
  * TAB-01: ghost text com aceitar, recusar e cancelar.
  * idle -> requesting -> suggesting -> accepted | rejected | cancelled.
- * Nova digitacao cancela a sugestao anterior; deltas de pedidos encerrados sao ignorados.
+ * TAB-02: aceitação de sugestão com continuação registra o próximo ponto
+ * de edição; o salto por teclado (Tab, jump()) segue para esse ponto.
+ * Nova digitacao cancela a sugestao anterior e o ponto pendente;
+ * deltas de pedidos encerrados sao ignorados.
  */
 export class GhostTextController {
   private readonly port: GhostTextCompletionPort;
@@ -97,6 +123,8 @@ export class GhostTextController {
   private phase: GhostTextPhase = "idle";
   private suggestion = "";
   private errorCode: string | null = null;
+  private nextEditPoint: GhostTextNextPoint | null = null;
+  private continuation: string | null = null;
   private active: ActiveRequest | null = null;
   private lastCompletionId: string | null = null;
   private actionInFlight = false;
@@ -146,6 +174,8 @@ export class GhostTextController {
     this.cursor += raw.length;
     this.suggestion = "";
     this.errorCode = null;
+    this.nextEditPoint = null;
+    this.continuation = null;
 
     const prefix = this.bufferText.slice(
       Math.max(0, this.cursor - GHOST_TEXT_PREFIX_LIMIT),
@@ -174,14 +204,41 @@ export class GhostTextController {
     return this.view;
   }
 
-  /** Insere a sugestao no buffer; geracao residual e cancelada. */
+  /** Insere a sugestao no buffer; geracao residual e cancelada.
+   * TAB-02: se a sugestão carrega o marcador de continuação, registra o
+   * próximo ponto de edição indicado (sem alterar o comportamento das
+   * sugestões sem continuação). */
   accept(): Promise<GhostTextViewSnapshot> {
     return this.runAction(async () => {
       this.requireSuggestion("Aceitar");
+      const markerAt = this.suggestion.indexOf(NEXT_EDIT_POINT_MARKER);
+      const inserted = markerAt >= 0 ? this.suggestion.slice(0, markerAt) : this.suggestion;
       this.bufferText =
-        this.bufferText.slice(0, this.cursor) + this.suggestion + this.bufferText.slice(this.cursor);
-      this.cursor += this.suggestion.length;
+        this.bufferText.slice(0, this.cursor) + inserted + this.bufferText.slice(this.cursor);
+      this.cursor += inserted.length;
+      if (markerAt >= 0) {
+        this.nextEditPoint = resolveNextPoint(this.bufferText, this.cursor);
+        this.continuation = this.suggestion.slice(markerAt + NEXT_EDIT_POINT_MARKER.length);
+      }
       await this.finish("accepted", false);
+    });
+  }
+
+  /** TAB-02: salto por teclado (Tab) para o próximo ponto de edição sugerido. */
+  jump(): Promise<GhostTextViewSnapshot> {
+    return this.runAction(async () => {
+      const continuation = this.continuation;
+      const point = this.nextEditPoint;
+      if (continuation === null || point === null || point.offset !== this.cursor) {
+        throw invalidState("Salto exige um proximo ponto de edicao disponivel.", [this.phase]);
+      }
+      this.bufferText =
+        this.bufferText.slice(0, point.offset) + continuation + this.bufferText.slice(point.offset);
+      this.cursor = point.offset + continuation.length;
+      this.nextEditPoint = null;
+      this.continuation = null;
+      this.phase = "jumped";
+      this.refreshView();
     });
   }
 
@@ -376,6 +433,7 @@ export class GhostTextController {
       suggestion: this.suggestion,
       completionId: this.lastCompletionId,
       errorCode: this.errorCode,
+      nextEditPoint: this.nextEditPoint,
     });
   }
 
