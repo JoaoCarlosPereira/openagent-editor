@@ -142,6 +142,11 @@ export type ExtensionWorkerResponse =
         | "hoverProviderUnregistered"
         | string;
       payload: unknown;
+    }
+  | {
+      kind: "childProc";
+      eventType: "spawned" | "exited";
+      pid: number;
     };
 
 export interface RegisteredCompletionProviderInfo {

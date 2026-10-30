@@ -1,6 +1,7 @@
 import fs from "node:fs";
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import path from "node:path";
+import { spawn as spawnChildProcess, type ChildProcess } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { Worker } from "node:worker_threads";
 
@@ -31,6 +32,26 @@ import type {
 const DEFAULT_WORKER_ENTRY = fileURLToPath(
   new URL("./worker-entry.mjs", import.meta.url),
 );
+
+interface ExtensionLockDescriptor {
+  pid: number;
+  token: string;
+  generation: number;
+  extensionActive: boolean;
+}
+
+// Liveness do holder só resolve no mesmo computador; hosts em máquinas
+// distintas compartilham o diretório via rede e pid local não vale — o
+// CONTRATO de lock vale para hosts locais (mesma máquina), o que é o
+// escopo declarado da camada.
+function holderProcessAlive(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    return (error as NodeJS.ErrnoException).code === "EPERM";
+  }
+}
 
 function compareSemverPrecedence(a: string, b: string): number {
   const [, coreA = "", preA] = /^([^-+]+)(?:-([^+]+))?/.exec(a) ?? [];
@@ -90,6 +111,7 @@ export class IsolatedExtensionHost {
   private readonly worker: Worker;
   private readonly options: IsolatedExtensionHostOptions;
   private readonly extensionWorkers = new Map<string, Worker>();
+  private readonly stoppingWorkers = new Map<string, Promise<void>>();
   private readonly commands = new Map<string, string>();
   private readonly completionProviders = new Map<
     string,
@@ -100,10 +122,17 @@ export class IsolatedExtensionHost {
     { extensionId: string; providerId: string; selector: unknown }
   >();
   private terminated = false;
+  private termination?: Promise<void>;
   private nextRequestId = 0;
   private readonly extensions = new Map<string, ExtensionRegistration>();
   private readonly installing = new Set<string>();
   private readonly changingEnablement = new Set<string>();
+  private readonly extensionLocks = new Map<string, ExtensionLockDescriptor>();
+  private readonly failingWorkers = new Set<string>();
+  private reaperProcess?: ChildProcess;
+  private readonly childOwners = new Map<number, string>();
+  private readonly lockToken = randomUUID();
+  private nextLockGeneration = 0;
   private readonly pending = new Map<
     string,
     {
@@ -126,7 +155,17 @@ export class IsolatedExtensionHost {
       if (!message || typeof message !== "object") {
         return;
       }
-      if (owner && this.extensionWorkers.get(owner) !== worker) return;
+      if (owner && (this.extensionWorkers.get(owner) !== worker ||
+          this.stoppingWorkers.has(owner) || this.failingWorkers.has(owner))) return;
+
+      if (message.kind === "childProc") {
+        const ownerId = owner;
+        if (ownerId && typeof message.pid === "number" && Number.isSafeInteger(message.pid) && message.pid > 0) {
+          if (message.eventType === "spawned") this.trackChild(ownerId, message.pid);
+          if (message.eventType === "exited") this.forgetChild(message.pid, ownerId);
+        }
+        return;
+      }
 
       if (message.kind === "editorRequest") {
         void (async () => {
@@ -246,9 +285,9 @@ export class IsolatedExtensionHost {
       }
     });
 
-    const invalidateWorker = (error: Error) => {
+    const invalidateWorker = (error: Error, exited: boolean) => {
       if (owner && this.extensionWorkers.get(owner) === worker) {
-        this.extensionWorkers.delete(owner);
+        if (exited) this.extensionWorkers.delete(owner);
         this.clearExtensionRegistrations(owner);
         const registration = this.extensions.get(owner);
         if (registration && ["loading", "active", "deactivating"].includes(registration.state)) {
@@ -262,10 +301,23 @@ export class IsolatedExtensionHost {
         this.pending.delete(id);
       }
     };
-    worker.on("error", invalidateWorker);
-    worker.on("exit", (code) => invalidateWorker(
-      new ProtocolError(PROTOCOL_ERROR_CODES.CANCELLED, `Worker encerrado (código ${code}).`),
-    ));
+    let failedBeforeExit = false;
+    worker.on("error", (error) => {
+      failedBeforeExit = !!owner && this.extensionWorkers.get(owner) === worker;
+      if (owner && failedBeforeExit) this.failingWorkers.add(owner);
+      invalidateWorker(error, false);
+    });
+    worker.on("exit", (code) => {
+      const wasOwner = owner && this.extensionWorkers.get(owner) === worker;
+      invalidateWorker(new ProtocolError(PROTOCOL_ERROR_CODES.CANCELLED, `Worker encerrado (código ${code}).`), true);
+      if (owner && (wasOwner || failedBeforeExit)) {
+        this.failingWorkers.delete(owner);
+        this.killOwnedChildren(owner);
+        if (!this.changingEnablement.has(owner)) {
+          this.releaseExtensionLock(owner);
+        }
+      }
+    });
   }
 
   static async spawn(
@@ -283,6 +335,7 @@ export class IsolatedExtensionHost {
     try {
       await host.initWorker();
       host.restoreInstalledExtensions();
+      host.startReaperProcess();
       return host;
     } catch (error) {
       await host.terminate();
@@ -365,15 +418,29 @@ export class IsolatedExtensionHost {
   }
 
   private async discardExtensionWorker(extensionId: string): Promise<void> {
+    const stopping = this.stoppingWorkers.get(extensionId);
+    if (stopping) return stopping;
     const worker = this.extensionWorkers.get(extensionId);
     if (worker) {
-      this.extensionWorkers.delete(extensionId);
       for (const [id, request] of this.pending) {
         if (request.worker !== worker) continue;
         this.pending.delete(id);
         request.reject(new ProtocolError(PROTOCOL_ERROR_CODES.CANCELLED, "Worker da extensão encerrado."));
       }
-      await worker.terminate();
+      const termination = worker.terminate().then(() => {
+        if (this.extensionWorkers.get(extensionId) === worker) this.extensionWorkers.delete(extensionId);
+        this.clearExtensionRegistrations(extensionId);
+      });
+      this.stoppingWorkers.set(extensionId, termination);
+      try {
+        await termination;
+        this.killOwnedChildren(extensionId);
+      } catch (error) {
+        if (this.extensionWorkers.get(extensionId) === worker) this.failingWorkers.add(extensionId);
+        throw error;
+      } finally {
+        this.stoppingWorkers.delete(extensionId);
+      }
     }
     this.clearExtensionRegistrations(extensionId);
   }
@@ -623,7 +690,155 @@ export class IsolatedExtensionHost {
     return path.join(this.config.extensionsDirectory, `.disabled-${createHash("sha256").update(extensionId).digest("hex")}`);
   }
 
-  // The preference is shared on disk, but running hosts do not synchronize lifecycle transitions.
+  // Coordenação entre hosts: um arquivo O_EXCL por extensão guarda o
+  // descritor do holder (pid, token do host, generation, extensionActive).
+  // Enquanto o worker existir, host externo não executa disable (CONFLICT).
+  // Um activate externo pode assumir a extensão quando ela está
+  // desativada no holder. Lock de holder morto (crash) vira stale e é
+  // removido pela consulta seguinte: não há garantia atômica entre
+  // morte do holder e recuperação, apenas recuperação eventual.
+  private acquireExtensionLock(id: string, allowDeactivatedSteal = false, extensionActive = false): void {
+    if (this.extensionLocks.has(id)) {
+      throw new ProtocolError(PROTOCOL_ERROR_CODES.CONFLICT, "Extensão em uso ou encerramento.");
+    }
+    const lockPath = `${this.enablementPath(id)}.lock`;
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      let existing: ExtensionLockDescriptor | null = null;
+      try {
+        existing = JSON.parse(fs.readFileSync(lockPath, "utf8")) as ExtensionLockDescriptor;
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== "ENOENT") existing = null;
+      }
+      if (existing) {
+        const stale = !Number.isSafeInteger(existing.pid) || !holderProcessAlive(existing.pid);
+        const stealable = allowDeactivatedSteal && existing.extensionActive === false && !stale;
+        if (stale || stealable) {
+          try {
+            fs.unlinkSync(lockPath);
+          } catch (error) {
+            if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
+              throw new ProtocolError(PROTOCOL_ERROR_CODES.CONFLICT, "Extensão em uso por outro host.");
+            }
+          }
+        } else {
+          throw new ProtocolError(PROTOCOL_ERROR_CODES.CONFLICT, "Extensão em uso por outro host.");
+        }
+      }
+      const descriptor: ExtensionLockDescriptor = {
+        pid: process.pid,
+        token: this.lockToken,
+        generation: this.nextLockGeneration++,
+        extensionActive,
+      };
+      try {
+        const handle = fs.openSync(lockPath, "wx");
+        try {
+          fs.writeFileSync(handle, JSON.stringify(descriptor));
+        } finally {
+          fs.closeSync(handle);
+        }
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code === "EEXIST" && attempt === 0) continue;
+        throw error;
+      }
+      this.extensionLocks.set(id, descriptor);
+      return;
+    }
+  }
+
+  private releaseExtensionLock(id: string): void {
+    const descriptor = this.extensionLocks.get(id);
+    if (!descriptor) return;
+    this.extensionLocks.delete(id);
+    const lockPath = `${this.enablementPath(id)}.lock`;
+    try {
+      const current = JSON.parse(fs.readFileSync(lockPath, "utf8")) as ExtensionLockDescriptor;
+      if (current.token === descriptor.token && current.generation === descriptor.generation) {
+        fs.unlinkSync(lockPath);
+      }
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "ENOENT") return;
+    }
+  }
+
+  private markExtensionLockDeactivated(id: string): void {
+    const descriptor = this.extensionLocks.get(id);
+    if (!descriptor) return;
+    const lockPath = `${this.enablementPath(id)}.lock`;
+    const updated = { ...descriptor, extensionActive: false };
+    try {
+      fs.writeFileSync(lockPath, JSON.stringify(updated));
+      this.extensionLocks.set(id, updated);
+    } catch {
+      // lock perdida (roubada por outro host): o holder não impede.
+    }
+  }
+
+  // Processo irmão que retransmite kills de subprocessos da extensão e
+  // termina descendentes quando o host morre sem limpeza (EOF no stdin).
+  // De modo degradado (spawn do reaper não disponível) o rastreamento
+  // não acontece e a limitação fica documentada no README da camada.
+  private startReaperProcess(): void {
+    if (this.reaperProcess) return;
+    try {
+      const reaperPath = fileURLToPath(new URL("./child-reaper.mjs", import.meta.url));
+      const proc = spawnChildProcess(process.execPath, [reaperPath], { stdio: ["pipe", "ignore", "ignore"] });
+      proc.stdin?.on("error", () => {
+        // reaper fora do ar: degradação silenciosa, sem rastreamento.
+      });
+      proc.on("error", () => {
+        this.reaperProcess = undefined;
+      });
+      this.reaperProcess = proc;
+    } catch {
+      // modo degradado
+    }
+  }
+
+  private commandReaper(commands: { op: string; pid: number }): void {
+    const stdin = this.reaperProcess?.stdin;
+    if (!stdin || !stdin.writable) return;
+    try {
+      stdin.write(`${JSON.stringify(commands)}\n`);
+    } catch {
+      // modo degradado
+    }
+  }
+
+  private trackChild(owner: string, pid: number): void {
+    this.childOwners.set(pid, owner);
+    this.commandReaper({ op: "track", pid });
+  }
+
+  private forgetChild(pid: number, owner: string): void {
+    if (this.childOwners.get(pid) !== owner) return;
+    this.childOwners.delete(pid);
+    this.commandReaper({ op: "forget", pid });
+  }
+
+  private killOwnedChildren(owner: string): void {
+    for (const [pid, ownerOf] of this.childOwners) {
+      if (ownerOf !== owner) continue;
+      this.childOwners.delete(pid);
+      this.commandReaper({ op: "kill", pid });
+    }
+  }
+
+  private stopReaper(): void {
+    for (const pid of this.childOwners.keys()) {
+      this.commandReaper({ op: "kill", pid });
+    }
+    this.childOwners.clear();
+    const proc = this.reaperProcess;
+    this.reaperProcess = undefined;
+    try {
+      proc?.stdin?.end();
+      proc?.unref?.();
+    } catch {
+      // já encerrado
+    }
+  }
+
   private requireExtension(extensionId: string): ExtensionRegistration {
     if (this.terminated || typeof extensionId !== "string" || !extensionId.trim()) {
       throw new ProtocolError(PROTOCOL_ERROR_CODES.INVALID_STATE, "Host encerrado ou identificador inválido.");
@@ -647,26 +862,33 @@ export class IsolatedExtensionHost {
   async enableExtension(extensionId: string): Promise<void> {
     const registration = this.requireExtension(extensionId);
     const id = registration.id;
-    if (this.installing.has(id) || this.changingEnablement.has(id) ||
+    if (this.installing.has(id) || this.changingEnablement.has(id) || this.failingWorkers.has(id) ||
         ["loading", "deactivating"].includes(registration.state)) {
       throw new ProtocolError(PROTOCOL_ERROR_CODES.CONFLICT, "Extensão em transição.");
     }
+    const held = this.extensionLocks.has(id);
+    if (!held) this.acquireExtensionLock(id, false, registration.state === "active");
     try {
-      fs.unlinkSync(this.enablementPath(id));
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+      try {
+        fs.unlinkSync(this.enablementPath(id));
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+      }
+    } finally {
+      if (!held) this.releaseExtensionLock(id);
     }
   }
 
   async disableExtension(extensionId: string): Promise<void> {
     const registration = this.requireExtension(extensionId);
     const id = registration.id;
-    if (this.installing.has(id) || this.changingEnablement.has(id) ||
+    if (this.installing.has(id) || this.changingEnablement.has(id) || this.failingWorkers.has(id) ||
         ["loading", "deactivating"].includes(registration.state)) {
       throw new ProtocolError(PROTOCOL_ERROR_CODES.CONFLICT, "Extensão em transição.");
     }
     this.changingEnablement.add(id);
     try {
+      if (!this.extensionLocks.has(id)) this.acquireExtensionLock(id, false, registration.state === "active");
       if (registration.state === "active") await this.deactivateExtension(id);
       await this.discardExtensionWorker(id);
       if (this.terminated) throw new ProtocolError(PROTOCOL_ERROR_CODES.INVALID_STATE, "Extension host já foi encerrado.");
@@ -679,6 +901,7 @@ export class IsolatedExtensionHost {
           `Não foi possível persistir a desabilitação; a extensão pode estar desativada e requer ativação explícita: ${String(error)}`);
       }
     } finally {
+      if (!this.extensionWorkers.has(id)) this.releaseExtensionLock(id);
       this.changingEnablement.delete(id);
     }
   }
@@ -696,7 +919,8 @@ export class IsolatedExtensionHost {
       throw new ProtocolError(PROTOCOL_ERROR_CODES.INVALID_STATE, "Extension host já foi encerrado.");
     }
     const canonicalId = this.requireExtension(extensionId).id;
-    if (this.installing.has(canonicalId) || this.changingEnablement.has(canonicalId)) {
+    if (this.installing.has(canonicalId) || this.changingEnablement.has(canonicalId) ||
+        this.stoppingWorkers.has(canonicalId) || this.failingWorkers.has(canonicalId)) {
       throw new ProtocolError(PROTOCOL_ERROR_CODES.CONFLICT, "Instalação da extensão em andamento.");
     }
     const registration = this.extensions.get(canonicalId);
@@ -707,9 +931,6 @@ export class IsolatedExtensionHost {
       );
     }
 
-    if (!this.isExtensionEnabled(canonicalId)) {
-      throw new ProtocolError(PROTOCOL_ERROR_CODES.INVALID_STATE, "Extensão desabilitada.");
-    }
     if (["active", "loading", "deactivating"].includes(registration.state)) {
       throw new ProtocolError(
         PROTOCOL_ERROR_CODES.INVALID_STATE,
@@ -717,6 +938,16 @@ export class IsolatedExtensionHost {
       );
     }
 
+    const alreadyHeld = this.extensionLocks.has(canonicalId) && this.extensionWorkers.has(canonicalId);
+    if (!alreadyHeld) this.acquireExtensionLock(canonicalId, true, true);
+    try {
+      if (!this.isExtensionEnabled(canonicalId)) {
+        throw new ProtocolError(PROTOCOL_ERROR_CODES.INVALID_STATE, "Extensão desabilitada.");
+      }
+    } catch (error) {
+      if (!alreadyHeld) this.releaseExtensionLock(canonicalId);
+      throw error;
+    }
     registration.state = "loading";
     if (registration.mainAbsolutePath === undefined) {
       registration.state = "active";
@@ -749,6 +980,8 @@ export class IsolatedExtensionHost {
       return result;
     } catch (err) {
       await this.discardExtensionWorker(canonicalId);
+      if (worker && this.failingWorkers.has(canonicalId)) await worker.terminate();
+      this.releaseExtensionLock(canonicalId);
       registration.state = "failed";
       registration.lastError = (err as Error).message;
       throw err;
@@ -813,8 +1046,10 @@ export class IsolatedExtensionHost {
     if (registration.mainAbsolutePath === undefined) {
       registration.state = "deactivated";
       registration.deactivatedAt = Date.now();
+      if (!this.changingEnablement.has(canonicalId)) this.markExtensionLockDeactivated(canonicalId);
       return { extensionId: canonicalId, deactivated: true };
     }
+    const worker = this.extensionWorkers.get(canonicalId);
     try {
       const result = await this.sendRequest<{
         extensionId: string;
@@ -822,14 +1057,17 @@ export class IsolatedExtensionHost {
       }>({
         kind: "deactivate",
         extensionId: canonicalId,
-      }, this.extensionWorkers.get(canonicalId));
+      }, worker);
 
       registration.state = "deactivated";
       this.clearExtensionRegistrations(canonicalId);
       registration.deactivatedAt = Date.now();
+      if (!this.changingEnablement.has(canonicalId)) this.markExtensionLockDeactivated(canonicalId);
       return result;
     } catch (err) {
       await this.discardExtensionWorker(canonicalId);
+      if (worker && this.failingWorkers.has(canonicalId)) await worker.terminate();
+      if (!this.changingEnablement.has(canonicalId)) this.releaseExtensionLock(canonicalId);
       registration.state = "failed";
       registration.lastError = (err as Error).message;
       throw err;
@@ -1037,9 +1275,7 @@ export class IsolatedExtensionHost {
   }
 
   async terminate(): Promise<void> {
-    if (this.terminated) {
-      return;
-    }
+    if (this.termination) return this.termination;
     this.terminated = true;
 
     for (const [, entry] of this.pending) {
@@ -1051,6 +1287,14 @@ export class IsolatedExtensionHost {
       );
     }
     this.pending.clear();
-    await Promise.all([this.worker, ...this.extensionWorkers.values()].map((worker) => worker.terminate()));
+    this.termination = (async () => {
+      await Promise.all([
+        this.worker.terminate(),
+        ...Array.from(this.extensionWorkers.keys(), (id) => this.discardExtensionWorker(id)),
+      ]);
+      for (const id of this.extensionLocks.keys()) this.releaseExtensionLock(id);
+      this.stopReaper();
+    })();
+    return this.termination;
   }
 }

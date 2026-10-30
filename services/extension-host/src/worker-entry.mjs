@@ -59,6 +59,44 @@ function matchesSelector(selector, uri) {
 import { parentPort } from "node:worker_threads";
 import { pathToFileURL } from "node:url";
 
+// Rastreamento de subprocessos criados pela extensão. Códigos CJS em
+// require("node:child_process") recebem o módulo cacheado desta thread, então
+// o patch cobre uma extensão inteira e segue confinada ao worker em que
+// roda. Extensões ESM que fazem import direto do módulo recebem um
+// namespace congelado e não são rastreadas (limitação declarada).
+try {
+  const { createRequire } = await import("node:module");
+  const cp = createRequire(import.meta.url)("node:child_process");
+  const spawnOriginal = cp.spawn.bind(cp);
+  const rastrearFilho = (child) => {
+    if (!child || typeof child.pid !== "number" || child.pid <= 0) {
+      return child;
+    }
+    child.once("spawn", () => {
+      parentPort?.postMessage({ kind: "childProc", eventType: "spawned", pid: child.pid });
+    });
+    child.once("exit", () => {
+      parentPort?.postMessage({ kind: "childProc", eventType: "exited", pid: child.pid });
+    });
+    return child;
+  };
+  cp.spawn = function spawnRastreado(file, args, options) {
+    return rastrearFilho(spawnOriginal(file, args, options));
+  };
+  cp.fork = function forkRastreado(entry, args, options) {
+    const listaArgs = args ?? undefined;
+    const optsArgs = options ?? undefined;
+    return rastrearFilho(spawnOriginal(
+      process.execPath,
+      [entry, ...(Array.isArray(listaArgs) ? listaArgs : [])],
+      { stdio: ["inherit", "inherit", "inherit", "ipc"], ...(optsArgs || {}) },
+    ));
+  };
+} catch {
+  // Sem o rastreamento o degradação é registrada no README; extensões
+  // continuam funcionando.
+}
+
 const FROZEN_EXTENSION_API_VERSION = "3.24.18";
 
 /** @type {import('./types.js').ExtensionHostConfig | null} */

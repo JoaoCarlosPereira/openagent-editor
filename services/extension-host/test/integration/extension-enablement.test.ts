@@ -101,7 +101,7 @@ test("falha de persistência após desativação exige reativação explícita",
   assert.equal(host.getExtension(id)?.state, "active");
 });
 
-test("hosts compartilham preferência, mas não sincronizam workers ativos", async (t) => {
+test("hosts recusam desabilitação enquanto outro host executa a extensão", async (t) => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "extension-enable-hosts-"));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
   const ext = path.join(root, "sample");
@@ -115,10 +115,15 @@ test("hosts compartilham preferência, mas não sincronizam workers ativos", asy
   const id = first.registerExtensionFromDirectory(ext).id;
   second.registerExtensionFromDirectory(ext);
   await second.activateExtension(id);
-  await first.disableExtension(id);
-  assert.equal(second.isExtensionEnabled(id), false);
+  await assert.rejects(first.disableExtension(id), (error: unknown) =>
+    error instanceof ProtocolError && error.code === "CONFLICT");
+  assert.equal(second.isExtensionEnabled(id), true);
   assert.equal(await second.executeCommand("sample.command"), "ok");
   await second.deactivateExtension(id);
+  await assert.rejects(first.disableExtension(id), (error: unknown) =>
+    error instanceof ProtocolError && error.code === "CONFLICT");
+  await second.disableExtension(id);
+  assert.equal(second.isExtensionEnabled(id), false);
   await assert.rejects(second.activateExtension(id), (error: unknown) =>
     error instanceof ProtocolError && error.code === "INVALID_STATE");
   await first.enableExtension(id);
