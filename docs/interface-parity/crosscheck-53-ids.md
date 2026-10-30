@@ -96,3 +96,17 @@ Como acordado, esta lista NÃO cria cards; somente registra onde um card novo se
 - P# bundle `resources/app/out/vs/workbench/workbench.desktop.main.js` (h `ed6922…`): inspeção futura do bundle congelado pode acrescentar estados de UI não documentados publicamente (só quando o bundle estiver disponível no ambiente — hoje gitignored/ausente).
 - `sources/cursor/changelog.html` (h `189f85…` via inventário): cruzar estados de UI listados no changelog congelado 3.24.18 com as URLs online usadas (O5/O12) — divergências, se houver, LOCAL prevalecerá e será anotada nos critérios correspondentes (nenhuma divergência detectável nesta rodada).
 - Pseudocódigo (`research/reverse-engineering/cursor-3.24.18/pseudocode/`): somente quando um critério específico de runtime for necessário; nenhum trecho substantivo copiado (regra da matriz).
+
+## Atualização de 30/10/2026 — estado real das implementações
+
+Esta matriz foi gerada sobre a `main` (1459ea3), que integra menos que as branches de trabalho. Itens marcados **PENDENTE** aqui já possuem implementação concluída em branches (aguardando integração; nenhum deles está pendente de implementação):
+
+| Item marcado PENDENTE | Implementação concluída em |
+|---|---|
+| TAB-02 (salto por teclado) | feat/task-169 @ d167302 |
+| TAB-03 (multiarquivo revisado) | feat/task-170 @ 2a7d9ed (código) + cenários em feat/task-194 @ 9501e1f |
+| SES-03 (checkpoint restauração) | feat/task-69 @ a04f52b (ancestral da base) + cenário ses-03 em feat/task-196 @ 586aa72 |
+| AGT-02 (plano inicia execução) | cenário agt-02 em feat/task-191 @ 7d6f7f4 (contrato); implementação de produto em linhas AGT precedentes |
+| AGT-04 (debug hipótese/evidência) | cenário agt-04 em feat/task-191 @ 7d6f7f4 (contrato) |
+
+Os 18 lacunas listadas continuam válidas como backlog de planejamento. Verificação independente do lote: APROVADO (relatório no card da task_182, 30/10/2026).
