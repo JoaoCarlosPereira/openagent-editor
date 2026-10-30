@@ -19,6 +19,12 @@ import { PER02_SCENARIO } from "../scenarios/per-02-cancel-execution.js";
 import { PER03_SCENARIO } from "../scenarios/per-03-readonly-block.js";
 import { STA01_SCENARIO } from "../scenarios/sta-01-terminal-state.js";
 import { VAL01_SCENARIO } from "../scenarios/val-01-empty-message.js";
+import { CTX01_SCENARIO } from "../scenarios/ctx-01-attach-context-summary.js";
+import { CTX02_SCENARIO } from "../scenarios/ctx-02-incremental-index.js";
+import { CTX03_SCENARIO } from "../scenarios/ctx-03-excluded-path-omitted.js";
+import { CTX04_SCENARIO } from "../scenarios/ctx-04-index-cleanup.js";
+import { PRV01_SCENARIO } from "../scenarios/prv-01-explicit-external-send.js";
+import { PRV02_SCENARIO } from "../scenarios/prv-02-redacted-tool-log.js";
 
 /** Requisitos cobertos pelo conjunto de cenários diferenciais do editor e agente. */
 export const EDITOR_REQUIREMENT_IDS = [
@@ -40,9 +46,15 @@ export const EDITOR_REQUIREMENT_IDS = [
   "PER-03",
   "STA-01",
   "VAL-01",
+  "CTX-01",
+  "CTX-02",
+  "CTX-03",
+  "CTX-04",
+  "PRV-01",
+  "PRV-02",
 ] as const;
 
-/** Cenários diferenciais de editor, agente, permissão e estado, dirigidos pelo driver dual (task_189). */
+/** Cenários diferenciais de editor, agente, permissão, estado, contexto e privacidade, dirigidos pelo driver dual (task_189). */
 export const EDITOR_SCENARIOS: readonly DualScenario[] = [
   LOC01_SCENARIO,
   UI01_SCENARIO,
@@ -62,6 +74,12 @@ export const EDITOR_SCENARIOS: readonly DualScenario[] = [
   PER03_SCENARIO,
   STA01_SCENARIO,
   VAL01_SCENARIO,
+  CTX01_SCENARIO,
+  CTX02_SCENARIO,
+  CTX03_SCENARIO,
+  CTX04_SCENARIO,
+  PRV01_SCENARIO,
+  PRV02_SCENARIO,
 ];
 
 export type EditorScenarioRun =
