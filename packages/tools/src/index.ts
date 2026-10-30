@@ -280,6 +280,27 @@ export {
 } from "./computer/linux-computer-adapter.js";
 
 export {
+  describeMacosComputerCapability,
+  MACOS_CHROME_EXECUTABLE_CANDIDATES,
+  MACOS_PERMISSIONS_NOTICE,
+  MACOS_REQUIRED_COMPUTER_PERMISSIONS,
+  MacosComputerUseAdapter,
+  prepareMacosComputerAction,
+  probeMacosComputerCapability,
+  type MacosChromeExecutableProbe,
+  type MacosComputerCapabilityResult,
+  type MacosComputerCapabilitySnapshot,
+  type MacosComputerLaunchWorker,
+  type MacosComputerPermission,
+  type MacosComputerProbeOptions,
+  type MacosComputerTargetLaunch,
+  type MacosComputerUseAdapterOptions,
+  type MacosComputerWorkerProcess,
+  type PrepareMacosComputerActionOptions,
+  type PreparedMacosComputerAction,
+} from "./computer/mac-computer-adapter.js";
+
+export {
   validateBrowserUrl,
   CdpTargetManager,
   InMemoryCdpTransport,
