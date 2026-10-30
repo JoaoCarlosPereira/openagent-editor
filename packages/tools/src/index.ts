@@ -235,6 +235,28 @@ export {
 } from "./mcp/load-local-customization-assets.js";
 
 export {
+  COMPUTER_SCREENSHOT_MOCK_BASE64,
+  COMPUTER_USE_CAPABILITY,
+  ComputerUseSession,
+  computerActionCdpCalls,
+  computerActionName,
+  executePolicyComputerAction,
+  formatAgentComputerToolResult,
+  formatComputerActionLabel,
+  preparePolicyComputerAction,
+  validateComputerAction,
+  type AgentComputerToolInvocationResult,
+  type ComputerActionAuthorization,
+  type ComputerActionInput,
+  type ComputerActionResult,
+  type ComputerActionType,
+  type ComputerUseCapability,
+  type PolicyComputerActionResult,
+  type PolicyComputerToolContext,
+  type PreparePolicyComputerActionInput,
+} from "./computer/index.js";
+
+export {
   validateBrowserUrl,
   CdpTargetManager,
   InMemoryCdpTransport,

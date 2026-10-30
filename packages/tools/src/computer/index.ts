@@ -25,3 +25,26 @@ export interface ComputerActionResult {
   screenshot?: string;
   timestamp: number;
 }
+
+/**
+ * AUT-02: adaptador policy/execução do computer use.
+ * Uma ação por vez, nomeada na permissão e com resultado visível.
+ */
+export {
+  COMPUTER_USE_CAPABILITY,
+  ComputerUseSession,
+  computerActionCdpCalls,
+  computerActionName,
+  executePolicyComputerAction,
+  formatAgentComputerToolResult,
+  formatComputerActionLabel,
+  preparePolicyComputerAction,
+  validateComputerAction,
+  type AgentComputerToolInvocationResult,
+  type ComputerActionAuthorization,
+  type ComputerUseCapability,
+  type PolicyComputerActionResult,
+  type PolicyComputerToolContext,
+  type PreparePolicyComputerActionInput,
+} from "./policy-computer-tools.js";
+export { COMPUTER_SCREENSHOT_MOCK_BASE64 } from "./policy-computer-tools.js";

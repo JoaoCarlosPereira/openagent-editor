@@ -11,6 +11,7 @@ const CAPABILITY_ACTION_LABELS: Record<string, string> = {
   "git.diff": "Consultar diff Git",
   "browser.open": "Abrir URL no navegador",
   "browser.navigate": "Navegar no navegador",
+  "computer.use": "Usar o computador",
   "tool.invoke": "Executar ferramenta",
   "run.write": "Controlar execução",
   "run.queue": "Alterar fila da execução",
