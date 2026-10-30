@@ -1,4 +1,4 @@
-/** INL-01: view do Inline Edit com diff, aceitar, rejeitar e refinar. */
+/** INL-01/INL-02: view do Inline Edit com diff, aceitar, rejeitar e refinar. */
 
 export type InlineEditPhase =
   | "idle"
@@ -8,7 +8,7 @@ export type InlineEditPhase =
   | "accepted"
   | "rejected";
 
-export type InlineEditMode = "selection" | "insert";
+export type InlineEditMode = "selection" | "insert" | "wholefile";
 
 export type InlineEditDiffRowKind = "context" | "add" | "remove";
 
@@ -41,6 +41,8 @@ export interface InlineEditViewSnapshot {
     canRefine: boolean;
     /** true quando o alvo e uma insercao no cursor (start == end). */
     insertAtCursor: boolean;
+    /** INL-02: true quando a edicao cobre o arquivo inteiro, com previa e restauracao por rejeitar. */
+    wholeFile: boolean;
     /** true quando o texto original permanecido intacto e visivel para revisao. */
     preservesOriginal: boolean;
     /** Rodadas de refino concluidas; o original permanece preservado em todas. */
@@ -152,7 +154,9 @@ export function buildInlineEditView(input: InlineEditViewInput): InlineEditViewS
     || ((input.phase === "accepted" || input.phase === "rejected") && input.proposal !== null);
   const showActions = input.phase === "generating" || input.phase === "refining" || inReview;
   const statusLabel = inlineEditStatusLabel(input.phase);
-  const keepsSelection = input.mode === "selection" && input.originalText !== null;
+  const keepsSelection =
+    (input.mode === "selection" || input.mode === "wholefile") && input.originalText !== null;
+  const isWholeFile = input.mode === "wholefile";
   const insertAtCursor = input.mode === "insert";
   const showsSelection = keepsSelection || insertAtCursor;
   const diffRows = showsDiff && input.originalText !== null && input.proposal !== null
@@ -170,7 +174,9 @@ export function buildInlineEditView(input: InlineEditViewInput): InlineEditViewS
     parts.push(
       insertAtCursor
         ? `<p data-testid="inline-edit-insert-cursor">${escapeHtml("Insercao no cursor")}</p>`
-        : `<p data-testid="inline-edit-selection">${escapeHtml("Selecao original")}</p>`,
+        : isWholeFile
+          ? `<p data-testid="inline-edit-whole-file">${escapeHtml("Edicao do arquivo inteiro")}</p>`
+          : `<p data-testid="inline-edit-selection">${escapeHtml("Selecao original")}</p>`,
     );
   }
   if (showsDiff) {
@@ -204,6 +210,7 @@ export function buildInlineEditView(input: InlineEditViewInput): InlineEditViewS
       canReject,
       canRefine,
       insertAtCursor,
+      wholeFile: isWholeFile,
       preservesOriginal: keepsSelection,
       refinementCount,
     },

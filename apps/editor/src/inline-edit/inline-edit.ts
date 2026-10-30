@@ -50,10 +50,21 @@ export interface InlineEditApplyEdit {
   replacement: string;
 }
 
+/** INL-02: restaura o conteudo do arquivo anterior ao pedido de edicao. */
+export interface InlineEditRestoreEdit {
+  content: string;
+}
+
 /** Porta do editor/daemon: gera a proposta e aplica o resultado revisado. */
 export interface InlineEditPort {
   generate(input: InlineEditGenerateInput): Promise<InlineEditGenerateResult>;
   apply(edit: InlineEditApplyEdit): Promise<void>;
+  /**
+   * INL-02: devolve o arquivo ao conteudo anterior ao pedido; usada por
+   * rejeitar no modo arquivo inteiro. Opcional para portas que garantem
+   * o original intacto sem escrita.
+   */
+  restore?(edit: InlineEditRestoreEdit): Promise<void>;
 }
 
 export interface InlineEditControllerOptions {
@@ -149,7 +160,13 @@ export class InlineEditController {
     return (async () => {
       try {
         const { document, start, end, instruction } = input;
-        const mode: InlineEditMode = start < end ? "selection" : "insert";
+        // INL-02: selecao que cobre o arquivo inteiro e edicao do arquivo inteiro
+        const mode: InlineEditMode =
+          start < end
+            ? start === 0 && end === document.length
+              ? "wholefile"
+              : "selection"
+            : "insert";
         const originalText = document.slice(start, end);
         const prefix = document.slice(
           Math.max(0, start - INLINE_EDIT_CONTEXT_PREFIX_LIMIT),
@@ -228,9 +245,25 @@ export class InlineEditController {
     if (this.phase !== "reviewing") {
       return Promise.reject(invalidState("Rejeitar exige edicao inline em revisao.", [this.phase]));
     }
+    const current = this.current;
     this.decideInFlight = true;
     return (async () => {
       try {
+        // INL-02: no arquivo inteiro, rejeitar restaura o conteudo anterior ao pedido
+        if (
+          current?.mode === "wholefile" &&
+          typeof current.document === "string" &&
+          typeof this.port.restore === "function"
+        ) {
+          try {
+            await this.port.restore({ content: current.document });
+          } catch (error) {
+            // restauracao falhada preserva a revisao, sem escrita
+            this.phase = "reviewing";
+            this.refreshView();
+            throw error;
+          }
+        }
         this.phase = "rejected";
         this.refreshView();
         return this.view;
