@@ -19,11 +19,9 @@
 import { createHash } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
-import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
 import os from "node:os";
-import zlib from "node:zlib";
 
 const require = createRequire(import.meta.url);
 // esbuild em ESM converte require de node:* para "Dynamic require" em runtime;
@@ -31,11 +29,8 @@ const require = createRequire(import.meta.url);
 const SEMIBANNER = `import { createRequire as __cr } from "node:module";\nconst require = __cr(import.meta.url);\n`;
 const esbuild = require("esbuild");
 const { execFileSync } = require("node:child_process");
-const tar = require("tar");
 
-const here = path.dirname(fileURLToPath(import.meta.url));
-const scriptDir = here;
-// o script roda de packaging/linux, mas o "here" real pode diferir quando chamado via CLI;
+// Resolve a raiz a partir de process.cwd() quando ele é o repo, subindo até achar o monorepo.
 // resolvemos a raiz a partir de process.cwd() quando ele é o repo, senão subimos até achar package.json.
 function findRepoRoot(startDir) {
   let dir = startDir;
@@ -72,7 +67,7 @@ export function buildPackageLinux(options = {}) {
     },
   };
 
-  for (const [label, spec] of Object.entries(entries)) {
+  for (const spec of Object.values(entries)) {
     fs.mkdirSync(path.dirname(spec.outfile), { recursive: true });
     // bundles: ESM node, externais apenas node:* — nada de npm runtime no pacote.
     esbuild.buildSync({
@@ -114,7 +109,7 @@ export function buildPackageLinux(options = {}) {
     'import "./runtime.mjs";\n',
   );
 
-  const bundleRuntime = esbuild.buildSync({
+  esbuild.buildSync({
     entryPoints: [path.join(editorRuntimeSrc, "runtime.ts")],
     bundle: true, platform: "node", format: "esm", target: "node20",
     external: ["node:*", "electron"],
@@ -159,37 +154,37 @@ usage() {
   cat <<USAGE
 Uso: install.sh [--prefix DIR] [--verify-only] [--help]
 
-Instala o OpenAgent Editor em \\\$HOME/.local/share/OpenAgent por padrão.
+Instala o OpenAgent Editor em $HOME/.local/share/OpenAgent por padrão.
 --verify-only confere os checksums e sai.
 USAGE
 }
-prefix="\${HOME}/.local/share/OpenAgent"
+prefix=""$HOME"/.local/share/OpenAgent"
 verify_only=0
-while [ \$# -gt 0 ]; do
-  case "\$1" in
-    --prefix) prefix="\$2"; shift 2 ;;
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --prefix) prefix="$2"; shift 2 ;;
     --verify-only) verify_only=1; shift ;;
     --help|-h) usage; exit 0 ;;
-    *) echo "opção desconhecida: \$1" >&2; usage >&2; exit 2 ;;
+    *) echo "opção desconhecida: $1" >&2; usage >&2; exit 2 ;;
   esac
 done
 command -v sha256sum >/dev/null 2>&1 || { echo "sha256sum ausente" >&2; exit 2; }
-cd "\$(dirname "\$0")"
+cd "$(dirname "$0")"
 [ -f sha256sums.txt ] || { echo "sha256sums.txt ausente" >&2; exit 2; }
 if ! sha256sum -c sha256sums.txt --status; then
   echo "checksum do pacote não confere" >&2
   exit 3
 fi
-if [ "\$verify_only" = "1" ]; then
+if [ "$verify_only" = "1" ]; then
   echo "checksums OK"
   exit 0
 fi
 command -v node >/dev/null 2>&1 || { echo "node >= 20 ausente no PATH" >&2; exit 4; }
-NODE_MAJOR=\$(node -p 'process.versions.node.split(".")[0]')
-[ "\$NODE_MAJOR" -ge 20 ] || { echo "node >= 20 necessário (encontrado \$NODE_MAJOR)" >&2; exit 4; }
-mkdir -p "\$prefix"
-cp -r bin workers sidecars editor package-manifest.json "\$prefix/"
-echo "instalado em \$prefix"
+NODE_MAJOR=$(node -p 'process.versions.node.split(".")[0]')
+[ "$NODE_MAJOR" -ge 20 ] || { echo "node >= 20 necessário (encontrado $NODE_MAJOR)" >&2; exit 4; }
+mkdir -p "$prefix"
+cp -r bin workers sidecars editor package-manifest.json "$prefix/"
+echo "instalado em $prefix"
 `;
   fs.writeFileSync(path.join(stagedDir, "install.sh"), installScript, { mode: 0o755 });
 
