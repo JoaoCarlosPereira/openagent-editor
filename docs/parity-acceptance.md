@@ -192,3 +192,50 @@ O conjunto foi estendido (`packages/parity/src/scenarios.ts`) com os sete cenár
 - Suítes com **0 falhas**: `npm test` 15/15; `npm run test:unit` 454/454 (inclui os 13 casos novos de `api-err-scenarios.test.ts` via colecionador `packages/*/test/**/*.test.ts`); `npm run test:integration` 321/321 (inclui os 13 casos novos de `api-err-scenarios.test.ts`); `npm run test:e2e` 48/48. Total 838 testes, 0 falhas, 0 excluídos silenciosamente.
 - `npm run parity:report` exit 0: status APROVADO, 53/53 requisitos presentes no catálogo canônico.
 - Sensor de mutação: 2 mutantes mortos em scratch `/tmp/opencode/t197-sensor` (symlink `node_modules`, sem `git stash`): `tokens: 200000 → 200001` em `api-03-context-ceiling-default.ts` (1 caso falhou) e `"Caminho fora do escopo." → "Caminho fora do escopo"` em `err-02-path-out-of-scope.ts` (1 caso falhou); baseline e pós-restauração 13/13 no scratch, worktree não alterado.
+
+## Preparação do aceite manual 53/53 — Linux (task_198)
+
+**Status: preparação concluída; aceite humano pendente.** O card task_198 é de aceite manual: a execução dos 53 cenários por uma pessoa, em produto instalado de pacote limpo com GUI real, não pode ser substituída por automação — este ambiente é Linux headless e o empacotamento e o runtime de IPC real vivem em branches ainda não integradas à base da paridade (`a59a8df`). O que foi entregue aqui é a **preparação completa** do aceite, com tudo que pode ser comprovado por máquina nesta máquina.
+
+### Artefatos de preparação
+
+- `packages/parity/report/uat-checklist.md` — checklist UAT 1:1 com o catálogo canônico (`packages/parity/src/catalog.ts`): para cada um dos 53 IDs, critério canônico, passos observáveis na ordem do cenário diferencial e evidência esperada (efeitos declarados por passo nos dois lados do dry-drive), mais coluna em branco `Resultado/evidência (pessoa)`.
+- `packages/parity/report/uat-checklist.json` — mesmo estado em formato machine-readable (`_fontes`, contagem, 53 entradas com `scenarioId`, `scenarioPath`, `steps`, `expectedEffects`).
+- Gerador: `scripts/uat-checklist.mjs` (executar `node --import tsx scripts/uat-checklist.mjs`). A geração falha se o catálogo ou a cobertura dos cenários não estiverem 53/53.
+- Fontes dos passos: cenários diferenciais dry-drive `packages/parity/scenarios/` (53 arquivos, task_188–task_197). Como registrado no doc da task_190: cenário sintético **não** prova paridade real por si só — é o roteiro do lado humano.
+- Sensor do script novo: 1 mutante em scratch `/tmp/opencode/mutant-198` (guarda `53 → 54`): mutante sai com `exit 1` e mensagem "matriz canônica incompleta"; original com os mesmos dados sai `0`. Mutante morto em `/tmp` (sem mutação no worktree).
+
+### Evidência de automação real desta máquina
+
+1. **Gate `build` na base `a59a8df` deste card (worktree `feat/task-198`):** `npm run check` exit 0; `npm run build` (npm ls + typecheck + lint) exit 0; `npm test` 15/15; `npm run test:unit` 454/454; `npm run test:integration` 321/321; `npm run test:e2e` 48/48; `npm run parity:report` exit 0 — status APROVADO, 53/53 requisitos presentes. Total: 838 testes, 0 falhas.
+2. **Pacote Linux da task_183 (branch `feat/task-183`, commit `d01cd39`) é funcional:** build do pacote produziu `openagent-editor-linux-x64.tar.gz` (sha256 `cce5c556be4a5544c98281624db289870f926741f8ef4c679b9fe6af6d174a6b`: `bin/` daemon, `workers/`, `sidecars/cliproxyapi/` pin+SBOM+provenance, `editor/`, `install.sh`, `sha256sums.txt`, `package-manifest.json`); `sh install.sh --verify-only` → "checksums OK"; `sh install.sh --prefix <dir-isolado>` → "instalado em <dir>" exit 0; smoke e2e do pacote `packaging/test/smoke/package-smoke.e2e.test.mts` 4/4 (build+checksum, instalação, handshake do daemon do pacote, worker de ferramentas embutido responde, checksum corrompido falha estável).
+3. **Boot real headless do runtime (branch `feat/editor-runtime-b601f98e`, commit `d111154`):** `electron --no-sandbox --disable-gpu --disable-dev-shm-usage apps/editor/runtime/main.mjs --runtime-smoke` → saída `{"runtimeSmoke":{"hasEditor":true,"isolated":true,"state":{"hasOpenDocument":true}}}` e `exit 0` — janela, preload via contextBridge, isolamento do renderer e round-trip real de IPC comprovados pelo processo Electron (não apenas a ponte em Node).
+
+### Estado integrado observado (honesto)
+
+- **Não integrado à base `a59a8df`:** nem `packaging/linux` (task_183), nem runtime com IPC/`--runtime-smoke` (editor-runtime), nem a dependência `electron`. As evidências 2 e 3 acima foram produzidas nas worktrees das próprias branches — válidas como prova de capacidade, **não** como pacote da linha base da paridade.
+- **Limitação declarada pelo task_183:** o binário do CLIProxyAPI não vai no pacote (release offline); o pacote entrega pin-manifest/SBOM/provenance com o checksum esperado. Validar o sidecar real é passo do UAT.
+- PRD (rastreabilidade) registra: "Nenhum ID do gate de 53 critérios está liberado".
+
+### Roteiro pronto para quem executa o aceite humano (Linux, máquina limpa)
+
+```sh
+# 1. A partir da integração da feat/task-183 (e do runtime de IPC):
+node packaging/linux/build-package-linux.mjs --out dist
+# 2. Conferir integridade e instalar em prefixo local (máquina limpa, node >= 20):
+sh dist/openagent-editor/install.sh --verify-only
+sh dist/openagent-editor/install.sh --prefix "$HOME"/.local/share/OpenAgent
+# 3. Abrir o editor em sessão gráfica e executar o checklist humano:
+#    packages/parity/report/uat-checklist.md (53 IDs), preenchendo o
+#    passo realizado, o resultado observado e a evidência (SO, versão,
+#    e Cursor/provedor por fixture).
+# 4. Salvar o preenchimento em packages/parity/report/uat-<so>-<data>.md
+#    e referenciar no card.
+```
+
+### O que ainda exige pessoa e máquina limpa (não marcado como feito)
+
+- Os 53 IDs do `uat-checklist.md` com coluna `Resultado/evidência` vazia — execução em GUI real, incluindo fluxo principal **e** caso de erro de cada requisito (ADR-001).
+- Instalação real do pacote em máquina limpa (a execução desta máquina foi em prefixo isolado, não numa máquina limpa de aceite).
+- Versões Windows e macOS (task_199 e task_200), fora do escopo deste card.
+
