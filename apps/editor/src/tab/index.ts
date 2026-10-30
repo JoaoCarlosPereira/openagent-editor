@@ -12,3 +12,12 @@ export {
   type GhostTextStream,
   type GhostTextViewSnapshot,
 } from "./ghost-text.js";
+export {
+  readTabAutoSuggestions,
+  removeTabAutoSuggestions,
+  TAB_SETTINGS_DIRNAME,
+  TAB_SETTINGS_FILENAME,
+  tabSettingsPath,
+  writeTabAutoSuggestions,
+  type TabWorkspaceSettings,
+} from "./auto-suggest.js";

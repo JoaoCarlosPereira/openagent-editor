@@ -53,6 +53,8 @@ export interface GhostTextControllerOptions {
   language?: string;
   kind?: CompletionKind;
   newCompletionId?: () => string;
+  /** TAB-01: false desliga a sugestão automática do workspace; adição e recusa seguem possíveis via API. */
+  autoSuggestionsDisabled?: boolean;
 }
 
 /** Liga a porta ao cliente do daemon, vinculando sessao e run. */
@@ -88,6 +90,7 @@ export class GhostTextController {
   private readonly port: GhostTextCompletionPort;
   private readonly language: string | undefined;
   private readonly kind: CompletionKind;
+  private readonly autoSuggestionsDisabled: boolean;
   private readonly newCompletionId: () => string;
   private bufferText: string;
   private cursor: number;
@@ -105,6 +108,7 @@ export class GhostTextController {
     this.port = options.port;
     this.language = options.language;
     this.kind = options.kind ?? "line";
+    this.autoSuggestionsDisabled = options.autoSuggestionsDisabled === true;
     this.newCompletionId = options.newCompletionId ?? (() => `ghost-${randomUUID()}`);
     this.bufferText = options.initialText ?? "";
     this.cursor = this.bufferText.length;
@@ -148,6 +152,13 @@ export class GhostTextController {
       this.cursor,
     );
     if (prefix.trim().length === 0) {
+      this.phase = "idle";
+      this.refreshView();
+      return this.view;
+    }
+    // Sugestão automática desligada no workspace: nenhum completion.start;
+    // sugestões pendentes são canceladas e o editor permanece em idle.
+    if (this.autoSuggestionsDisabled) {
       this.phase = "idle";
       this.refreshView();
       return this.view;
