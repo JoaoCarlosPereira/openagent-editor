@@ -40,6 +40,13 @@ import { CUS03_SCENARIO } from "../scenarios/cus-03-hook-denies-action.js";
 import { MCP01_SCENARIO } from "../scenarios/mcp-01-mcp-tools-permission.js";
 import { CLI01_SCENARIO } from "../scenarios/cli-01-reuse-workspace-config.js";
 import { CLI02_SCENARIO } from "../scenarios/cli-02-headless-session-in-editor.js";
+import { SES01_SCENARIO } from "../scenarios/ses-01-reopen-sessions-on-restart.js";
+import { SES02_SCENARIO } from "../scenarios/ses-02-export-session-text.js";
+import { SES03_SCENARIO } from "../scenarios/ses-03-checkpoint-restore-conflict.js";
+import { SES04_SCENARIO } from "../scenarios/ses-04-worktree-isolation.js";
+import { SES05_SCENARIO } from "../scenarios/ses-05-conversation-search.js";
+import { SES06_SCENARIO } from "../scenarios/ses-06-side-conversation-preserves-main.js";
+import { SES07_SCENARIO } from "../scenarios/ses-07-session-delete.js";
 
 /** Requisitos cobertos pelo conjunto de cenários diferenciais do editor e agente. */
 export const EDITOR_REQUIREMENT_IDS = [
@@ -82,9 +89,16 @@ export const EDITOR_REQUIREMENT_IDS = [
   "MCP-01",
   "CLI-01",
   "CLI-02",
+  "SES-01",
+  "SES-02",
+  "SES-03",
+  "SES-04",
+  "SES-05",
+  "SES-06",
+  "SES-07",
 ] as const;
 
-/** Cenários diferenciais de editor, agente, permissão, estado, contexto, privacidade, Tab, Inline, navegador, desenho, canvas, regras, MCP e CLI, dirigidos pelo driver dual. */
+/** Cenários diferenciais de editor, agente, permissão, estado, contexto, privacidade, Tab, Inline, navegador, desenho, canvas, regras, MCP, CLI e sessões, dirigidos pelo driver dual. */
 export const EDITOR_SCENARIOS: readonly DualScenario[] = [
   LOC01_SCENARIO,
   UI01_SCENARIO,
@@ -125,6 +139,13 @@ export const EDITOR_SCENARIOS: readonly DualScenario[] = [
   MCP01_SCENARIO,
   CLI01_SCENARIO,
   CLI02_SCENARIO,
+  SES01_SCENARIO,
+  SES02_SCENARIO,
+  SES03_SCENARIO,
+  SES04_SCENARIO,
+  SES05_SCENARIO,
+  SES06_SCENARIO,
+  SES07_SCENARIO,
 ];
 
 export type EditorScenarioRun =

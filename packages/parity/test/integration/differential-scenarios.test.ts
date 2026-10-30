@@ -321,5 +321,5 @@ test("relatório registra os cenários diferenciais por requisito", () => {
   for (const scenario of DIFFERENTIAL_SCENARIOS) {
     assert.ok(report.includes(scenario.scenarioId), `cenário ausente do relatório: ${scenario.scenarioId}`);
   }
-  assert.ok(report.includes("Cobertura: 39/39"));
+  assert.ok(report.includes("Cobertura: 46/46"));
 });

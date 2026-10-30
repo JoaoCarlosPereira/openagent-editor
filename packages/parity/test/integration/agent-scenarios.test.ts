@@ -268,8 +268,8 @@ test("cenários do agente são determinísticos e repetíveis", () => {
   }
 });
 
-test("conjunto completo cobre os 39 requisitos com a única divergência declarada do LOC-01", () => {
-  assert.equal(EDITOR_SCENARIOS.length, 39);
+test("conjunto completo cobre os 46 requisitos com a única divergência declarada do LOC-01", () => {
+  assert.equal(EDITOR_SCENARIOS.length, 46);
   assert.equal(EDITOR_SCENARIOS.length, EDITOR_REQUIREMENT_IDS.length);
   assert.deepEqual(
     EDITOR_SCENARIOS.map((scenario) => scenario.requirementId).join(","),
@@ -278,7 +278,7 @@ test("conjunto completo cobre os 39 requisitos com a única divergência declara
 
   const coverage = editorScenarioCoverage();
   assert.deepEqual(coverage.missing, []);
-  assert.equal(coverage.covered.length, 39);
+  assert.equal(coverage.covered.length, 46);
 
   const runs = runAllEditorScenarios();
   for (const run of runs) {

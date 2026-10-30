@@ -329,14 +329,14 @@ test("cenários de regras, MCP e CLI não mutam suas entradas", () => {
   }
 });
 
-test("conjunto completo cobre os 39 requisitos com a única divergência declarada do LOC-01", () => {
-  assert.equal(EDITOR_SCENARIOS.length, 39);
-  assert.equal(EDITOR_REQUIREMENT_IDS.length, 39);
+test("conjunto completo cobre os 46 requisitos com a única divergência declarada do LOC-01", () => {
+  assert.equal(EDITOR_SCENARIOS.length, 46);
+  assert.equal(EDITOR_REQUIREMENT_IDS.length, 46);
   const unknown = EDITOR_REQUIREMENT_IDS.filter((id) => !EDITOR_SCENARIOS.some((s) => s.requirementId === id));
   assert.deepEqual(unknown, []);
   const coverage = editorScenarioCoverage();
-  assert.equal(coverage.covered.length, 39);
-  assert.equal(coverage.required.length, 39);
+  assert.equal(coverage.covered.length, 46);
+  assert.equal(coverage.required.length, 46);
   for (const requirementId of ["CUS-01", "CUS-02", "CUS-03", "MCP-01", "CLI-01", "CLI-02"]) {
     assert.ok(
       EDITOR_SCENARIOS.some((s) => s.requirementId === requirementId),
@@ -359,5 +359,5 @@ test("relatório registra os cenários de regras, MCP e CLI por requisito", () =
     const scenario = scenarioOf(requirementId);
     assert.ok(report.includes(scenario.scenarioId), `cenário ausente do relatório: ${scenario.scenarioId}`);
   }
-  assert.ok(report.includes("Cobertura: 39/39"));
+  assert.ok(report.includes("Cobertura: 46/46"));
 });
