@@ -27,3 +27,7 @@ Cada cenário deve ser executado no Cursor de referência e no OpenAgent com o m
 | D01 | Distribuição | Instalar pacote próprio em Linux e Windows, atualizar e preservar configurações. |
 
 Serviços em nuvem e automações remotas serão avaliados na MVP seguinte. O provedor de modelo pode diferir do Cursor; a avaliação deve medir o comportamento da ferramenta e a qualidade mínima definida para o cenário, sem exigir respostas textualmente idênticas.
+
+## Driver de captura dual (task_189)
+
+`packages/parity/src/dual-driver.ts` expõe `driveDualCapture`, o driver usado pelos cenários diferenciais (task_190+): ele dirige os **mesmos passos** em duas superfícies — a superfície congelada do Cursor 3.24.18 (`product: "cursor"`, versão fixa) e a superfície do OpenAgent — e gera as duas capturas do contrato v1 (`packages/parity/src/capture.ts`, task_188) para o mesmo `requirementId` do catálogo. Superfícies são tabelas de efeitos puros (`dry-drive`): dados sintéticos por passo, sem acoplamento a marca ou binários do Cursor (proveniência behavioral, ADR-002/ADR-007). Cenários de exemplo: `packages/parity/scenarios/loc-01-open-folder.ts` e `packages/parity/scenarios/ui-01-agent-panel.ts`. Entrada ou estado inválido retorna o código estável `INVALID_STATE` sem efeito colateral e sem mutar a entrada. As capturas gêmeas alimentam a comparação diferencial por efeito conforme `docs/parity-acceptance.md`; cenários sintéticos não comprovam paridade real por si só — evidência real de aceite fica nas tarefas de UAT (task_198+).
