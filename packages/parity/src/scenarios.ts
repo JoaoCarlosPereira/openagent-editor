@@ -6,23 +6,47 @@ import { UI01_SCENARIO } from "../scenarios/ui-01-agent-panel.js";
 import { UI02_SCENARIO } from "../scenarios/ui-02-theme-panel.js";
 import { UI03_SCENARIO } from "../scenarios/ui-03-onboarding.js";
 import { UI04_SCENARIO } from "../scenarios/ui-04-agents-window.js";
+import { AGT01_SCENARIO } from "../scenarios/agt-01-ask-no-mutation.js";
+import { AGT02_SCENARIO } from "../scenarios/agt-02-plan-execution.js";
+import { AGT03_SCENARIO } from "../scenarios/agt-03-agent-multi-file-diff.js";
+import { AGT04_SCENARIO } from "../scenarios/agt-04-debug-hypothesis-evidence.js";
+import { AGT05_SCENARIO } from "../scenarios/agt-05-subagents-named.js";
+import { AGT06_SCENARIO } from "../scenarios/agt-06-message-queue.js";
+import { AGT07_SCENARIO } from "../scenarios/agt-07-subagent-cancel.js";
+import { PRJ01_SCENARIO } from "../scenarios/prj-01-local-coordinator.js";
 
-/** Requisitos cobertos pelo conjunto de cenários diferenciais do editor. */
+/** Requisitos cobertos pelo conjunto de cenários diferenciais do editor e agente. */
 export const EDITOR_REQUIREMENT_IDS = [
   "LOC-01",
   "UI-01",
   "UI-02",
   "UI-03",
   "UI-04",
+  "AGT-01",
+  "AGT-02",
+  "AGT-03",
+  "AGT-04",
+  "AGT-05",
+  "AGT-06",
+  "AGT-07",
+  "PRJ-01",
 ] as const;
 
-/** Cenários diferenciais do editor, dirigidos pelo driver dual (task_189). */
+/** Cenários diferenciais do editor e do agente local, dirigidos pelo driver dual (task_189). */
 export const EDITOR_SCENARIOS: readonly DualScenario[] = [
   LOC01_SCENARIO,
   UI01_SCENARIO,
   UI02_SCENARIO,
   UI03_SCENARIO,
   UI04_SCENARIO,
+  AGT01_SCENARIO,
+  AGT02_SCENARIO,
+  AGT03_SCENARIO,
+  AGT04_SCENARIO,
+  AGT05_SCENARIO,
+  AGT06_SCENARIO,
+  AGT07_SCENARIO,
+  PRJ01_SCENARIO,
 ];
 
 export type EditorScenarioRun =
@@ -142,7 +166,7 @@ export function formatEditorScenarioReport(): string {
   const runs = runAllEditorScenarios();
   const coverage = editorScenarioCoverage();
   const lines: string[] = [
-    "=== Cenários diferenciais do editor (dual dry-drive) ===",
+    "=== Cenários diferenciais do editor e agente (dual dry-drive) ===",
     `Requisitos obrigatórios: ${coverage.required.join(", ")}`,
     `Cobertura: ${coverage.covered.length}/${coverage.required.length}` +
       (coverage.missing.length === 0

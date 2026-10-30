@@ -47,3 +47,22 @@ O conjunto do editor (`packages/parity/src/scenarios.ts`, `EDITOR_SCENARIOS`) co
 - `runAllEditorScenarios()` dirige os cinco cenários e `compareDualSurfaces()` compara os efeitos observáveis por `(kind, name)` entre as superfícies; a única divergência de grupo declarada é `so-no-openagent: ui:package-identity` (identidade de pacote do LOC-01). `formatEditorScenarioReport()` produz um relatório textual reproduzível por requisito (passos, contagem de efeitos por lado e divergências).
 - Teste de integração co-localizado: `packages/parity/test/integration/editor-scenarios.test.ts` (7 casos: efeitos por requisito, determinismo, não-mutação da entrada, cobertura dos cinco requisitos, relatório, caminho de erro `INVALID_STATE` sem efeito colateral).
 - **Limites honestos de UAT**: os cenários são dry-drive sintético (dados puros de efeito) e demonstram o contrato bilateral do passo a passo do editor; **não substituem** o aceite manual em pacotes reais com Cursor de referência e UI executada — esse aceite acontece nas tasks 198+. A comparação valida paridade contratual dos efeitos, não paridade visual real. Versões registradas nas capturas: Cursor `3.24.18` (congelado) e OpenAgent `0.3.0`; plataforma dos lances: `linux` (rodadas Windows/macOS ficam para o aceite manual multiplataforma).
+
+## Cenários diferenciais do agente local (task_191)
+
+O conjunto do editor foi estendido (`packages/parity/src/scenarios.ts`) com os oito cenários diferenciais do agente local, cobrindo AGT-01..AGT-07 e PRJ-01 com dry-drive bilateral (superfícies `cursor` da versão congelada 3.24.18 e `openagent` da versão corrente `0.3.0`, plataforma `linux`):
+
+| Requisito | Cenário (`packages/parity/scenarios/`) | Passos observados |
+| --- | --- | --- |
+| AGT-01 | `agt-01-ask-no-mutation.ts` | modo Ask pergunta sobre função, responde usando leitura e busca; verificação de `files-written: 0` e `commands-executed: 0` |
+| AGT-02 | `agt-02-plan-execution.ts` | plano proposto no modo Plan, aceite, execução iniciada com o plano visível e progresso por etapas |
+| AGT-03 | `agt-03-agent-multi-file-diff.ts` | execução no modo Agent, edição de três arquivos (`multi-file-edit`), teste autorizado com resultado, diff agrupado e resultado por ferramenta |
+| AGT-04 | `agt-04-debug-hypothesis-evidence.ts` | hipótese registrada, evidência de execução, verificação e conclusão da tarefa somente após a ordem observada |
+| AGT-05 | `agt-05-subagents-named.ts` | divisão em subagentes locais; cada um com nome, estado e resultado próprios (`per-agent: true`) |
+| AGT-06 | `agt-06-message-queue.ts` | mensagem durante a execução entra na fila (`ordinal`), listagem ordenada, remoção permitida só de item não iniciado; item iniciado recusado com `CONFLICT` |
+| AGT-07 | `agt-07-subagent-cancel.ts` | cancelamento isolado de um subagente; demais preservados com `affected: 0` e run pai mantido |
+| PRJ-01 | `prj-01-local-coordinator.ts` | projeto com objetivo cria coordenador local, divisão em tarefas de agentes na mesma máquina, resultado por tarefa e decisão de aceitar/rejeitar |
+
+- Os oito cenários são **efeitos idênticos** nas duas superfícies (nenhuma divergência declarada); `runAllEditorScenarios()` dirige agora os 13 cenários e a cobertura canônica sobe de 5/5 para **13/13** (`EDITOR_REQUIREMENT_IDS` inclui AGT-01..07 e PRJ-01).
+- Teste de integração co-localizado: `packages/parity/test/integration/agent-scenarios.test.ts` (11 casos: verificação de efeitos e ordem por requisito, determinismo, não-mutação das entradas, cobertura dos 13 requisitos com a única divergência declarada do LOC-01 e relatório).
+- **Limites honestos de UAT**: como na task_190, os cenários são dry-drive sintético — demonstram o **contrato bilateral** dos passos do agente local (o que o produto deve observar a cada passo), mas **não provam** execução real pelo daemon, UI real ou paridade com o Cursor de referência: o aceite manual UAT desses oito requisitos (AGT-01..07, PRJ-01) fica nas tasks de UAT (task_198+), com SO, versão e provedor/fixture registrados nas alocações. Os valores dos efeitos (quantidades de arquivos, nomes de subagentes, resultados) são fixtures sintéticos representativos, não capturas de execução real.
