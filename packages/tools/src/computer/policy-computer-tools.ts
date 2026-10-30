@@ -285,8 +285,7 @@ export interface ComputerActionAuthorization {
   requestId: string;
 }
 
-export interface PolicyComputerActionResult {
-  capability: ComputerUseCapability;
+export interface PolicyComputerActionResult {  capability: ComputerUseCapability;
   tool: "computer.use";
   action: ComputerActionType;
   actionName: string;
@@ -345,7 +344,13 @@ export class ComputerUseSession {
   constructor(
     private readonly transport: CdpTransport,
     private readonly defaultTimeoutMs?: number,
-  ) {}
+    /** target anexado (Target.attachToTarget): roteia os comandos CDP para a sessão da página. */
+    options?: { cdpSessionId?: string },
+  ) {
+    this.cdpSessionId = options?.cdpSessionId;
+  }
+
+  private readonly cdpSessionId: string | undefined;
 
   get busy(): boolean {
     return this.inflight !== null;
@@ -400,11 +405,15 @@ export class ComputerUseSession {
     const calls = computerActionCdpCalls(action);
     const cdpCalls: string[] = [];
     for (const call of calls) {
-      await timed.send(call.method, call.params);
+      await timed.send(call.method, call.params, this.cdpSessionId);
       cdpCalls.push(call.method);
     }
 
-    const screenshotRes = await timed.send("Page.captureScreenshot", { format: "png" });
+    const screenshotRes = await timed.send(
+      "Page.captureScreenshot",
+      { format: "png" },
+      this.cdpSessionId,
+    );
     cdpCalls.push("Page.captureScreenshot");
     const screenshot = String(screenshotRes["data"] ?? "");
     if (!screenshot) {

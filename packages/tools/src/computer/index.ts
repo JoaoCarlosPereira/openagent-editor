@@ -48,3 +48,26 @@ export {
   type PreparePolicyComputerActionInput,
 } from "./policy-computer-tools.js";
 export { COMPUTER_SCREENSHOT_MOCK_BASE64 } from "./policy-computer-tools.js";
+
+export {
+  buildLinuxComputerTargetArgs,
+  classifyLinuxDisplayMode,
+  describeLinuxComputerCapability,
+  DEFAULT_CHROME_EXECUTABLE_CANDIDATES,
+  LinuxComputerUseAdapter,
+  prepareLinuxComputerAction,
+  probeLinuxComputerDisplay,
+  readLinuxDisplayEnvironment,
+  type LinuxChromiumExecutableProbe,
+  type LinuxComputerCapabilityResult,
+  type LinuxComputerCapabilitySnapshot,
+  type LinuxComputerLaunchWorker,
+  type LinuxComputerProbeOptions,
+  type LinuxComputerTargetLaunch,
+  type LinuxComputerUseAdapterOptions,
+  type LinuxComputerWorkerProcess,
+  type LinuxDisplayEnvironment,
+  type LinuxDisplayMode,
+  type PrepareLinuxComputerActionOptions,
+  type PreparedLinuxComputerAction,
+} from "./linux-computer-adapter.js";

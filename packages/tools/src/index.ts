@@ -257,6 +257,29 @@ export {
 } from "./computer/index.js";
 
 export {
+  buildLinuxComputerTargetArgs,
+  classifyLinuxDisplayMode,
+  describeLinuxComputerCapability,
+  DEFAULT_CHROME_EXECUTABLE_CANDIDATES,
+  LinuxComputerUseAdapter,
+  prepareLinuxComputerAction,
+  probeLinuxComputerDisplay,
+  readLinuxDisplayEnvironment,
+  type LinuxChromiumExecutableProbe,
+  type LinuxComputerCapabilityResult,
+  type LinuxComputerCapabilitySnapshot,
+  type LinuxComputerLaunchWorker,
+  type LinuxComputerProbeOptions,
+  type LinuxComputerTargetLaunch,
+  type LinuxComputerUseAdapterOptions,
+  type LinuxComputerWorkerProcess,
+  type LinuxDisplayEnvironment,
+  type LinuxDisplayMode,
+  type PrepareLinuxComputerActionOptions,
+  type PreparedLinuxComputerAction,
+} from "./computer/linux-computer-adapter.js";
+
+export {
   validateBrowserUrl,
   CdpTargetManager,
   InMemoryCdpTransport,

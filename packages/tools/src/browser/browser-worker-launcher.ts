@@ -14,7 +14,7 @@ import {
 import { WebSocketCdpTransport } from "./cdp-transport.js";
 
 /** Executaveis do Chrome/Chromium tentados em ordem até encontrar um instalado (AUT-01 + ADR-006). */
-const DEFAULT_CHROME_EXECUTABLE_CANDIDATES: readonly string[] = [
+export const DEFAULT_CHROME_EXECUTABLE_CANDIDATES: readonly string[] = [
   "/usr/bin/google-chrome",
   "/usr/bin/google-chrome-stable",
   "/usr/bin/chromium",
@@ -61,6 +61,11 @@ export interface LaunchBrowserWorkerOptions {
   startupTimeoutMs?: number;
   /** Somente testes: substitui a detecção real de sandbox nativa. */
   sandboxOptions?: DescribeSandboxCapabilityOptions;
+  /**
+   * Argumentos extras ao executável do Chromium definidos pelo chamador
+   * (ex.: adapter Linux do computer use com Wayland nativo — `--ozone-platform-hint=auto`).
+   */
+  extraChromiumArgs?: readonly string[];
 }
 
 async function resolveExecutable(
@@ -231,6 +236,7 @@ export async function launchBrowserWorker(
   const sandbox = describeSandboxCapability(options?.sandboxOptions);
 
   const chromeArgs = [
+    ...(options?.extraChromiumArgs ?? []),
     "--headless",
     "--disable-gpu",
     "--remote-debugging-port=0",
