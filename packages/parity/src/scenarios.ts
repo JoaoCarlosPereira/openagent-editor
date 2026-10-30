@@ -34,6 +34,12 @@ import { AUT01_SCENARIO } from "../scenarios/aut-01-authorized-browser.js";
 import { AUT02_SCENARIO } from "../scenarios/aut-02-computer-action-at-a-time.js";
 import { DES01_SCENARIO } from "../scenarios/des-01-element-code-attach.js";
 import { CAN01_SCENARIO } from "../scenarios/can-01-canvas-persistent-panel.js";
+import { CUS01_SCENARIO } from "../scenarios/cus-01-user-project-rules.js";
+import { CUS02_SCENARIO } from "../scenarios/cus-02-command-skill-plugin-origin.js";
+import { CUS03_SCENARIO } from "../scenarios/cus-03-hook-denies-action.js";
+import { MCP01_SCENARIO } from "../scenarios/mcp-01-mcp-tools-permission.js";
+import { CLI01_SCENARIO } from "../scenarios/cli-01-reuse-workspace-config.js";
+import { CLI02_SCENARIO } from "../scenarios/cli-02-headless-session-in-editor.js";
 
 /** Requisitos cobertos pelo conjunto de cenários diferenciais do editor e agente. */
 export const EDITOR_REQUIREMENT_IDS = [
@@ -70,9 +76,15 @@ export const EDITOR_REQUIREMENT_IDS = [
   "AUT-02",
   "DES-01",
   "CAN-01",
+  "CUS-01",
+  "CUS-02",
+  "CUS-03",
+  "MCP-01",
+  "CLI-01",
+  "CLI-02",
 ] as const;
 
-/** Cenários diferenciais de editor, agente, permissão, estado, contexto, privacidade, Tab, Inline, navegador, desenho e canvas, dirigidos pelo driver dual. */
+/** Cenários diferenciais de editor, agente, permissão, estado, contexto, privacidade, Tab, Inline, navegador, desenho, canvas, regras, MCP e CLI, dirigidos pelo driver dual. */
 export const EDITOR_SCENARIOS: readonly DualScenario[] = [
   LOC01_SCENARIO,
   UI01_SCENARIO,
@@ -107,6 +119,12 @@ export const EDITOR_SCENARIOS: readonly DualScenario[] = [
   AUT02_SCENARIO,
   DES01_SCENARIO,
   CAN01_SCENARIO,
+  CUS01_SCENARIO,
+  CUS02_SCENARIO,
+  CUS03_SCENARIO,
+  MCP01_SCENARIO,
+  CLI01_SCENARIO,
+  CLI02_SCENARIO,
 ];
 
 export type EditorScenarioRun =
