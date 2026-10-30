@@ -14,6 +14,11 @@ import { AGT05_SCENARIO } from "../scenarios/agt-05-subagents-named.js";
 import { AGT06_SCENARIO } from "../scenarios/agt-06-message-queue.js";
 import { AGT07_SCENARIO } from "../scenarios/agt-07-subagent-cancel.js";
 import { PRJ01_SCENARIO } from "../scenarios/prj-01-local-coordinator.js";
+import { PER01_SCENARIO } from "../scenarios/per-01-permission-accept.js";
+import { PER02_SCENARIO } from "../scenarios/per-02-cancel-execution.js";
+import { PER03_SCENARIO } from "../scenarios/per-03-readonly-block.js";
+import { STA01_SCENARIO } from "../scenarios/sta-01-terminal-state.js";
+import { VAL01_SCENARIO } from "../scenarios/val-01-empty-message.js";
 
 /** Requisitos cobertos pelo conjunto de cenários diferenciais do editor e agente. */
 export const EDITOR_REQUIREMENT_IDS = [
@@ -30,9 +35,14 @@ export const EDITOR_REQUIREMENT_IDS = [
   "AGT-06",
   "AGT-07",
   "PRJ-01",
+  "PER-01",
+  "PER-02",
+  "PER-03",
+  "STA-01",
+  "VAL-01",
 ] as const;
 
-/** Cenários diferenciais do editor e do agente local, dirigidos pelo driver dual (task_189). */
+/** Cenários diferenciais de editor, agente, permissão e estado, dirigidos pelo driver dual (task_189). */
 export const EDITOR_SCENARIOS: readonly DualScenario[] = [
   LOC01_SCENARIO,
   UI01_SCENARIO,
@@ -47,6 +57,11 @@ export const EDITOR_SCENARIOS: readonly DualScenario[] = [
   AGT06_SCENARIO,
   AGT07_SCENARIO,
   PRJ01_SCENARIO,
+  PER01_SCENARIO,
+  PER02_SCENARIO,
+  PER03_SCENARIO,
+  STA01_SCENARIO,
+  VAL01_SCENARIO,
 ];
 
 export type EditorScenarioRun =
