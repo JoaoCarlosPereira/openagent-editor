@@ -301,6 +301,27 @@ export {
 } from "./computer/mac-computer-adapter.js";
 
 export {
+  describeWindowsComputerCapability,
+  WINDOWS_CHROME_EXECUTABLE_CANDIDATES,
+  WINDOWS_COMPUTER_PIPE,
+  WindowsComputerUseAdapter,
+  prepareWindowsComputerAction,
+  probeWindowsComputerCapability,
+  resolveWindowsChromeAppType,
+  type PrepareWindowsComputerActionOptions,
+  type PreparedWindowsComputerAction,
+  type WindowsChromeAppType,
+  type WindowsChromeExecutableProbe,
+  type WindowsComputerCapabilityResult,
+  type WindowsComputerCapabilitySnapshot,
+  type WindowsComputerLaunchWorker,
+  type WindowsComputerProbeOptions,
+  type WindowsComputerTargetLaunch,
+  type WindowsComputerUseAdapterOptions,
+  type WindowsComputerWorkerProcess,
+} from "./computer/win-computer-adapter.js";
+
+export {
   validateBrowserUrl,
   CdpTargetManager,
   InMemoryCdpTransport,
@@ -312,6 +333,7 @@ export {
   preparePolicyBrowserOpen,
   AuthorizedBrowserSession,
   launchBrowserWorker,
+  parseDevToolsActivePort,
   type AgentBrowserToolInvocationResult,
   type BrowserCdpToolResult,
   type BrowserConsoleLogEntry,

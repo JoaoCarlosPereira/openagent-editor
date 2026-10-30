@@ -87,6 +87,20 @@ async function resolveExecutable(
   );
 }
 
+/**
+ * Parse do DevToolsActivePort do target isolado (AUT-01/PAD).
+ * Tolerante a quebras de linha LF e CRLF (o ramo do Windows grava o arquivo
+ * com CRLF; o `\r` residual não pode poluir o caminho do endpoint).
+ * Retorna `null` enquanto o arquivo não estiver completo.
+ */
+export function parseDevToolsActivePort(raw: string): string | null {
+  const [port, path] = raw.trim().split(/\r?\n/);
+  if (port && path) {
+    return `ws://127.0.0.1:${port}${path}`;
+  }
+  return null;
+}
+
 async function readDevToolsEndpoint(
   profileDir: string,
   timeoutMs: number,
@@ -95,9 +109,9 @@ async function readDevToolsEndpoint(
   while (Date.now() < deadline) {
     try {
       const raw = await readFile(join(profileDir, "DevToolsActivePort"), "utf8");
-      const [port, path] = raw.trim().split("\n");
-      if (port && path) {
-        return `ws://127.0.0.1:${port}${path}`;
+      const endpoint = parseDevToolsActivePort(raw);
+      if (endpoint) {
+        return endpoint;
       }
     } catch {
       // Arquivo ainda não escrito pelo processo do navegador; tenta novamente.
