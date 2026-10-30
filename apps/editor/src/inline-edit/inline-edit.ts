@@ -37,6 +37,11 @@ export interface InlineEditGenerateInput {
   prefix: string;
   suffix: string;
   mode: InlineEditMode;
+  /**
+   * Proposta em revisao que origina este pedido de refino; ausente na
+   * geracao inicial. Garante que o refino parte do diff existente.
+   */
+  previousProposal?: string;
 }
 
 export interface InlineEditApplyEdit {
@@ -100,6 +105,7 @@ export class InlineEditController {
   private generationInFlight = false;
   private decideInFlight = false;
   private phase: InlineEditPhase = "idle";
+  private refinementCount = 0;
   private current: InlineEditCurrent | null = null;
   private view: InlineEditViewSnapshot;
 
@@ -152,6 +158,7 @@ export class InlineEditController {
         const suffix = document.slice(end, end + INLINE_EDIT_CONTEXT_SUFFIX_LIMIT);
         this.current = { document, start, end, mode, originalText, proposal: null };
         this.phase = "generating";
+        this.refinementCount = 0;
         this.refreshView();
         const proposal = await this.port.generate({
           instruction,
@@ -271,11 +278,14 @@ export class InlineEditController {
           ),
           suffix: refined.document.slice(refined.end, refined.end + INLINE_EDIT_CONTEXT_SUFFIX_LIMIT),
           mode: refined.mode,
+          // o refino parte do diff existente: a proposta em revisao acompanha
+          previousProposal: editing.proposal ?? undefined,
         });
         if (typeof proposal?.content !== "string") {
           throw invalidState("Proposta da edicao inline invalida.", ["content"]);
         }
         refined.proposal = proposal.content;
+        this.refinementCount += 1;
         this.phase = "reviewing";
         this.refreshView();
         return this.view;
@@ -298,6 +308,7 @@ export class InlineEditController {
     }
     this.phase = "idle";
     this.current = null;
+    this.refinementCount = 0;
     this.refreshView();
     return this.view;
   }
@@ -308,6 +319,7 @@ export class InlineEditController {
       mode: this.current?.mode ?? null,
       proposal: this.current?.proposal ?? null,
       originalText: this.current?.originalText ?? null,
+      refinementCount: this.refinementCount,
     });
   }
 

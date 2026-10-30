@@ -22,6 +22,8 @@ export interface InlineEditViewInput {
   mode: InlineEditMode | null;
   proposal: string | null;
   originalText: string | null;
+  /** Rodadas de refino concluidas nesta edicao; ausente equivale a 0. */
+  refinementCount?: number;
 }
 
 export interface InlineEditViewSnapshot {
@@ -41,6 +43,8 @@ export interface InlineEditViewSnapshot {
     insertAtCursor: boolean;
     /** true quando o texto original permanecido intacto e visivel para revisao. */
     preservesOriginal: boolean;
+    /** Rodadas de refino concluidas; o original permanece preservado em todas. */
+    refinementCount: number;
   };
 }
 
@@ -138,6 +142,7 @@ function renderDiffRow(row: InlineEditDiffRow): string {
 }
 
 export function buildInlineEditView(input: InlineEditViewInput): InlineEditViewSnapshot {
+  const refinementCount = input.refinementCount ?? 0;
   const inReview = input.phase === "reviewing";
   const canAccept = inReview;
   const canReject = inReview;
@@ -157,6 +162,7 @@ export function buildInlineEditView(input: InlineEditViewInput): InlineEditViewS
   const parts: string[] = [
     `<section data-testid="inline-edit-panel"`,
     input.mode !== null ? ` data-mode="${input.mode}"` : ``,
+    ` data-refinements="${refinementCount}"`,
     ` data-phase="${input.phase}">`,
     `<p data-testid="inline-edit-status" role="status">${statusLabel}</p>`,
   ];
@@ -199,6 +205,7 @@ export function buildInlineEditView(input: InlineEditViewInput): InlineEditViewS
       canRefine,
       insertAtCursor,
       preservesOriginal: keepsSelection,
+      refinementCount,
     },
   };
 }
