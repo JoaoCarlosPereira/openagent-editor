@@ -276,8 +276,8 @@ test("cenários de contexto e privacidade são determinísticos e repetíveis", 
   }
 });
 
-test("conjunto completo cobre os 46 requisitos com a única divergência declarada do LOC-01", () => {
-  assert.equal(EDITOR_SCENARIOS.length, 46);
+test("conjunto completo cobre os 53 requisitos com a única divergência declarada do LOC-01", () => {
+  assert.equal(EDITOR_SCENARIOS.length, 53);
   assert.equal(EDITOR_SCENARIOS.length, EDITOR_REQUIREMENT_IDS.length);
   assert.deepEqual(
     EDITOR_SCENARIOS.map((scenario) => scenario.requirementId).join(","),
@@ -286,7 +286,7 @@ test("conjunto completo cobre os 46 requisitos com a única divergência declara
 
   const coverage = editorScenarioCoverage();
   assert.deepEqual(coverage.missing, []);
-  assert.equal(coverage.covered.length, 46);
+  assert.equal(coverage.covered.length, 53);
 
   const runs = runAllEditorScenarios();
   for (const run of runs) {
@@ -309,5 +309,5 @@ test("relatório registra os cenários de contexto e privacidade por requisito",
   for (const scenario of CTX_PRIVACY_SCENARIOS) {
     assert.ok(report.includes(scenario.scenarioId), `cenário ausente do relatório: ${scenario.scenarioId}`);
   }
-  assert.ok(report.includes("Cobertura: 46/46"));
+  assert.ok(report.includes("Cobertura: 53/53"));
 });

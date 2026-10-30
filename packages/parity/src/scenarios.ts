@@ -47,6 +47,13 @@ import { SES04_SCENARIO } from "../scenarios/ses-04-worktree-isolation.js";
 import { SES05_SCENARIO } from "../scenarios/ses-05-conversation-search.js";
 import { SES06_SCENARIO } from "../scenarios/ses-06-side-conversation-preserves-main.js";
 import { SES07_SCENARIO } from "../scenarios/ses-07-session-delete.js";
+import { API01_SCENARIO } from "../scenarios/api-01-provider-test-vault.js";
+import { API02_SCENARIO } from "../scenarios/api-02-provider-failure-preserves-diff.js";
+import { API03_SCENARIO } from "../scenarios/api-03-context-ceiling-default.js";
+import { ERR01_SCENARIO } from "../scenarios/err-01-file-changed-conflict-versions.js";
+import { ERR02_SCENARIO } from "../scenarios/err-02-path-out-of-scope.js";
+import { ERR03_SCENARIO } from "../scenarios/err-03-incomplete-stream-retry.js";
+import { ERR04_SCENARIO } from "../scenarios/err-04-index-removes-recently-excluded.js";
 
 /** Requisitos cobertos pelo conjunto de cenários diferenciais do editor e agente. */
 export const EDITOR_REQUIREMENT_IDS = [
@@ -96,9 +103,16 @@ export const EDITOR_REQUIREMENT_IDS = [
   "SES-05",
   "SES-06",
   "SES-07",
+  "API-01",
+  "API-02",
+  "API-03",
+  "ERR-01",
+  "ERR-02",
+  "ERR-03",
+  "ERR-04",
 ] as const;
 
-/** Cenários diferenciais de editor, agente, permissão, estado, contexto, privacidade, Tab, Inline, navegador, desenho, canvas, regras, MCP, CLI e sessões, dirigidos pelo driver dual. */
+/** Cenários diferenciais de editor, agente, permissão, estado, contexto, privacidade, Tab, Inline, navegador, desenho, canvas, regras, MCP, CLI, sessões, provedor e casos de borda, dirigidos pelo driver dual. */
 export const EDITOR_SCENARIOS: readonly DualScenario[] = [
   LOC01_SCENARIO,
   UI01_SCENARIO,
@@ -146,6 +160,13 @@ export const EDITOR_SCENARIOS: readonly DualScenario[] = [
   SES05_SCENARIO,
   SES06_SCENARIO,
   SES07_SCENARIO,
+  API01_SCENARIO,
+  API02_SCENARIO,
+  API03_SCENARIO,
+  ERR01_SCENARIO,
+  ERR02_SCENARIO,
+  ERR03_SCENARIO,
+  ERR04_SCENARIO,
 ];
 
 export type EditorScenarioRun =
