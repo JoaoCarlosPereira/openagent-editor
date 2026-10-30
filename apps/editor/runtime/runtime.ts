@@ -74,6 +74,29 @@ async function start() {
   ipcMain.handle("editor:action", (event, action: unknown, value: unknown) =>
     bridge.dispatch(event, action, value));
   await current.loadFile(path.join(here, "index.html"));
+
+  // Modo automação: comprova com o processo Electron real a inicialização
+  // da janela, o carregamento do preload via contextBridge, o isolamento
+  // do renderer e o round-trip real de IPC. Sair depois do resultado.
+  if (process.argv.includes("--runtime-smoke")) {
+    try {
+      const result = await current.webContents.executeJavaScript(
+        `new Promise((resolve) => {
+          const isol = typeof process === "undefined" && typeof require === "undefined";
+          if (!isol) return resolve({ hasEditor: !!window.editor, isolated: false, state: null });
+          Promise.resolve(window.editor?.state?.()).then((state) => {
+            resolve({ hasEditor: !!window.editor, isolated: true, state: state ? { hasOpenDocument: "document" in state } : null });
+          }, () => resolve({ hasEditor: !!window.editor, isolated: true, state: null }));
+        })`, false);
+      console.log(JSON.stringify({ runtimeSmoke: result }));
+      app.exit(0);
+      return;
+    } catch (error) {
+      console.log(JSON.stringify({ runtimeSmoke: { error: String(error) } }));
+      app.exit(1);
+      return;
+    }
+  }
 }
 
 app.on("window-all-closed", () => app.quit());
