@@ -8,6 +8,9 @@
  */
 
 import {
+  type ContextAttachmentDraft,
+} from "@openagent/context";
+import {
   validateBrowserUrl,
   type BrowserConsoleLogEntry,
 } from "@openagent/tools";
@@ -21,20 +24,32 @@ import {
   type RpcParamsMap,
 } from "@openagent/protocol";
 
+import { elementSelectionToAttachmentDraft } from "./browser-draw-mode.js";
 import {
   buildBrowserPanelView,
+  type BrowserPanelDrawSelectionRow,
   type BrowserPanelEvidenceRow,
   type BrowserPanelUiPhase,
   type BrowserPanelViewSnapshot,
 } from "./browser-panel-view.js";
 
 export type {
+  BrowserPanelDrawSelectionRow,
   BrowserPanelEvidenceRow,
   BrowserPanelLastInteraction,
   BrowserPanelUiPhase,
   BrowserPanelViewSnapshot,
 } from "./browser-panel-view.js";
-export { buildBrowserPanelView, browserPanelStatusLabel } from "./browser-panel-view.js";
+export type {
+  DrawModeElementSelection,
+  DrawModeSelectionContext,
+} from "./browser-draw-mode.js";
+export {
+  buildBrowserPanelView,
+  browserPanelStatusLabel,
+  browserDrawModeButtonLabel,
+} from "./browser-panel-view.js";
+export { elementSelectionToAttachmentDraft } from "./browser-draw-mode.js";
 
 /** Evento emitido pelo daemon quando a execução autorizada do navegador falha (task_175). */
 export const BROWSER_OPEN_FAILED_EVENT = "browser.open.failed";
@@ -95,6 +110,14 @@ export class BrowserPanelController {
   private evidenceRow: BrowserPanelEvidenceRow | null = null;
   private errorMessage: string | null = null;
   private lastResultRefValue: string | null = null;
+  /** DES-01: modo desenho ativo sobre o target autorizado. */
+  private drawMode = false;
+  /** DES-01: seleção pendente de anexo à mensagem seguinte. */
+  private pendingSelection:
+    | { row: BrowserPanelDrawSelectionRow; draft: ContextAttachmentDraft }
+    | null = null;
+  /** DES-01: contador para desambiguar seleções repetidas. */
+  private selectionSequence = 0;
   private view: BrowserPanelViewSnapshot;
 
   constructor(options: { runId: string; sessionId: string }) {
@@ -272,6 +295,99 @@ export class BrowserPanelController {
   }
 
   /**
+   * DES-01: ativa/desativa o modo desenho sobre o target autorizado.
+   * Exige navegador autorizado com captura exibida (fase evidence);
+   * ativação duplicada ou desativação sem ativo → INVALID_STATE.
+   */
+  setDrawMode(enabled: unknown): { view: BrowserPanelViewSnapshot } {
+    if (typeof enabled !== "boolean") {
+      throw invalidState("Estado do modo desenho inválido.", ["drawMode"]);
+    }
+    if (enabled) {
+      if (this.phase !== "evidence" || this.evidenceRow === null) {
+        throw invalidState(
+          "Modo desenho exige navegador autorizado com captura exibida.",
+          [this.phase],
+        );
+      }
+      if (this.drawMode) {
+        throw invalidState("Modo desenho já está ativo nesta execução.", []);
+      }
+      this.drawMode = true;
+    } else {
+      if (!this.drawMode) {
+        throw invalidState("Modo desenho não está ativo nesta execução.", []);
+      }
+      this.drawMode = false;
+    }
+    this.refreshView();
+    return { view: this.view };
+  }
+
+  /**
+   * DES-01: seleção de elemento na captura em modo desenho. Produz o rascunho
+   * de anexo (identidade + trecho de código) para a mensagem seguinte do agente
+   * — nada é enviado aqui; o envio continua sendo ato explícito no composer.
+   */
+  selectElement(rawSelection: unknown): { view: BrowserPanelViewSnapshot } {
+    if (
+      !this.drawMode ||
+      this.phase !== "evidence" ||
+      this.evidenceRow === null
+    ) {
+      throw invalidState(
+        "Seleção de elemento exige modo desenho ativo com captura exibida.",
+        [this.drawMode ? this.phase : "desenho-desativado"],
+      );
+    }
+    if (!isRecord(rawSelection)) {
+      throw invalidState("Seleção de elemento inválida.", ["selection"]);
+    }
+    const selector = rawSelection["selector"];
+    const codeSnippet = rawSelection["codeSnippet"];
+    if (!isNonEmptyString(selector)) {
+      throw invalidState("Seletor da seleção inválido.", ["selector"]);
+    }
+    if (!isNonEmptyString(codeSnippet)) {
+      throw invalidState("Trecho de código da seleção inválido.", ["codeSnippet"]);
+    }
+    this.selectionSequence += 1;
+    const normalizedSelector = selector.trim();
+    const draft = elementSelectionToAttachmentDraft(
+      { selector: normalizedSelector, codeSnippet },
+      { url: this.evidenceRow.url, sequence: this.selectionSequence },
+    );
+    this.pendingSelection = {
+      draft,
+      row: {
+        id: draft.id,
+        selector: normalizedSelector,
+        codeSnippet,
+        url: this.evidenceRow.url,
+      },
+    };
+    this.refreshView();
+    return { view: this.view };
+  }
+
+  /**
+   * DES-01: entrega o anexo da próxima mensagem do agente (consumo único).
+   * Depois de consumida, nova mensagem só traz anexo com nova seleção.
+   */
+  takeSelectionAttachment(): { attachment: ContextAttachmentDraft } {
+    if (this.pendingSelection === null) {
+      throw invalidState(
+        "Nenhuma seleção pendente para anexar à mensagem seguinte.",
+        [],
+      );
+    }
+    const attachment = this.pendingSelection.draft;
+    this.pendingSelection = null;
+    this.refreshView();
+    return { attachment };
+  }
+
+  /**
    * Consume eco do stream da run: tool.result (evidência disponível no CAS)
    * ou browser.open.failed (falha preservando a evidência anterior).
    */
@@ -443,6 +559,8 @@ export class BrowserPanelController {
       pendingPrompt: this.pendingPrompt,
       evidence: this.evidenceRow,
       errorMessage: this.errorMessage,
+      drawMode: this.drawMode,
+      pendingSelection: this.pendingSelection?.row ?? null,
     });
   }
 

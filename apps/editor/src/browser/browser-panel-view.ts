@@ -24,6 +24,14 @@ export interface BrowserPanelEvidenceRow {
   consoleLogs: readonly BrowserConsoleLogEntry[];
 }
 
+/** DES-01: seleção de elemento pendente de anexo na mensagem seguinte. */
+export interface BrowserPanelDrawSelectionRow {
+  id: string;
+  selector: string;
+  codeSnippet: string;
+  url: string;
+}
+
 export interface BrowserPanelViewInput {
   runId: string;
   sessionId: string;
@@ -34,6 +42,10 @@ export interface BrowserPanelViewInput {
   pendingPrompt: { action: string; target: string; scopeLabel: string } | null;
   evidence: BrowserPanelEvidenceRow | null;
   errorMessage: string | null;
+  /** DES-01: modo desenho (seleção de elemento na captura autorizada). */
+  drawMode: boolean;
+  /** DES-01: seleção pendente de anexo à mensagem seguinte. */
+  pendingSelection: BrowserPanelDrawSelectionRow | null;
 }
 
 export interface BrowserPanelViewSnapshot {
@@ -54,6 +66,19 @@ export interface BrowserPanelViewSnapshot {
     canOpen: boolean;
     canClick: boolean;
     errorMessage: string | null;
+    /** DES-01: modo desenho ativado sobre o target autorizado. */
+    drawMode: boolean;
+    /** DES-01: seleção pendente para a próxima mensagem do agente. */
+    pendingSelection: {
+      id: string;
+      selector: string;
+      codeSnippetPresent: boolean;
+      url: string;
+    } | null;
+    /** DES-01: modo desenho pode ser ativado (navegador autorizado com captura). */
+    canEnterDrawMode: boolean;
+    /** DES-01: seleção de elemento permitida no estado corrente. */
+    canSelectElement: boolean;
   };
 }
 
@@ -138,6 +163,48 @@ function renderEvidence(evidence: BrowserPanelEvidenceRow): string {
   ].join("");
 }
 
+/** DES-01: captura autorizada permite entrar/desativar o modo desenho. */
+export function browserDrawModeButtonLabel(drawMode: boolean): string {
+  return drawMode ? "Sair do modo desenho" : "Ativar modo desenho";
+}
+
+function renderDrawModeControls(
+  phase: BrowserPanelUiPhase,
+  drawMode: boolean,
+): string {
+  const controls: string[] = [];
+  if (phase === "evidence") {
+    controls.push(
+      `<button type="button" data-testid="browser-draw-mode-button"`,
+      ` aria-label="${escapeHtml(browserDrawModeButtonLabel(drawMode))}"`,
+      `>${escapeHtml(browserDrawModeButtonLabel(drawMode))}</button>`,
+    );
+  }
+  if (drawMode && phase === "evidence") {
+    controls.push(
+      `<p data-testid="browser-draw-mode-active"`,
+      ` aria-label="Modo desenho ativo">Modo desenho ativo: selecione um`,
+      ` elemento na captura para anexar identidade e código</p>`,
+    );
+  }
+  return controls.join("");
+}
+
+function renderPendingSelection(
+  selection: BrowserPanelDrawSelectionRow,
+): string {
+  return [
+    `<div data-testid="browser-draw-selection"`,
+    ` data-selection-id="${escapeHtml(selection.id)}"`,
+    ` data-selector="${escapeHtml(selection.selector)}">`,
+    `<p data-testid="browser-draw-selection-identity">Elemento:`,
+    ` ${escapeHtml(selection.selector)} em ${escapeHtml(selection.url)}</p>`,
+    `<pre data-testid="browser-draw-code-snippet"><code>${escapeHtml(selection.codeSnippet)}</code></pre>`,
+    `<p data-testid="browser-draw-attachment-note">Anexo da próxima mensagem</p>`,
+    `</div>`,
+  ].join("");
+}
+
 /** AUT-01: autorização → URL aberta e interação autorizada → captura e texto de console visíveis. */
 export function buildBrowserPanelView(
   input: BrowserPanelViewInput,
@@ -186,11 +253,18 @@ export function buildBrowserPanelView(
     ? `<p data-testid="browser-open-hint">Informe seletor para interagir no target autorizado</p>`
     : "";
 
+  const drawControls = renderDrawModeControls(input.phase, input.drawMode);
+  const drawSelectionBlock =
+    input.pendingSelection === null
+      ? ""
+      : renderPendingSelection(input.pendingSelection);
+
   const html = [
     `<section data-testid="browser-panel" aria-label="Painel do navegador"`,
     ` data-run-id="${escapeHtml(input.runId)}"`,
     ` data-session-id="${escapeHtml(input.sessionId)}"`,
-    ` data-phase="${escapeHtml(input.phase)}">`,
+    ` data-phase="${escapeHtml(input.phase)}"`,
+    ` data-draw-mode="${input.drawMode ? "on" : "off"}">`,
     `<h2 data-testid="browser-panel-title">Navegador</h2>`,
     `<p data-testid="browser-status" aria-live="polite">${escapeHtml(phaseLabel)}</p>`,
     openForm,
@@ -198,6 +272,8 @@ export function buildBrowserPanelView(
     failureBlock,
     evidenceBlock,
     hint,
+    drawControls,
+    drawSelectionBlock,
     `</section>`,
   ].join("");
 
@@ -222,6 +298,18 @@ export function buildBrowserPanelView(
       canOpen,
       canClick,
       errorMessage: input.errorMessage,
+      drawMode: input.drawMode,
+      pendingSelection:
+        input.pendingSelection === null
+          ? null
+          : {
+              id: input.pendingSelection.id,
+              selector: input.pendingSelection.selector,
+              codeSnippetPresent: input.pendingSelection.codeSnippet.trim().length > 0,
+              url: input.pendingSelection.url,
+            },
+      canEnterDrawMode: input.phase === "evidence",
+      canSelectElement: input.drawMode && input.phase === "evidence",
     },
   };
 }
