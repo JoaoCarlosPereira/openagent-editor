@@ -116,3 +116,14 @@ export {
   type GhostTextStream,
   type GhostTextViewSnapshot,
 } from "./tab/index.js";
+
+export {
+  CrossFileSuggestionController,
+  buildCrossFileSuggestionView,
+  crossFileStatusLabel,
+  type CrossFileOfferInput,
+  type CrossFileSuggestionControllerOptions,
+  type CrossFileSuggestionPort,
+  type CrossFileSuggestionPhase,
+  type CrossFileSuggestionViewSnapshot,
+} from "./tab/index.js";

@@ -12,3 +12,14 @@ export {
   type GhostTextStream,
   type GhostTextViewSnapshot,
 } from "./ghost-text.js";
+
+export {
+  CrossFileSuggestionController,
+  type CrossFileOfferInput,
+  type CrossFileSuggestionControllerOptions,
+  type CrossFileSuggestionPort,
+  type CrossFileSuggestionPhase,
+  type CrossFileSuggestionViewSnapshot,
+  buildCrossFileSuggestionView,
+  crossFileStatusLabel,
+} from "./cross-file-suggestion.js";
