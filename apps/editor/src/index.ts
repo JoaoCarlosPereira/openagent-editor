@@ -118,3 +118,34 @@ export {
   type GhostTextStream,
   type GhostTextViewSnapshot,
 } from "./tab/index.js";
+
+export {
+  CrossFileSuggestionController,
+  buildCrossFileSuggestionView,
+  crossFileStatusLabel,
+  type CrossFileOfferInput,
+  type CrossFileSuggestionControllerOptions,
+  type CrossFileSuggestionPort,
+  type CrossFileSuggestionPhase,
+  type CrossFileSuggestionViewSnapshot,
+} from "./tab/index.js";
+
+export { InlineEditController } from "./inline-edit/index.js";
+export type {
+  InlineEditApplyEdit,
+  InlineEditControllerOptions,
+  InlineEditDiffRow,
+  InlineEditDiffRowKind,
+  InlineEditGenerateInput,
+  InlineEditGenerateResult,
+  InlineEditMode,
+  InlineEditPhase,
+  InlineEditPort,
+  InlineEditRequestInput,
+  InlineEditViewSnapshot,
+} from "./inline-edit/index.js";
+export {
+  buildInlineEditView,
+  computeInlineEditDiff,
+  inlineEditStatusLabel,
+} from "./inline-edit/index.js";

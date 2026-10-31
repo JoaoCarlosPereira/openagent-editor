@@ -8,6 +8,7 @@
     ".": "./src/index.ts",
     "./agent": "./src/agent/agent-panel.ts",
     "./agents": "./src/agents/index.ts",
+    "./inline-edit": "./src/inline-edit/index.ts",
     "./permissions": "./src/permissions/permission-dialog.ts",
     "./tab": "./src/tab/index.ts"
   },
