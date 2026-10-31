@@ -33,10 +33,6 @@ export type WorkspaceTransportValidationResult =
   | { valid: true; value: WorkspaceTransportHello }
   | { valid: false; code: "INVALID_STATE"; errors: string[] };
 
-export type WorkspaceTransportAckValidationResult =
-  | { valid: true; value: WorkspaceTransportAck }
-  | { valid: false; code: "INVALID_STATE"; errors: string[] };
-
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
@@ -92,54 +88,6 @@ export function validateWorkspaceTransportHello(raw: unknown): WorkspaceTranspor
       type: "workspace.hello",
       workspaceId: raw["workspaceId"] as string,
       workspaceRoot: raw["workspaceRoot"] as string,
-      providerProfileId: raw["providerProfileId"] as string,
-      mode: raw["mode"] as string,
-      rulesRef: raw["rulesRef"] as string,
-      mcpServerIds: raw["mcpServerIds"] as string[],
-      sessionIds: raw["sessionIds"] as string[],
-    },
-  };
-}
-
-export function validateWorkspaceTransportAck(raw: unknown): WorkspaceTransportAckValidationResult {
-  const errors: string[] = [];
-
-  if (!isRecord(raw) || raw["type"] !== "workspace.ack") {
-    return {
-      valid: false,
-      code: PROTOCOL_ERROR_CODES.INVALID_STATE,
-      errors: ["Resposta deve ser um objeto workspace.ack."],
-    };
-  }
-
-  if (!isNonEmptyString(raw["workspaceId"])) {
-    errors.push("Campo obrigatório 'workspaceId' ausente ou inválido.");
-  }
-  if (!isNonEmptyString(raw["providerProfileId"])) {
-    errors.push("Campo obrigatório 'providerProfileId' ausente ou inválido.");
-  }
-  if (!isNonEmptyString(raw["mode"])) {
-    errors.push("Campo obrigatório 'mode' ausente ou inválido.");
-  }
-  if (!isNonEmptyString(raw["rulesRef"])) {
-    errors.push("Campo obrigatório 'rulesRef' ausente ou inválido.");
-  }
-  if (!isStringArray(raw["mcpServerIds"])) {
-    errors.push("Campo obrigatório 'mcpServerIds' deve ser um array de strings.");
-  }
-  if (!isStringArray(raw["sessionIds"])) {
-    errors.push("Campo obrigatório 'sessionIds' deve ser um array de strings.");
-  }
-
-  if (errors.length > 0) {
-    return { valid: false, code: PROTOCOL_ERROR_CODES.INVALID_STATE, errors };
-  }
-
-  return {
-    valid: true,
-    value: {
-      type: "workspace.ack",
-      workspaceId: raw["workspaceId"] as string,
       providerProfileId: raw["providerProfileId"] as string,
       mode: raw["mode"] as string,
       rulesRef: raw["rulesRef"] as string,
