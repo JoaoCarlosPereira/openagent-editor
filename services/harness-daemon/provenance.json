@@ -1,5 +1,5 @@
 {
-  "module": "services/harness-daemon/src/lifecycle",
+  "module": "services/harness-daemon/src/sessions",
   "strategy": "behavioral-reimplementation",
   "sourceVersion": "3.24.18",
   "method": "techspec-and-adr-003",

@@ -74,9 +74,8 @@ async function connectRpcClient(address: string): Promise<RpcClient> {
 
   writeProtocolFrame(socket, Buffer.from(JSON.stringify(WORKSPACE), "utf8"));
   const ackFrame = await readProtocolFrame(socket);
-  const ackValidation = validateWorkspaceTransportAck(
-    JSON.parse(ackFrame.toString("utf8")) as unknown,
-  );
+  const ackParsed = JSON.parse(ackFrame.toString("utf8")) as unknown;
+  const ackValidation = validateWorkspaceTransportAck(ackParsed);
   assert.equal(ackValidation.valid, true);
 
   const activeSessionId = `ses-${randomUUID()}`;

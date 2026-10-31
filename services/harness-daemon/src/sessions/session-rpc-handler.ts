@@ -12,7 +12,6 @@ import {
   type RpcRequestEnvelope,
   type RpcResultMap,
 } from "@openagent/protocol";
-import { buildSessionRulesLoadedEmission } from "@openagent/policy";
 import {
   createStoredSession,
   exportSessionTextFile,
@@ -22,14 +21,11 @@ import {
   searchSessionMessages,
   type WorkspaceDatabase,
 } from "@openagent/storage";
-import type { WorkspaceCustomizationRules } from "../customization/session-rules-loader.js";
 import type { WorkspaceBindingState } from "../workspace-state.js";
-import { mapStoredSessionToListEntry } from "./session-resume.js";
 
 export type SessionRpcContext = {
   dataRoot: string;
   binding: WorkspaceBindingState;
-  customizationRules: WorkspaceCustomizationRules;
 };
 
 function isAgentMode(value: string): value is AgentMode {
@@ -146,12 +142,6 @@ function handleSessionCreate(
   const mode = params.mode ?? (isAgentMode(context.binding.mode) ? context.binding.mode : "agent");
   const sessionId = `ses-${randomUUID()}`;
 
-  const rulesSnapshot = context.customizationRules.beginSession({
-    workspaceRoot: context.binding.workspaceRoot,
-    sessionId,
-    rulesRef: context.binding.rulesRef,
-  });
-
   withSqlite(db, (sqlite) => {
     ensureWorkspaceRow(sqlite, context.binding.workspaceId, context.binding.workspaceRoot);
     createStoredSession(sqlite, {
@@ -165,18 +155,10 @@ function handleSessionCreate(
     context.binding.sessionIds.push(sessionId);
   }
 
-  const rulesLoaded = buildSessionRulesLoadedEmission({
-    sessionId,
-    rulesRef: rulesSnapshot.rulesRef,
-    loadedRules: rulesSnapshot.display,
-  });
-
   return {
     sessionId,
     workspaceId: context.binding.workspaceId,
     mode,
-    loadedRules: rulesSnapshot.display,
-    rulesLoaded,
   };
 }
 
@@ -188,7 +170,7 @@ function handleSessionList(
   const params = (request.payload ?? {}) as RpcParamsMap[typeof RPC_METHOD.SESSION_LIST];
   const limit = params.limit ?? 100;
 
-  let sessions: ReturnType<typeof mapStoredSessionToListEntry>[] = [];
+  let sessions: Array<{ sessionId: string; mode: AgentMode }> = [];
   withSqlite(db, (sqlite) => {
     let stored = listStoredSessionsByWorkspace(sqlite, context.binding.workspaceId);
     if (params.cursor) {
@@ -197,10 +179,10 @@ function handleSessionList(
         stored = stored.slice(cursorIndex + 1);
       }
     }
-    sessions = stored.slice(0, limit).map((row) => {
-      const mode = isAgentMode(row.mode) ? row.mode : "agent";
-      return mapStoredSessionToListEntry(db, row, mode);
-    });
+    sessions = stored.slice(0, limit).map((row) => ({
+      sessionId: row.id,
+      mode: isAgentMode(row.mode) ? row.mode : "agent",
+    }));
   });
 
   return { sessions };
