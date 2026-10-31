@@ -18,6 +18,7 @@ import { serveRpcOnConnection } from "./rpc-connection.js";
 import { createWorkspaceCustomizationRules } from "./customization/session-rules-loader.js";
 import type { CompletionTextSource } from "./completion/completion-source.js";
 import type { DaemonRpcContext } from "./runs/run-rpc-handler.js";
+import { BrowserSessionRegistry } from "./runs/browser-session-registry.js";
 
 export async function performServerTransportHandshake(
   socket: net.Socket,
@@ -99,6 +100,7 @@ export async function performServerTransportHandshake(
     customizationRules: createWorkspaceCustomizationRules(),
     runMachines: new Map<string, RunStateMachine>(),
     runQueues: new Map<string, RunMessageQueue>(),
+    browserSessions: new BrowserSessionRegistry(),
     ...(options.completionSource ? { completionSource: options.completionSource } : {}),
   };
   await serveRpcOnConnection(socket, rpcContext);

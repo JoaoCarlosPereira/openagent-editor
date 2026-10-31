@@ -35,6 +35,7 @@ import {
 } from "../../src/agents/agent-subagent-grants.js";
 import { createWorkspaceCustomizationRules } from "../../src/customization/session-rules-loader.js";
 import type { DaemonRpcContext } from "../../src/runs/run-rpc-handler.js";
+import { BrowserSessionRegistry } from "../../src/runs/browser-session-registry.js";
 import { startHarnessDaemon } from "../../src/index.js";
 
 const WORKSPACE_HELLO: WorkspaceTransportHello = {
@@ -63,6 +64,7 @@ function buildGrantTestContext(workspaceId: string): DaemonRpcContext {
     customizationRules: createWorkspaceCustomizationRules(),
     runMachines: new Map(),
     runQueues: new Map(),
+    browserSessions: new BrowserSessionRegistry(),
   };
 }
 

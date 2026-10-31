@@ -20,6 +20,7 @@ import {
 } from "./completion/index.js";
 import { dispatchContextRpc } from "./context/context-rpc-handler.js";
 import { dispatchRunRpc, type DaemonRpcContext } from "./runs/run-rpc-handler.js";
+import { BrowserPermissionRpc } from "./runs/browser-permission-rpc.js";
 import { dispatchSessionRpc } from "./sessions/session-rpc-handler.js";
 
 const SESSION_RPC_METHODS = new Set<string>([
@@ -33,6 +34,7 @@ const SESSION_RPC_METHODS = new Set<string>([
 
 const RUN_RPC_METHODS = new Set<string>([
   RPC_METHOD.RUN_START,
+  RPC_METHOD.RUN_CANCEL,
   RPC_METHOD.RUN_QUEUE_ADD,
   RPC_METHOD.RUN_QUEUE_REMOVE,
 ]);
@@ -68,16 +70,19 @@ export async function serveRpcOnConnection(
   socket: net.Socket,
   context: DaemonRpcContext,
 ): Promise<void> {
+  const browserPermissions = new BrowserPermissionRpc();
   const inFlightCompletions = new Set<Promise<void>>();
   // Conexão caiu: aborta geração em voo para liberar o provedor e fechar o estado terminal.
   const abortOnClose = (): void => abortAllCompletions(context);
   socket.once("close", abortOnClose);
   try {
-    await serveFrames(socket, context, inFlightCompletions);
+    await serveFrames(socket, context, inFlightCompletions, browserPermissions);
   } finally {
     abortOnClose();
     await Promise.allSettled(inFlightCompletions);
     socket.off("close", abortOnClose);
+    // AUT-01 + ADR-006: workers de navegador pertencem à conexão; encerrá-los quando ela termina.
+    await context.browserSessions.closeAll();
   }
 }
 
@@ -85,6 +90,7 @@ async function serveFrames(
   socket: net.Socket,
   context: DaemonRpcContext,
   inFlightCompletions: Set<Promise<void>>,
+  browserPermissions: BrowserPermissionRpc,
 ): Promise<void> {
   while (!socket.destroyed) {
     let frame: Buffer;
@@ -127,6 +133,9 @@ async function serveFrames(
     const isRun = RUN_RPC_METHODS.has(request.method);
     const isCheckpoint = CHECKPOINT_RPC_METHODS.has(request.method);
     const isContext = CONTEXT_RPC_METHODS.has(request.method);
+    const isBrowserPermission =
+      request.method === RPC_METHOD.PERMISSION_DECIDE ||
+      request.method === RPC_METHOD.TOOL_INVOKE;
     if (COMPLETION_RPC_METHODS.has(request.method)) {
       const operation = dispatchCompletionRpc(socket, context, request).finally(() =>
         inFlightCompletions.delete(operation),
@@ -134,7 +143,7 @@ async function serveFrames(
       inFlightCompletions.add(operation);
       continue;
     }
-    if (!isSession && !isRun && !isCheckpoint && !isContext) {
+    if (!isSession && !isRun && !isCheckpoint && !isContext && !isBrowserPermission) {
       writeProtocolError(
         socket,
         PROTOCOL_ERROR_CODES.INVALID_STATE,
@@ -145,13 +154,15 @@ async function serveFrames(
     }
 
     try {
-      const result = isRun
-        ? dispatchRunRpc(context, request)
-        : isCheckpoint
-          ? dispatchCheckpointRpc(context, request)
-          : isContext
-            ? dispatchContextRpc(context, request)
-            : dispatchSessionRpc(context, request);
+      const result = isBrowserPermission
+        ? await browserPermissions.dispatch(context, request)
+        : isRun
+          ? await dispatchRunRpc(context, request)
+          : isCheckpoint
+            ? dispatchCheckpointRpc(context, request)
+            : isContext
+              ? dispatchContextRpc(context, request)
+              : dispatchSessionRpc(context, request);
       writeProtocolFrame(
         socket,
         Buffer.from(

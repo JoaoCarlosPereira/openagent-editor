@@ -13,6 +13,10 @@ export {
   type PermissionGrantContext,
 } from "./grants.js";
 export {
+  WorkspaceGrantStore,
+  resolvePermissionGrantsPath,
+} from "./grant-store.js";
+export {
   describeCapabilityAction,
   validatePolicyCapability,
 } from "./capability.js";

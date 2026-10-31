@@ -81,3 +81,31 @@ export {
   type CustomizationOriginPhase,
   type CustomizationOriginViewSnapshot,
 } from "./permissions/customization-origin.js";
+export {
+  McpToolController,
+  type McpToolControllerOptions,
+  type McpExecutionOutcome,
+  type McpRunResult,
+  type McpRunError,
+  type McpPendingPermission,
+} from "./mcp/index.js";
+export {
+  buildMcpConfigView,
+  type McpServerConfigInput,
+} from "./mcp/index.js";
+export {
+  ProjectsLocalController,
+  LocalProjectCoordinator,
+  decomposeObjective,
+  PROJECT_OBJECTIVE_MAX_LENGTH,
+  type ProjectsLocalPort,
+  type ProjectsLocalCoordinator,
+  type ProjectTaskResult,
+} from "./agents/index.js";
+export {
+  buildProjectsLocalView,
+  type ProjectLocalPhase,
+  type ProjectNodeStatus,
+  type ProjectNodeView,
+  type ProjectsLocalViewSnapshot,
+} from "./agents/index.js";

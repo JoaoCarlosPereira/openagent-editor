@@ -122,6 +122,7 @@ export interface HarnessWorkspaceBinding {
 
 export interface HarnessClient {
   readonly binding: HarnessWorkspaceBinding;
+  callRpc<M extends RpcMethod>(method: M, params: RpcParamsMap[M]): Promise<RpcResultMap[M]>;
   createSession(input: CreateSession): Promise<Session>;
   startRun(input: StartRun): AsyncIterable<HarnessEvent>;
   enqueue(runId: string, input: UserInput): Promise<QueueItem>;
@@ -562,7 +563,7 @@ class TransportHarnessClient implements HarnessClient {
     return { restored: true };
   }
 
-  private async callRpc<M extends RpcMethod>(
+  async callRpc<M extends RpcMethod>(
     method: M,
     params: RpcParamsMap[M],
     context: {

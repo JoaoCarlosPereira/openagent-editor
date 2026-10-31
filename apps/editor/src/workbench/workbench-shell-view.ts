@@ -13,6 +13,33 @@ import {
   buildTextEditorView,
   type TextEditorViewSnapshot,
 } from "./text-editor-view.js";
+import type { IntegratedGitPanel } from "./git-panel.js";
+import {
+  buildGitPanelView,
+  type GitPanelViewSnapshot,
+} from "./git-panel-view.js";
+import type { IntegratedTerminalSession } from "./terminal.js";
+import {
+  buildTerminalView,
+  type TerminalViewSnapshot,
+} from "./terminal-view.js";
+import type { IntegratedDebugSession } from "./debug-session.js";
+import {
+  buildDebugView,
+  type DebugViewSnapshot,
+} from "./debug-view.js";
+import {
+  WORKBENCH_THEME_DEFAULT,
+  type WorkbenchTheme,
+  themeTokensCssVariables,
+  WORKBENCH_PANEL_WIDTH_DEFAULT_PX,
+} from "./theme.js";
+import {
+  WORKBENCH_HEALTH_SUBSYSTEMS,
+  describeWorkbenchHealthStatus,
+  describeWorkbenchHealthSubsystem,
+  type WorkbenchHealthSnapshot,
+} from "./health-indicator.js";
 
 export type WorkbenchCapabilitySlot =
   | "editor"
@@ -41,6 +68,17 @@ export interface WorkbenchShellViewInput {
   expandedDirectories?: readonly string[];
   /** Documento aberto no editor de texto (task_121). */
   textEditorDocument?: TextEditorDocument | null;
+  /** Sessão do terminal integrado (task_122). */
+  terminalSession?: IntegratedTerminalSession | null;
+  /** Painel Git status/diff (task_123). */
+  gitPanel?: IntegratedGitPanel | null;
+  /** Sessão de depuração DAP (task_124). */
+  debugSession?: IntegratedDebugSession | null;
+  /** Tema claro/escuro (UI-02). */
+  theme?: WorkbenchTheme;
+  /** Largura do painel em px (UI-02). */
+  panelWidthPx?: number;
+  health?: WorkbenchHealthSnapshot;
 }
 
 export interface WorkbenchShellViewSnapshot {
@@ -55,9 +93,20 @@ export interface WorkbenchShellViewSnapshot {
     toolsAllowedInRenderer: false;
     fileTree: FileTreeViewSnapshot["accessible"];
     textEditor: TextEditorViewSnapshot["accessible"];
+    terminal: TerminalViewSnapshot["accessible"];
+    git: GitPanelViewSnapshot["accessible"];
+    debug: DebugViewSnapshot["accessible"];
+    /** Tema ativo no workbench (UI-02). */
+    theme: WorkbenchTheme;
+    /** Largura do painel em px (UI-02). */
+    panelWidthPx: number;
+    health: WorkbenchHealthSnapshot;
   };
   fileTree: FileTreeViewSnapshot;
   textEditor: TextEditorViewSnapshot;
+  terminal: TerminalViewSnapshot;
+  git: GitPanelViewSnapshot;
+  debug: DebugViewSnapshot;
 }
 
 function escapeHtml(text: string): string {
@@ -71,9 +120,21 @@ function escapeHtml(text: string): string {
 function renderCapabilitySlot(
   slot: WorkbenchCapabilitySlot,
   textEditor: TextEditorViewSnapshot,
+  terminal: TerminalViewSnapshot,
+  git: GitPanelViewSnapshot,
+  debug: DebugViewSnapshot,
 ): string {
   if (slot === "editor") {
     return textEditor.html;
+  }
+  if (slot === "terminal") {
+    return terminal.html;
+  }
+  if (slot === "git") {
+    return git.html;
+  }
+  if (slot === "debug") {
+    return debug.html;
   }
   return [
     `<section data-testid="workbench-slot-${slot}" data-capability="${slot}"`,
@@ -83,7 +144,7 @@ function renderCapabilitySlot(
   ].join("");
 }
 
-/** LOC-01: shell do workbench com identidade OpenAgent, slots, árvore e editor. */
+/** LOC-01: shell do workbench com identidade OpenAgent, slots, árvore, editor, terminal, Git e debug DAP. */
 export function buildWorkbenchShellView(
   input: WorkbenchShellViewInput,
 ): WorkbenchShellViewSnapshot {
@@ -92,6 +153,17 @@ export function buildWorkbenchShellView(
   const fileTreeEntries = input.fileTreeEntries ?? [];
   const expandedDirectories = input.expandedDirectories ?? [];
   const textEditorDocument = input.textEditorDocument ?? null;
+  const terminalSession = input.terminalSession ?? null;
+  const gitPanel = input.gitPanel ?? null;
+  const debugSession = input.debugSession ?? null;
+  const theme = input.theme ?? WORKBENCH_THEME_DEFAULT;
+  const panelWidthPx = input.panelWidthPx ?? WORKBENCH_PANEL_WIDTH_DEFAULT_PX;
+  const health = input.health ?? {
+    daemon: { subsystem: "daemon" as const, status: daemonConnected ? "connected" as const : "disconnected" as const, message: daemonConnected ? "Conectado" : "Desconectado" },
+    sandbox: { subsystem: "sandbox" as const, status: "degraded" as const, message: "Isolamento nativo não confirmado" },
+    index: { subsystem: "index" as const, status: "offline" as const, message: "Índice indisponível" },
+    cliproxyapi: { subsystem: "cliproxyapi" as const, status: "offline" as const, message: "Sidecar não iniciado" },
+  };
 
   const fileTree = buildFileTreeView({
     folderPath: input.folderPath,
@@ -99,6 +171,9 @@ export function buildWorkbenchShellView(
     expandedDirectories,
   });
   const textEditor = buildTextEditorView({ document: textEditorDocument });
+  const terminal = buildTerminalView({ session: terminalSession });
+  const git = buildGitPanelView({ panel: gitPanel });
+  const debug = buildDebugView({ session: debugSession });
 
   const focusOrder = [
     "workbench-product-name",
@@ -108,25 +183,36 @@ export function buildWorkbenchShellView(
     "workbench-daemon-link",
     "workbench-renderer-tools",
     "workbench-slot-editor",
-    ...WORKBENCH_CAPABILITY_SLOTS.filter((slot) => slot !== "editor").map(
-      (slot) => `workbench-slot-${slot}`,
-    ),
+    "workbench-slot-terminal",
+    "workbench-slot-git",
+    "workbench-slot-debug",
+    ...WORKBENCH_CAPABILITY_SLOTS.filter(
+      (slot) => slot !== "editor" && slot !== "terminal" && slot !== "git" && slot !== "debug",
+    ).map((slot) => `workbench-slot-${slot}`),
   ] as const;
 
   const folderLabel = input.folderPath ?? "Nenhuma pasta aberta";
   const slotsHtml = WORKBENCH_CAPABILITY_SLOTS.map((slot) =>
-    renderCapabilitySlot(slot, textEditor),
+    renderCapabilitySlot(slot, textEditor, terminal, git, debug),
   ).join("");
   const daemonLabel = daemonConnected
     ? "Main ligado ao harness-daemon"
     : "Main sem ligação ao daemon";
+  const themeCssVars = themeTokensCssVariables(theme);
+  const healthHtml = WORKBENCH_HEALTH_SUBSYSTEMS.map((subsystem) => {
+    const item = health[subsystem];
+    return `<li data-testid="health-indicator-${subsystem}" data-health-subsystem="${subsystem}" data-health-status="${item.status}" role="status" aria-label="${describeWorkbenchHealthSubsystem(subsystem)}: ${describeWorkbenchHealthStatus(item.status)}">${describeWorkbenchHealthSubsystem(subsystem)}: ${describeWorkbenchHealthStatus(item.status)}. ${item.message}</li>`;
+  }).join("");
 
   const html = [
     `<main role="application" aria-label="${escapeHtml(input.identity.displayName)}"`,
     ` data-testid="workbench-shell" data-platform="${escapeHtml(input.platform)}"`,
     ` data-daemon-connected="${daemonConnected ? "true" : "false"}"`,
     ` data-tools-allowed-in-renderer="false"`,
-    ` data-folder-open="${input.folderPath !== null ? "true" : "false"}">`,
+    ` data-folder-open="${input.folderPath !== null ? "true" : "false"}"`,
+    ` data-theme="${theme}"`,
+    ` data-panel-width="${panelWidthPx}"`,
+    ` style="background:var(--workbench-bg);color:var(--workbench-fg);border-color:var(--workbench-border);${themeCssVars};">`,
     `<header data-testid="workbench-branding">`,
     `<img data-testid="workbench-product-icon" src="${escapeHtml(input.identity.iconRelativePath)}"`,
     ` alt="${escapeHtml(OPENAGENT_PRODUCT_NAME)}" tabindex="0" />`,
@@ -141,6 +227,7 @@ export function buildWorkbenchShellView(
     `${escapeHtml(daemonLabel)}</p>`,
     `<p data-testid="workbench-renderer-tools" aria-live="polite" tabindex="0"`,
     ` data-tools-allowed="false">Renderer sem ferramentas</p>`,
+    `<ul data-testid="workbench-health-indicators" aria-label="Saúde dos subsistemas" aria-live="polite">${healthHtml}</ul>`,
     `<div data-testid="workbench-capabilities">${slotsHtml}</div>`,
     `</main>`,
   ].join("");
@@ -157,8 +244,17 @@ export function buildWorkbenchShellView(
       toolsAllowedInRenderer,
       fileTree: fileTree.accessible,
       textEditor: textEditor.accessible,
+      terminal: terminal.accessible,
+      git: git.accessible,
+      debug: debug.accessible,
+      theme,
+      panelWidthPx,
+      health,
     },
     fileTree,
     textEditor,
+    terminal,
+    git,
+    debug,
   };
 }

@@ -235,6 +235,21 @@ export {
 } from "./mcp/load-local-customization-assets.js";
 
 export {
+  executePolicyMcpToolInvoke,
+  formatAgentMcpToolResult,
+  preparePolicyMcpToolInvoke,
+  type AgentMcpToolInvocationResult,
+  type PolicyMcpToolContext,
+  type PreparePolicyMcpToolInvokeInput,
+} from "./mcp/policy-mcp-tools.js";
+export {
+  primaryTextFromMcpToolInvocation,
+  mapCallToolResultToInvocation,
+  type McpToolContentBlock,
+  type McpToolInvocationResult,
+} from "./mcp/mcp-tool-invocation-result.js";
+
+export {
   COMPUTER_SCREENSHOT_MOCK_BASE64,
   COMPUTER_USE_CAPABILITY,
   ComputerUseSession,

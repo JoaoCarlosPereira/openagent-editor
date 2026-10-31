@@ -26,6 +26,7 @@ import {
 } from "@openagent/protocol";
 import { openWorkspaceDatabase } from "@openagent/storage";
 import { completeRunningRunLifecycle } from "../../src/runs/run-rpc-handler.js";
+import { BrowserSessionRegistry } from "../../src/runs/browser-session-registry.js";
 import { RunStateMachine } from "../../src/state/run-state-machine.js";
 import { RunMessageQueue } from "../../src/queue/run-message-queue.js";
 import { createWorkspaceCustomizationRules, startHarnessDaemon } from "../../src/index.js";
@@ -289,6 +290,7 @@ test.describe("agent.spawn RPC (AGT-05)", { concurrency: 1 }, () => {
       customizationRules: createWorkspaceCustomizationRules(),
       runMachines: new Map<string, RunStateMachine>(),
       runQueues: new Map<string, RunMessageQueue>(),
+      browserSessions: new BrowserSessionRegistry(),
     };
     completeRunningRunLifecycle(context, runId);
 

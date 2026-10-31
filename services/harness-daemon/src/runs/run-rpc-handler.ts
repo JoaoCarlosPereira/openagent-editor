@@ -9,6 +9,7 @@ import {
   type RpcRequestEnvelope,
   type RpcResultMap,
 } from "@openagent/protocol";
+import { persistHarnessEventWithPayload } from "@openagent/policy";
 import { openWorkspaceDatabase, type WorkspaceDatabase } from "@openagent/storage";
 import { runAgentModeIfRequested } from "../agent/agent-mode-run.js";
 import { executeAskRunLoop } from "../agent/ask-run-loop.js";
@@ -27,6 +28,9 @@ import {
 import { RunStateMachine } from "../state/run-state-machine.js";
 import type { RunLifecycleState } from "../state/run-state.js";
 import type { SessionRpcContext } from "../sessions/session-rpc-handler.js";
+import type { RunGrantRegistryMap } from "../agents/agent-subagent-grants.js";
+import type { SubagentRuntimeRegistry } from "../agents/agent-subagent-runtime.js";
+import { BrowserSessionRegistry } from "./browser-session-registry.js";
 import type { CompletionTextSource } from "../completion/completion-source.js";
 
 export type DaemonRpcContext = SessionRpcContext & {
@@ -34,6 +38,12 @@ export type DaemonRpcContext = SessionRpcContext & {
   runMachines: Map<string, RunStateMachine>;
   /** Filas em memória por runId (AGT-06), sincronizadas com SQLite. */
   runQueues: Map<string, RunMessageQueue>;
+  /** Sessões de navegador autorizado ativas por runId na conexão (AUT-01). */
+  browserSessions: BrowserSessionRegistry;
+  /** Subagentes em execução por runId (AGT-07). */
+  subagentRuns?: SubagentRuntimeRegistry;
+  /** Grants do run pai compartilhados com subagentes (AGT-05 / PER-01). */
+  runGrantRegistries?: RunGrantRegistryMap;
   /** Fonte de texto do completion (TAB-01); omitida usa o CLIProxyAPI do perfil do workspace. */
   completionSource?: CompletionTextSource;
 };
@@ -293,13 +303,60 @@ function handleRunQueueRemove(
   return removePendingRunMessage(context, request.runId, params.queueItemId);
 }
 
-export function handleRunRpc(
+async function handleRunCancel(
+  context: DaemonRpcContext,
+  request: RpcRequestEnvelope<typeof RPC_METHOD.RUN_CANCEL>,
+): Promise<RpcResultMap[typeof RPC_METHOD.RUN_CANCEL]> {
+  assertRunWorkspace(context, request);
+  if (request.payload?.agentId) {
+    throw new ProtocolError(
+      PROTOCOL_ERROR_CODES.INVALID_STATE,
+      "Cancelamento de subagente não é suportado.",
+    );
+  }
+  const db = openWorkspaceDatabase({
+    dataRoot: context.dataRoot,
+    workspaceId: context.binding.workspaceId,
+  });
+  try {
+    const updated = withSqlite(db, (sqlite) =>
+      sqlite
+        .prepare(
+          "UPDATE run SET state = 'cancelled', ended_at = ? WHERE id = ? AND session_id = ? AND state = 'running'",
+        )
+        .run(new Date().toISOString(), request.runId, request.sessionId).changes,
+    );
+    if (updated !== 1) {
+      throw new ProtocolError(
+        PROTOCOL_ERROR_CODES.INVALID_STATE,
+        "Execução inexistente, terminal ou de outra sessão.",
+      );
+    }
+    context.runMachines.set(request.runId, new RunStateMachine("cancelled"));
+    // AUT-01 + ADR-006: cancelamento da run encerra o worker do navegador e impede novos dispatches.
+    const browserClosed = await context.browserSessions.closeForRun(request.runId);
+    if (browserClosed) {
+      persistHarnessEventWithPayload(db, request.runId, "browser.cancelled", {
+        type: "browser.cancelled",
+        runId: request.runId,
+        sessionId: request.sessionId,
+      });
+    }
+    return { cancelled: true };
+  } finally {
+    db.close();
+  }
+}
+
+export async function handleRunRpc(
   context: DaemonRpcContext,
   request: RpcRequestEnvelope,
-): RpcResultMap[RpcMethod] {
+): Promise<RpcResultMap[RpcMethod]> {
   switch (request.method) {
     case RPC_METHOD.RUN_START:
       return handleRunStart(context, request as RpcRequestEnvelope<typeof RPC_METHOD.RUN_START>);
+    case RPC_METHOD.RUN_CANCEL:
+      return handleRunCancel(context, request as RpcRequestEnvelope<typeof RPC_METHOD.RUN_CANCEL>);
     case RPC_METHOD.RUN_QUEUE_ADD:
       return handleRunQueueAdd(
         context,
@@ -318,12 +375,12 @@ export function handleRunRpc(
   }
 }
 
-export function dispatchRunRpc(
+export async function dispatchRunRpc(
   context: DaemonRpcContext,
   request: RpcRequestEnvelope,
-): RpcResultMap[RpcMethod] {
+): Promise<RpcResultMap[RpcMethod]> {
   try {
-    return handleRunRpc(context, request);
+    return await handleRunRpc(context, request);
   } catch (error) {
     throw mapProtocolError(error);
   }

@@ -109,8 +109,8 @@ export function describeSandboxCapability(
     }
 
     const degradationNotice = probe.appContainerSupported
-      ? "AppContainer indisponível ou não operacional; Job Object indisponível; isolamento limitado a worker thread."
-      : "AppContainer não suportado nesta versão do Windows; isolamento limitado a worker thread.";
+      ? `AppContainer indisponível ou não operacional no win32; Job Object indisponível; isolamento limitado a worker thread.`
+      : `AppContainer não suportado nesta versão do Windows (${platform}); isolamento limitado a worker thread.`;
 
     return {
       level: "degraded",

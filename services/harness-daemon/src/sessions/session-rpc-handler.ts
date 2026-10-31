@@ -21,11 +21,15 @@ import {
   searchSessionMessages,
   type WorkspaceDatabase,
 } from "@openagent/storage";
+import { buildSessionRulesLoadedEmission } from "@openagent/policy";
 import type { WorkspaceBindingState } from "../workspace-state.js";
+import type { WorkspaceCustomizationRules } from "../customization/session-rules-loader.js";
+import { mapStoredSessionToListEntry } from "./session-resume.js";
 
 export type SessionRpcContext = {
   dataRoot: string;
   binding: WorkspaceBindingState;
+  customizationRules: WorkspaceCustomizationRules;
 };
 
 function isAgentMode(value: string): value is AgentMode {
@@ -148,6 +152,12 @@ function handleSessionCreate(
     rulesRef: context.binding.rulesRef,
   });
 
+  const rulesLoaded = buildSessionRulesLoadedEmission({
+    sessionId,
+    rulesRef: rulesSnapshot.rulesRef,
+    loadedRules: rulesSnapshot.display,
+  });
+
   withSqlite(db, (sqlite) => {
     ensureWorkspaceRow(sqlite, context.binding.workspaceId, context.binding.workspaceRoot);
     createStoredSession(sqlite, {
@@ -165,6 +175,8 @@ function handleSessionCreate(
     sessionId,
     workspaceId: context.binding.workspaceId,
     mode,
+    loadedRules: rulesSnapshot.display,
+    rulesLoaded,
   };
 }
 
@@ -176,7 +188,7 @@ function handleSessionList(
   const params = (request.payload ?? {}) as RpcParamsMap[typeof RPC_METHOD.SESSION_LIST];
   const limit = params.limit ?? 100;
 
-  let sessions: Array<{ sessionId: string; mode: AgentMode }> = [];
+  let sessions: ReturnType<typeof mapStoredSessionToListEntry>[] = [];
   withSqlite(db, (sqlite) => {
     let stored = listStoredSessionsByWorkspace(sqlite, context.binding.workspaceId);
     if (params.cursor) {
@@ -185,10 +197,10 @@ function handleSessionList(
         stored = stored.slice(cursorIndex + 1);
       }
     }
-    sessions = stored.slice(0, limit).map((row) => ({
-      sessionId: row.id,
-      mode: isAgentMode(row.mode) ? row.mode : "agent",
-    }));
+    sessions = stored.slice(0, limit).map((row) => {
+      const mode = isAgentMode(row.mode) ? row.mode : "agent";
+      return mapStoredSessionToListEntry(db, row, mode);
+    });
   });
 
   return { sessions };

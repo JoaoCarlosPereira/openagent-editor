@@ -33,6 +33,9 @@ export const RPC_METHOD = {
   CONTEXT_INDEX: "context.index",
   CONTEXT_SEARCH: "context.search",
   CONTEXT_CLEAR: "context.clear",
+  CONTEXT_EXCLUSIONS_GET: "context.exclusions.get",
+  CONTEXT_EXCLUSIONS_SET: "context.exclusions.set",
+  CONTEXT_CLEAR_PREVIEW: "context.clear.preview",
   COMPLETION_START: "completion.start",
   COMPLETION_CANCEL: "completion.cancel",
   EXTENSION_INSTALL: "extension.install",
@@ -225,6 +228,7 @@ export interface ContextSearchParams {
 
 export interface ContextClearParams {
   scope?: "session" | "workspace";
+  previewToken?: string;
 }
 
 /** Tamanho do índice lexical antes da limpeza (CTX-04). */
@@ -239,7 +243,16 @@ export interface ContextClearResult {
   cleared: true;
   scope: "workspace";
   size: ContextClearIndexSize;
+  sizeAfter?: ContextClearIndexSize;
 }
+
+export interface ContextClearPreview {
+  scope: "workspace";
+  size: ContextClearIndexSize;
+  previewToken: string;
+}
+
+
 
 export type CompletionKind = "line" | "block";
 
@@ -315,6 +328,9 @@ export interface RpcParamsMap {
   [RPC_METHOD.CONTEXT_INDEX]: ContextIndexParams;
   [RPC_METHOD.CONTEXT_SEARCH]: ContextSearchParams;
   [RPC_METHOD.CONTEXT_CLEAR]: ContextClearParams;
+  [RPC_METHOD.CONTEXT_EXCLUSIONS_GET]: Record<string, never>;
+  [RPC_METHOD.CONTEXT_EXCLUSIONS_SET]: { patterns: string[] };
+  [RPC_METHOD.CONTEXT_CLEAR_PREVIEW]: Record<string, never>;
   [RPC_METHOD.COMPLETION_START]: CompletionStartParams;
   [RPC_METHOD.COMPLETION_CANCEL]: CompletionCancelParams;
   [RPC_METHOD.EXTENSION_INSTALL]: ExtensionInstallParams;
@@ -341,7 +357,9 @@ export interface RpcResultMap {
   [RPC_METHOD.RUN_QUEUE_ADD]: { queueItemId: string; ordinal: number };
   [RPC_METHOD.RUN_QUEUE_REMOVE]: { removed: true };
   [RPC_METHOD.PERMISSION_DECIDE]: { persisted: boolean };
-  [RPC_METHOD.TOOL_INVOKE]: { resultRef: string };
+  [RPC_METHOD.TOOL_INVOKE]:
+    | { resultRef: string }
+    | { pending: true; permissionRequestId: string; prompt: { action: string; target: string; scopeLabel: string; sandboxIsolationLevel?: string; degradationNotice?: string } };
   [RPC_METHOD.CHECKPOINT_CREATE]: { checkpointId: string };
   [RPC_METHOD.CHECKPOINT_RESTORE]: CheckpointRestoreRpcResult;
   [RPC_METHOD.AGENT_SPAWN]: { agentId: string };
@@ -353,6 +371,9 @@ export interface RpcResultMap {
   [RPC_METHOD.CONTEXT_INDEX]: { indexed: number };
   [RPC_METHOD.CONTEXT_SEARCH]: { hits: Array<{ ref: string; score: number }> };
   [RPC_METHOD.CONTEXT_CLEAR]: ContextClearResult;
+  [RPC_METHOD.CONTEXT_EXCLUSIONS_GET]: { patterns: string[] };
+  [RPC_METHOD.CONTEXT_EXCLUSIONS_SET]: { patterns: string[] };
+  [RPC_METHOD.CONTEXT_CLEAR_PREVIEW]: ContextClearPreview;
   [RPC_METHOD.COMPLETION_START]: CompletionStartResult;
   [RPC_METHOD.COMPLETION_CANCEL]: CompletionCancelResult;
   [RPC_METHOD.EXTENSION_INSTALL]: { extensionId: string };
@@ -369,150 +390,165 @@ const CLI_WORKSPACE_BINDINGS: readonly WorkspaceBindingFacet[] = [
 ];
 
 export const RPC_METHOD_SPECS: Record<RpcMethod, RpcMethodSpec> = {
-  [RPC_METHOD.SESSION_CREATE]: {
+[RPC_METHOD.SESSION_CREATE]: {
     method: RPC_METHOD.SESSION_CREATE,
     capability: "session.write",
     workspaceBindings: CLI_WORKSPACE_BINDINGS,
   },
-  [RPC_METHOD.SESSION_LIST]: {
-    method: RPC_METHOD.SESSION_LIST,
-    capability: "session.read",
-    workspaceBindings: CLI_WORKSPACE_BINDINGS,
-  },
-  [RPC_METHOD.SESSION_SEARCH]: {
-    method: RPC_METHOD.SESSION_SEARCH,
-    capability: "session.read",
-    workspaceBindings: CLI_WORKSPACE_BINDINGS,
-  },
-  [RPC_METHOD.SESSION_EXPORT]: {
-    method: RPC_METHOD.SESSION_EXPORT,
-    capability: "session.read",
-    workspaceBindings: CLI_WORKSPACE_BINDINGS,
-  },
-  [RPC_METHOD.SESSION_DELETE]: {
-    method: RPC_METHOD.SESSION_DELETE,
-    capability: "session.write",
-    workspaceBindings: CLI_WORKSPACE_BINDINGS,
-  },
-  [RPC_METHOD.SESSION_FORK]: {
-    method: RPC_METHOD.SESSION_FORK,
-    capability: "session.write",
-    workspaceBindings: CLI_WORKSPACE_BINDINGS,
-  },
-  [RPC_METHOD.RUN_START]: {
-    method: RPC_METHOD.RUN_START,
-    capability: "run.write",
-    workspaceBindings: CLI_WORKSPACE_BINDINGS,
-  },
-  [RPC_METHOD.RUN_CANCEL]: {
-    method: RPC_METHOD.RUN_CANCEL,
-    capability: "run.write",
-    workspaceBindings: CLI_WORKSPACE_BINDINGS,
-  },
-  [RPC_METHOD.RUN_RESUME]: {
-    method: RPC_METHOD.RUN_RESUME,
-    capability: "run.write",
-    workspaceBindings: CLI_WORKSPACE_BINDINGS,
-  },
-  [RPC_METHOD.RUN_QUEUE_ADD]: {
-    method: RPC_METHOD.RUN_QUEUE_ADD,
-    capability: "run.queue",
-    workspaceBindings: CLI_WORKSPACE_BINDINGS,
-  },
-  [RPC_METHOD.RUN_QUEUE_REMOVE]: {
-    method: RPC_METHOD.RUN_QUEUE_REMOVE,
-    capability: "run.queue",
-    workspaceBindings: CLI_WORKSPACE_BINDINGS,
-  },
-  [RPC_METHOD.PERMISSION_DECIDE]: {
-    method: RPC_METHOD.PERMISSION_DECIDE,
-    capability: "permission.grant",
-    workspaceBindings: ["rules", "mcp"],
-  },
-  [RPC_METHOD.TOOL_INVOKE]: {
-    method: RPC_METHOD.TOOL_INVOKE,
-    capability: "tool.invoke",
-    workspaceBindings: ["rules", "mcp"],
-  },
-  [RPC_METHOD.CHECKPOINT_CREATE]: {
-    method: RPC_METHOD.CHECKPOINT_CREATE,
-    capability: "checkpoint.write",
-    workspaceBindings: ["sessions"],
-  },
-  [RPC_METHOD.CHECKPOINT_RESTORE]: {
-    method: RPC_METHOD.CHECKPOINT_RESTORE,
-    capability: "checkpoint.write",
-    workspaceBindings: ["sessions"],
-  },
-  [RPC_METHOD.AGENT_SPAWN]: {
-    method: RPC_METHOD.AGENT_SPAWN,
-    capability: "agent.spawn",
-    workspaceBindings: CLI_WORKSPACE_BINDINGS,
-  },
-  [RPC_METHOD.AGENT_CANCEL]: {
-    method: RPC_METHOD.AGENT_CANCEL,
-    capability: "agent.spawn",
-    workspaceBindings: CLI_WORKSPACE_BINDINGS,
-  },
-  [RPC_METHOD.PROJECT_CREATE]: {
-    method: RPC_METHOD.PROJECT_CREATE,
-    capability: "project.write",
-    workspaceBindings: CLI_WORKSPACE_BINDINGS,
-  },
-  [RPC_METHOD.PROJECT_ACCEPT]: {
-    method: RPC_METHOD.PROJECT_ACCEPT,
-    capability: "project.write",
-    workspaceBindings: CLI_WORKSPACE_BINDINGS,
-  },
-  [RPC_METHOD.PROJECT_REJECT]: {
-    method: RPC_METHOD.PROJECT_REJECT,
-    capability: "project.write",
-    workspaceBindings: CLI_WORKSPACE_BINDINGS,
-  },
-  [RPC_METHOD.CONTEXT_ATTACH]: {
-    method: RPC_METHOD.CONTEXT_ATTACH,
-    capability: "context.write",
-    workspaceBindings: ["provider", "rules", "mcp", "sessions"],
-  },
-  [RPC_METHOD.CONTEXT_INDEX]: {
-    method: RPC_METHOD.CONTEXT_INDEX,
-    capability: "context.write",
-    workspaceBindings: ["rules", "mcp", "sessions"],
-  },
-  [RPC_METHOD.CONTEXT_SEARCH]: {
-    method: RPC_METHOD.CONTEXT_SEARCH,
-    capability: "context.read",
-    workspaceBindings: ["rules", "mcp", "sessions"],
-  },
-  [RPC_METHOD.CONTEXT_CLEAR]: {
-    method: RPC_METHOD.CONTEXT_CLEAR,
-    capability: "context.write",
-    workspaceBindings: ["sessions"],
-  },
-  [RPC_METHOD.COMPLETION_START]: {
+[RPC_METHOD.COMPLETION_START]: {
     method: RPC_METHOD.COMPLETION_START,
     capability: "completion.stream",
     workspaceBindings: ["provider", "rules", "sessions"],
   },
-  [RPC_METHOD.COMPLETION_CANCEL]: {
+[RPC_METHOD.COMPLETION_CANCEL]: {
     method: RPC_METHOD.COMPLETION_CANCEL,
     capability: "completion.cancel",
     workspaceBindings: ["sessions"],
   },
-  [RPC_METHOD.EXTENSION_INSTALL]: {
+[RPC_METHOD.EXTENSION_INSTALL]: {
     method: RPC_METHOD.EXTENSION_INSTALL,
     capability: "extension.install",
     workspaceBindings: ["mcp"],
   },
-  [RPC_METHOD.EXTENSION_ENABLE]: {
+[RPC_METHOD.EXTENSION_ENABLE]: {
     method: RPC_METHOD.EXTENSION_ENABLE,
     capability: "extension.manage",
     workspaceBindings: ["mcp"],
   },
-  [RPC_METHOD.EXTENSION_DISABLE]: {
+[RPC_METHOD.EXTENSION_DISABLE]: {
     method: RPC_METHOD.EXTENSION_DISABLE,
     capability: "extension.manage",
     workspaceBindings: ["mcp"],
+  },
+[RPC_METHOD.SESSION_LIST]: {
+    method: RPC_METHOD.SESSION_LIST,
+    capability: "session.read",
+    workspaceBindings: CLI_WORKSPACE_BINDINGS,
+  },
+[RPC_METHOD.SESSION_SEARCH]: {
+    method: RPC_METHOD.SESSION_SEARCH,
+    capability: "session.read",
+    workspaceBindings: CLI_WORKSPACE_BINDINGS,
+  },
+[RPC_METHOD.SESSION_EXPORT]: {
+    method: RPC_METHOD.SESSION_EXPORT,
+    capability: "session.read",
+    workspaceBindings: CLI_WORKSPACE_BINDINGS,
+  },
+[RPC_METHOD.SESSION_DELETE]: {
+    method: RPC_METHOD.SESSION_DELETE,
+    capability: "session.write",
+    workspaceBindings: CLI_WORKSPACE_BINDINGS,
+  },
+[RPC_METHOD.SESSION_FORK]: {
+    method: RPC_METHOD.SESSION_FORK,
+    capability: "session.write",
+    workspaceBindings: CLI_WORKSPACE_BINDINGS,
+  },
+[RPC_METHOD.RUN_START]: {
+    method: RPC_METHOD.RUN_START,
+    capability: "run.write",
+    workspaceBindings: CLI_WORKSPACE_BINDINGS,
+  },
+[RPC_METHOD.RUN_CANCEL]: {
+    method: RPC_METHOD.RUN_CANCEL,
+    capability: "run.write",
+    workspaceBindings: CLI_WORKSPACE_BINDINGS,
+  },
+[RPC_METHOD.RUN_RESUME]: {
+    method: RPC_METHOD.RUN_RESUME,
+    capability: "run.write",
+    workspaceBindings: CLI_WORKSPACE_BINDINGS,
+  },
+[RPC_METHOD.RUN_QUEUE_ADD]: {
+    method: RPC_METHOD.RUN_QUEUE_ADD,
+    capability: "run.queue",
+    workspaceBindings: CLI_WORKSPACE_BINDINGS,
+  },
+[RPC_METHOD.RUN_QUEUE_REMOVE]: {
+    method: RPC_METHOD.RUN_QUEUE_REMOVE,
+    capability: "run.queue",
+    workspaceBindings: CLI_WORKSPACE_BINDINGS,
+  },
+[RPC_METHOD.PERMISSION_DECIDE]: {
+    method: RPC_METHOD.PERMISSION_DECIDE,
+    capability: "permission.grant",
+    workspaceBindings: ["rules", "mcp"],
+  },
+[RPC_METHOD.TOOL_INVOKE]: {
+    method: RPC_METHOD.TOOL_INVOKE,
+    capability: "tool.invoke",
+    workspaceBindings: ["rules", "mcp"],
+  },
+[RPC_METHOD.CHECKPOINT_CREATE]: {
+    method: RPC_METHOD.CHECKPOINT_CREATE,
+    capability: "checkpoint.write",
+    workspaceBindings: ["sessions"],
+  },
+[RPC_METHOD.CHECKPOINT_RESTORE]: {
+    method: RPC_METHOD.CHECKPOINT_RESTORE,
+    capability: "checkpoint.write",
+    workspaceBindings: ["sessions"],
+  },
+[RPC_METHOD.AGENT_SPAWN]: {
+    method: RPC_METHOD.AGENT_SPAWN,
+    capability: "agent.spawn",
+    workspaceBindings: CLI_WORKSPACE_BINDINGS,
+  },
+[RPC_METHOD.AGENT_CANCEL]: {
+    method: RPC_METHOD.AGENT_CANCEL,
+    capability: "agent.spawn",
+    workspaceBindings: CLI_WORKSPACE_BINDINGS,
+  },
+[RPC_METHOD.PROJECT_CREATE]: {
+    method: RPC_METHOD.PROJECT_CREATE,
+    capability: "project.write",
+    workspaceBindings: CLI_WORKSPACE_BINDINGS,
+  },
+[RPC_METHOD.PROJECT_ACCEPT]: {
+    method: RPC_METHOD.PROJECT_ACCEPT,
+    capability: "project.write",
+    workspaceBindings: CLI_WORKSPACE_BINDINGS,
+  },
+[RPC_METHOD.PROJECT_REJECT]: {
+    method: RPC_METHOD.PROJECT_REJECT,
+    capability: "project.write",
+    workspaceBindings: CLI_WORKSPACE_BINDINGS,
+  },
+[RPC_METHOD.CONTEXT_ATTACH]: {
+    method: RPC_METHOD.CONTEXT_ATTACH,
+    capability: "context.write",
+    workspaceBindings: ["provider", "rules", "mcp", "sessions"],
+  },
+[RPC_METHOD.CONTEXT_INDEX]: {
+    method: RPC_METHOD.CONTEXT_INDEX,
+    capability: "context.write",
+    workspaceBindings: ["rules", "mcp", "sessions"],
+  },
+[RPC_METHOD.CONTEXT_SEARCH]: {
+    method: RPC_METHOD.CONTEXT_SEARCH,
+    capability: "context.read",
+    workspaceBindings: ["rules", "mcp", "sessions"],
+  },
+[RPC_METHOD.CONTEXT_CLEAR]: {
+    method: RPC_METHOD.CONTEXT_CLEAR,
+    capability: "context.write",
+    workspaceBindings: ["sessions"],
+  },
+[RPC_METHOD.CONTEXT_EXCLUSIONS_GET]: {
+    method: RPC_METHOD.CONTEXT_EXCLUSIONS_GET,
+    capability: "context.read",
+    workspaceBindings: ["rules"],
+  },
+[RPC_METHOD.CONTEXT_EXCLUSIONS_SET]: {
+    method: RPC_METHOD.CONTEXT_EXCLUSIONS_SET,
+    capability: "context.write",
+    workspaceBindings: ["rules"],
+  },
+[RPC_METHOD.CONTEXT_CLEAR_PREVIEW]: {
+    method: RPC_METHOD.CONTEXT_CLEAR_PREVIEW,
+    capability: "context.read",
+    workspaceBindings: ["sessions"],
   },
 };
 
