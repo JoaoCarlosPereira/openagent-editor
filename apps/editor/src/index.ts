@@ -1,4 +1,13 @@
 export {
+  McpToolController,
+  type McpExecutionOutcome,
+  type McpPendingPermission,
+  type McpRunError,
+  type McpRunResult,
+  type McpToolControllerOptions,
+} from "./mcp/index.js";
+
+export {
   AgentPanelController,
   buildAgentPanelView,
   USER_INPUT_EMPTY_MESSAGE,
@@ -127,3 +136,17 @@ export {
   type SettingsViewInput,
   type SettingsViewSnapshot,
 } from "./settings/index.js";
+export {
+  ProjectsLocalController,
+  LocalProjectCoordinator,
+  decomposeObjective,
+  buildProjectsLocalView,
+  PROJECT_OBJECTIVE_MAX_LENGTH,
+  type ProjectsLocalPort,
+  type ProjectsLocalCoordinator,
+  type ProjectTaskResult,
+  type ProjectLocalPhase,
+  type ProjectNodeStatus,
+  type ProjectNodeView,
+  type ProjectsLocalViewSnapshot,
+} from "./agents/index.js";

@@ -186,6 +186,7 @@ export type {
 
 export {
   discoverMcpStdioTools,
+  type DiscoverMcpStdioToolsOptions,
   type DiscoveredMcpStdioTool,
   type McpStdioToolDiscoveryResult,
 } from "./mcp/discover-mcp-stdio-tools.js";
@@ -197,6 +198,7 @@ export {
 
 export {
   discoverMcpHttpTools,
+  type DiscoverMcpHttpToolsOptions,
   type DiscoveredMcpHttpTool,
   type McpHttpToolDiscoveryResult,
 } from "./mcp/discover-mcp-http-tools.js";
@@ -205,6 +207,32 @@ export {
   parseMcpHttpServerEndpoint,
   type McpHttpServerEndpoint,
 } from "./mcp/mcp-http-config.js";
+
+export {
+  assertMcpAuthSecretRef,
+  mcpAuthMaterialToHttpHeaders,
+  resolveMcpHttpHeaders,
+  resolveMcpStdioEnv,
+  type McpAuthMaterial,
+  type McpAuthSecretResolver,
+} from "./mcp/mcp-auth-material.js";
+
+export {
+  assertLocalHooksAllowMcpToolInvoke,
+  type McpToolHookGateInput,
+} from "./mcp/local-hook-gate.js";
+
+export {
+  createNodeCustomizationRuleFileReader,
+  loadCustomizationRulesFromPaths,
+  type CustomizationRuleFileReader,
+  type LoadCustomizationRulesFromPathsInput,
+} from "./mcp/load-customization-rules.js";
+
+export {
+  loadLocalCustomizationAssetsFromPaths,
+  type LoadLocalCustomizationAssetsInput,
+} from "./mcp/load-local-customization-assets.js";
 
 export {
   executeMcpTool,

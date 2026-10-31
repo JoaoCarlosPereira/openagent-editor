@@ -245,14 +245,7 @@ export class SettingsController {
     }
     this.configuredExclusionPatterns = [...parsed.patterns];
     this.projectExclusionPatterns.splice(0, this.projectExclusionPatterns.length, ...projectIgnorePatterns.map((pattern) => pattern.trim()));
-    this.value = {
-      ...this.value,
-      exclusionRules: [
-        ...this.projectExclusionPatterns.map((pattern) => ({ pattern, source: "project-ignore" as const, removable: false })),
-        ...this.configuredExclusionPatterns.map((pattern) => ({ pattern, source: "workspace-config" as const, removable: true })),
-      ],
-    };
-    this.notify();
+    this._syncExclusionRulesSnapshot();
     return this.snapshot;
   }
 
@@ -280,15 +273,7 @@ export class SettingsController {
       this.operationInProgress = false;
     }
     this.configuredExclusionPatterns = [...patterns];
-    this.value = {
-      ...this.value,
-      exclusionRules: [
-        ...this.projectExclusionPatterns.map((pattern) => ({ pattern, source: "project-ignore" as const, removable: false })),
-        ...patterns.map((pattern) => ({ pattern, source: "workspace-config" as const, removable: true })),
-      ],
-      errorMessage: null,
-    };
-    this.notify();
+    this._syncExclusionRulesSnapshot();
     return this.snapshot;
   }
 
@@ -340,6 +325,18 @@ export class SettingsController {
     } finally {
       this.operationInProgress = false;
     }
+  }
+
+  /** Constrói exclusionRules a partir das patterns carregadas (DRY para loadExclusionRules e setExclusionPatterns). */
+  private _syncExclusionRulesSnapshot(): void {
+    this.value = {
+      ...this.value,
+      exclusionRules: [
+        ...this.projectExclusionPatterns.map((pattern) => ({ pattern, source: "project-ignore" as const, removable: false })),
+        ...this.configuredExclusionPatterns.map((pattern) => ({ pattern, source: "workspace-config" as const, removable: true })),
+      ],
+    };
+    this.notify();
   }
 
   private notify(): void {
