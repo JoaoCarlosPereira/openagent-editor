@@ -1,0 +1,17 @@
+{
+  "name": "openagent-representative",
+  "publisher": "openagent",
+  "version": "1.0.0",
+  "displayName": "OpenAgent Representative Extension",
+  "description": "Extensao representativa da API congelada 3.24.18 para o workbench OpenAgent (LOC-01).",
+  "icon": "media/icon.svg",
+  "main": "./extension.js",
+  "engines": { "vscode": "^1.96.0", "openagent": "^0.1.0" },
+  "activationEvents": ["onCommand:openagent.representative.brand"],
+  "contributes": {
+    "commands": [
+      { "command": "openagent.representative.brand", "title": "Brand Document", "category": "OpenAgent" },
+      { "command": "openagent.representative.status", "title": "Show Status", "category": "OpenAgent" }
+    ]
+  }
+}

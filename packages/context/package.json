@@ -1,0 +1,17 @@
+{
+  "name": "@openagent/context",
+  "version": "0.1.0",
+  "description": "Anexos de contexto, tokenização e orçamento do OpenAgent Editor",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "private": true,
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@openagent/policy": "0.1.0",
+    "@openagent/provenance": "0.0.0",
+    "@openagent/protocol": "0.1.0"
+  }
+}

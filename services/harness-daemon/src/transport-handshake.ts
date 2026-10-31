@@ -1,0 +1,107 @@
+import type net from "node:net";
+import {
+  assertLocalPeerAuth,
+  buildProtocolTransportErrorFrame,
+  buildProtocolVersionAck,
+  buildWorkspaceTransportAck,
+  readProtocolFrame,
+  validateProtocolVersionHello,
+  validateWorkspaceTransportHello,
+  writeProtocolFrame,
+} from "@openagent/protocol";
+import type { WorkspaceTransportHello } from "@openagent/protocol";
+import type { WorkspaceBindingState } from "./workspace-state.js";
+import { readPeerCredentialFromSocket } from "./peer-credential.js";
+import { RunMessageQueue } from "./queue/run-message-queue.js";
+import { RunStateMachine } from "./state/run-state-machine.js";
+import { serveRpcOnConnection } from "./rpc-connection.js";
+import { createWorkspaceCustomizationRules } from "./customization/session-rules-loader.js";
+import type { CompletionTextSource } from "./completion/completion-source.js";
+import type { DaemonRpcContext } from "./runs/run-rpc-handler.js";
+import { BrowserSessionRegistry } from "./runs/browser-session-registry.js";
+
+export async function performServerTransportHandshake(
+  socket: net.Socket,
+  resolveWorkspace: (hello: WorkspaceTransportHello) => WorkspaceBindingState,
+  options: { dataRoot: string; completionSource?: CompletionTextSource },
+): Promise<void> {
+  const versionFrame = await readProtocolFrame(socket);
+  const versionParsed = JSON.parse(versionFrame.toString("utf8")) as unknown;
+  const versionValidation = validateProtocolVersionHello(versionParsed);
+  if (!versionValidation.valid) {
+    writeProtocolFrame(
+      socket,
+      Buffer.from(
+        JSON.stringify(
+          buildProtocolTransportErrorFrame(
+            versionValidation.code,
+            versionValidation.errors.join(" "),
+          ),
+        ),
+        "utf8",
+      ),
+    );
+    socket.end();
+    return;
+  }
+
+  writeProtocolFrame(
+    socket,
+    Buffer.from(JSON.stringify(buildProtocolVersionAck(versionValidation.value)), "utf8"),
+  );
+
+  const workspaceFrame = await readProtocolFrame(socket);
+  const workspaceParsed = JSON.parse(workspaceFrame.toString("utf8")) as unknown;
+  const workspaceValidation = validateWorkspaceTransportHello(workspaceParsed);
+  if (!workspaceValidation.valid) {
+    writeProtocolFrame(
+      socket,
+      Buffer.from(
+        JSON.stringify(
+          buildProtocolTransportErrorFrame(
+            workspaceValidation.code,
+            workspaceValidation.errors.join(" "),
+          ),
+        ),
+        "utf8",
+      ),
+    );
+    socket.end();
+    return;
+  }
+
+  const peer = readPeerCredentialFromSocket(socket);
+  const auth = assertLocalPeerAuth(peer, workspaceValidation.value.workspaceId);
+  void auth;
+
+  const binding = resolveWorkspace(workspaceValidation.value);
+  writeProtocolFrame(
+    socket,
+    Buffer.from(
+      JSON.stringify(
+        buildWorkspaceTransportAck({
+          type: "workspace.hello",
+          workspaceId: binding.workspaceId,
+          workspaceRoot: binding.workspaceRoot,
+          providerProfileId: binding.providerProfileId,
+          mode: binding.mode,
+          rulesRef: binding.rulesRef,
+          mcpServerIds: binding.mcpServerIds,
+          sessionIds: binding.sessionIds,
+        }),
+      ),
+      "utf8",
+    ),
+  );
+
+  const rpcContext: DaemonRpcContext = {
+    dataRoot: options.dataRoot,
+    binding,
+    customizationRules: createWorkspaceCustomizationRules(),
+    runMachines: new Map<string, RunStateMachine>(),
+    runQueues: new Map<string, RunMessageQueue>(),
+    browserSessions: new BrowserSessionRegistry(),
+    ...(options.completionSource ? { completionSource: options.completionSource } : {}),
+  };
+  await serveRpcOnConnection(socket, rpcContext);
+}

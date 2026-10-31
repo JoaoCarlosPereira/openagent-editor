@@ -1,0 +1,54 @@
+{
+  "bomFormat": "CycloneDX",
+  "specVersion": "1.5",
+  "serialNumber": "urn:uuid:openagent-editor-cliproxyapi-8.0.45-ad8bdd3",
+  "version": 1,
+  "metadata": {
+    "timestamp": "2026-10-27T15:33:00Z",
+    "component": {
+      "type": "application",
+      "name": "CLIProxyAPI",
+      "version": "8.0.45",
+      "purl": "pkg:github/router-for-me/CLIProxyAPI@ad8bdd3f20bef44f0684b8a6096a216b2c76040d",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://github.com/router-for-me/CLIProxyAPI"
+        },
+        {
+          "type": "distribution",
+          "url": "https://github.com/router-for-me/CLIProxyAPI/releases/tag/v8.0.45"
+        }
+      ]
+    }
+  },
+  "components": [
+    {
+      "type": "application",
+      "bom-ref": "cliproxyapi-sidecar",
+      "name": "CLIProxyAPI",
+      "version": "8.0.45",
+      "purl": "pkg:github/router-for-me/CLIProxyAPI@ad8bdd3f20bef44f0684b8a6096a216b2c76040d",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://github.com/router-for-me/CLIProxyAPI"
+        }
+      ]
+    }
+  ]
+}

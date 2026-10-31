@@ -1,0 +1,27 @@
+{
+  "description": "Respostas OpenAI-compatible de erro usadas nos testes de normalização PROVIDER_* e preservação de prompt/diff (API-02).",
+  "pinVersion": "8.0.45",
+  "gitCommitShort": "ad8bdd3",
+  "samples": {
+    "rate_limit": {
+      "httpStatus": 429,
+      "body": { "error": { "message": "429 Too Many Requests", "type": "rate_limit" } },
+      "expectedCode": "PROVIDER_RATE_LIMIT"
+    },
+    "timeout": {
+      "httpStatus": 504,
+      "body": { "error": { "message": "Gateway Timeout upstream", "type": "timeout" } },
+      "expectedCode": "PROVIDER_TIMEOUT"
+    },
+    "capability_missing": {
+      "httpStatus": 404,
+      "body": {
+        "error": {
+          "message": "model does not support requested capability",
+          "type": "capability_missing"
+        }
+      },
+      "expectedCode": "PROVIDER_CAPABILITY_MISSING"
+    }
+  }
+}

@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "schemaVersion": 1,
+  "module": "services/harness-daemon/src/queue",
+  "strategy": "behavioral-reimplementation",
+  "sources": [
+    {
+      "artifactSha256": "6d39ababf803ad073ade9c2fbdaadc9dbbfc3745f2751856599b64fea673053e",
+      "artifactPath": "resources/app/out/vs/workbench/workbench.desktop.main.js",
+      "cursorVersion": "3.24.18",
+      "origin": {
+        "bundle": "workbench.desktop.main.js"
+      },
+      "recoveryMethod": "js-bundle-recovery"
+    },
+    {
+      "artifactSha256": "984a5e3fa8c08474b2bb8a21dc18ed1278f3661534282e1f0fa3953d844f6b04",
+      "artifactPath": "research/reverse-engineering/cursor-3.24.18/pseudocode/functions.c",
+      "cursorVersion": "3.24.18",
+      "origin": {
+        "address": "0x140001000",
+        "symbol": "FUN_140001000"
+      },
+      "recoveryMethod": "ghidra-pseudocode"
+    }
+  ],
+  "license": {
+    "spdx": "MIT"
+  },
+  "containsCursorBrandAssets": false,
+  "notes": "Exemplo ilustrativo: hashes, caminho e endereco sao ficticios. Fila reescrita a partir do comportamento observado; nenhum trecho extraido incorporado."
+}

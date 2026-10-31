@@ -1,0 +1,20 @@
+{
+  "name": "@openagent/tools",
+  "version": "0.1.0",
+  "description": "Ferramentas nativas, workers isolados e sandbox do OpenAgent Editor",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "private": true,
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "1.12.1",
+    "@openagent/policy": "0.1.0",
+    "@openagent/protocol": "0.1.0"
+  },
+  "devDependencies": {
+    "@openagent/storage": "0.1.0"
+  }
+}

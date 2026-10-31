@@ -1,0 +1,23 @@
+{
+  "name": "@openagent/editor-app",
+  "version": "0.1.0",
+  "description": "Workbench Electron do OpenAgent Editor (componentes de UI)",
+  "type": "module",
+  "private": true,
+  "exports": {
+    ".": "./src/index.ts",
+    "./agent": "./src/agent/agent-panel.ts",
+    "./agents": "./src/agents/index.ts",
+    "./inline-edit": "./src/inline-edit/index.ts",
+    "./permissions": "./src/permissions/permission-dialog.ts",
+    "./tab": "./src/tab/index.ts"
+  },
+  "dependencies": {
+    "@openagent/context": "0.1.0",
+    "@openagent/policy": "0.1.0",
+    "@openagent/protocol": "0.1.0"
+  },
+  "devDependencies": {
+    "@openagent/tools": "0.1.0"
+  }
+}

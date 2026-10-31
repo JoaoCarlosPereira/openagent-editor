@@ -2,3 +2,9 @@ node_modules/
 *.vsix
 .vscode-test/
 .env
+dist/
+
+# Artefatos Cursor/RE locais (não redistribuir) — ver research/README.md
+/sources/
+/resources/
+/research/reverse-engineering/

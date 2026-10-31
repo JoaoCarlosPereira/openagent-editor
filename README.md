@@ -29,6 +29,8 @@ O modo Agent requer um modelo/provedor que implemente `tool_calls` no formato Op
 
 ## Direção técnica
 
-O produto completo deve empacotar Code OSS e esta camada de IA com identidade, atualizações e instaladores próprios. A extensão é o primeiro módulo desse produto. O [plano de paridade](docs/roadmap.md), a [matriz de funcionalidades](docs/feature-matrix.md), os [critérios de aceitação](docs/parity-acceptance.md) e o [caderno de evidências](docs/evidence.md) orientam as próximas etapas.
+O alvo de produto é um **editor Electron + TypeScript/Node** com paridade local ao Cursor 3.24.18 (TechSpec SDD). A extensão VS Code em `extension/` permanece protótipo legado e referência até a migração. Layout do monorepo: [docs/monorepo-layout.md](docs/monorepo-layout.md).
+
+O [plano de paridade](docs/roadmap.md), a [matriz de funcionalidades](docs/feature-matrix.md), os [critérios de aceitação](docs/parity-acceptance.md) e o [caderno de evidências](docs/evidence.md) orientam as próximas etapas.
 
 Não inclua binários, código, recursos de marca ou credenciais do Cursor neste repositório. As observações de engenharia reversa são registradas como fatos e hipóteses, sem copiar implementação proprietária.

@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "schemaVersion": 1,
+  "module": "packaging/sidecars/cliproxyapi",
+  "strategy": "behavioral-reimplementation",
+  "sources": [
+    {
+      "artifactSha256": "a6997b703859521f51fd64b2fac99721aa804451984ed170b79ffb567df037aa",
+      "artifactPath": "packaging/sidecars/cliproxyapi/pin-manifest.json",
+      "cursorVersion": "3.24.18",
+      "origin": {
+        "bundle": "upstream-sidecar-pin"
+      },
+      "recoveryMethod": "public-documentation"
+    }
+  ],
+  "license": {
+    "spdx": "MIT"
+  },
+  "containsCursorBrandAssets": false,
+  "notes": "Pin do sidecar MIT router-for-me/CLIProxyAPI v8.0.45 (commit ad8bdd3). Binários não são versionados no Git; checksums oficiais da release v8.0.45 (ADR-005)."
+}
