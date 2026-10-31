@@ -38,6 +38,7 @@ export type DaemonRpcContext = SessionRpcContext & {
 export { consumePendingRunQueueAtRunEnd };
 
 const RUN_STARTED_EVENT_TYPE = "run.started";
+const RUN_CANCELLED_EVENT_TYPE = "run.cancelled";
 
 function mapProtocolError(error: unknown): ProtocolError {
   if (error instanceof ProtocolError) {
@@ -112,10 +113,53 @@ function persistRunCompleted(db: WorkspaceDatabase, runId: string, endedAtIso: s
   });
 }
 
+function persistRunCancelled(db: WorkspaceDatabase, runId: string, endedAtIso: string): void {
+  withSqlite(db, (sqlite) => {
+    sqlite
+      .prepare(`UPDATE run SET state = ?, ended_at = ? WHERE id = ?`)
+      .run("cancelled", endedAtIso, runId);
+  });
+}
+
 /**
  * Encerra uma execução em andamento: consome itens pending da fila e persiste estado completed.
  * Usado pelo loop do agente ao fim de uma iteração (AGT-06).
  */
+/**
+ * Cancela execução em andamento: persiste `cancelled`, atualiza máquina (STA-01/PER-02)
+ * e não consome itens pending da fila (sem novo dispatch).
+ */
+export function cancelRunningRunLifecycle(
+  context: DaemonRpcContext,
+  runId: string,
+): { cancelled: true } {
+  const db = openWorkspaceDatabase({
+    dataRoot: context.dataRoot,
+    workspaceId: context.binding.workspaceId,
+  });
+  try {
+    const machine = machineForRun(context, db, runId);
+    machine.cancel();
+    const endedAtIso = new Date().toISOString();
+    persistRunCancelled(db, runId, endedAtIso);
+    const payloadBody = JSON.stringify({
+      type: RUN_CANCELLED_EVENT_TYPE,
+      runId,
+      endedAt: endedAtIso,
+    });
+    const cas = db.putCasBlob(Buffer.from(payloadBody, "utf8"));
+    db.appendHarnessEvent({
+      runId,
+      type: RUN_CANCELLED_EVENT_TYPE,
+      payloadRef: cas.contentRef,
+      timestamp: Date.now(),
+    });
+    return { cancelled: true };
+  } finally {
+    db.close();
+  }
+}
+
 export function completeRunningRunLifecycle(
   context: DaemonRpcContext,
   runId: string,
@@ -272,6 +316,47 @@ function assertRunWorkspace(context: DaemonRpcContext, request: RpcRequestEnvelo
   }
 }
 
+function handleRunCancel(
+  context: DaemonRpcContext,
+  request: RpcRequestEnvelope<typeof RPC_METHOD.RUN_CANCEL>,
+): RpcResultMap[typeof RPC_METHOD.RUN_CANCEL] {
+  assertRunWorkspace(context, request);
+  const params = (request.payload ?? {}) as RpcParamsMap[typeof RPC_METHOD.RUN_CANCEL];
+  if (params.agentId) {
+    throw new ProtocolError(
+      PROTOCOL_ERROR_CODES.INVALID_STATE,
+      "Cancelamento de subagente ainda não implementado; omita agentId para cancelar a execução.",
+      [params.agentId],
+    );
+  }
+
+  const db = openWorkspaceDatabase({
+    dataRoot: context.dataRoot,
+    workspaceId: context.binding.workspaceId,
+  });
+  try {
+    const lifecycle = loadRunLifecycleState(db, request.runId);
+    if (lifecycle === null) {
+      throw new ProtocolError(
+        PROTOCOL_ERROR_CODES.INVALID_STATE,
+        "runId inexistente para run.cancel.",
+        [request.runId],
+      );
+    }
+    if (lifecycle !== "running") {
+      throw new ProtocolError(
+        PROTOCOL_ERROR_CODES.INVALID_STATE,
+        "run.cancel exige execução em andamento.",
+        [request.runId, lifecycle],
+      );
+    }
+  } finally {
+    db.close();
+  }
+
+  return cancelRunningRunLifecycle(context, request.runId);
+}
+
 function handleRunQueueAdd(
   context: DaemonRpcContext,
   request: RpcRequestEnvelope<typeof RPC_METHOD.RUN_QUEUE_ADD>,
@@ -297,6 +382,8 @@ export function handleRunRpc(
   switch (request.method) {
     case RPC_METHOD.RUN_START:
       return handleRunStart(context, request as RpcRequestEnvelope<typeof RPC_METHOD.RUN_START>);
+    case RPC_METHOD.RUN_CANCEL:
+      return handleRunCancel(context, request as RpcRequestEnvelope<typeof RPC_METHOD.RUN_CANCEL>);
     case RPC_METHOD.RUN_QUEUE_ADD:
       return handleRunQueueAdd(
         context,

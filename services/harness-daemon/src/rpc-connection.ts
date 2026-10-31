@@ -12,7 +12,8 @@ import {
   type ProtocolErrorCode,
   type RpcRequestEnvelope,
 } from "@openagent/protocol";
-import { dispatchSessionRpc, type SessionRpcContext } from "./sessions/session-rpc-handler.js";
+import { dispatchRunRpc, type DaemonRpcContext } from "./runs/run-rpc-handler.js";
+import { dispatchSessionRpc } from "./sessions/session-rpc-handler.js";
 
 const SESSION_RPC_METHODS = new Set<string>([
   RPC_METHOD.SESSION_CREATE,
@@ -21,6 +22,13 @@ const SESSION_RPC_METHODS = new Set<string>([
   RPC_METHOD.SESSION_EXPORT,
   RPC_METHOD.SESSION_DELETE,
   RPC_METHOD.SESSION_FORK,
+]);
+
+const RUN_RPC_METHODS = new Set<string>([
+  RPC_METHOD.RUN_START,
+  RPC_METHOD.RUN_CANCEL,
+  RPC_METHOD.RUN_QUEUE_ADD,
+  RPC_METHOD.RUN_QUEUE_REMOVE,
 ]);
 
 function writeProtocolError(socket: net.Socket, code: ProtocolErrorCode, message: string): void {
@@ -32,7 +40,7 @@ function writeProtocolError(socket: net.Socket, code: ProtocolErrorCode, message
 
 export async function serveRpcOnConnection(
   socket: net.Socket,
-  context: SessionRpcContext,
+  context: DaemonRpcContext,
 ): Promise<void> {
   while (!socket.destroyed) {
     let frame: Buffer;
@@ -61,7 +69,18 @@ export async function serveRpcOnConnection(
     }
 
     const request = validation.value as RpcRequestEnvelope;
-    if (!isRpcMethod(request.method) || !SESSION_RPC_METHODS.has(request.method)) {
+    if (!isRpcMethod(request.method)) {
+      writeProtocolError(
+        socket,
+        PROTOCOL_ERROR_CODES.INVALID_STATE,
+        `Método RPC não suportado nesta conexão: ${String(request.method)}`,
+      );
+      continue;
+    }
+
+    const isSession = SESSION_RPC_METHODS.has(request.method);
+    const isRun = RUN_RPC_METHODS.has(request.method);
+    if (!isSession && !isRun) {
       writeProtocolError(
         socket,
         PROTOCOL_ERROR_CODES.INVALID_STATE,
@@ -71,7 +90,9 @@ export async function serveRpcOnConnection(
     }
 
     try {
-      const result = dispatchSessionRpc(context, request);
+      const result = isRun
+        ? dispatchRunRpc(context, request)
+        : dispatchSessionRpc(context, request);
       writeProtocolFrame(
         socket,
         Buffer.from(
