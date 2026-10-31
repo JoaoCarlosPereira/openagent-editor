@@ -494,6 +494,17 @@ export async function installVsixPackage(
     );
   }
 
+  if (manifest.icon !== undefined) {
+    const normalizedIcon = path.normalize(manifest.icon);
+    if (!manifest.icon.trim() || path.isAbsolute(manifest.icon) || normalizedIcon === ".." ||
+        normalizedIcon.startsWith(`..${path.sep}`) || !extensionEntries.has(normalizedIcon)) {
+      throw new ProtocolError(
+        PROTOCOL_ERROR_CODES.INVALID_STATE,
+        `Ícone da extensão (${manifest.icon}) não encontrado no pacote VSIX.`,
+      );
+    }
+  }
+
   const extract = (tempStageDir: string): void => {
     for (const [relPath, content] of extensionEntries) {
       const destinationFile = path.resolve(tempStageDir, relPath);
