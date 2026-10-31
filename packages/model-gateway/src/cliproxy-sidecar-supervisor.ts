@@ -86,6 +86,14 @@ function defaultRuntimeDirectory(): string {
   return fs.mkdtempSync(path.join(os.tmpdir(), "openagent-cliproxy-"));
 }
 
+function removeEphemeralRuntimeDirectory(runtimeDirectory: string): void {
+  try {
+    fs.rmSync(runtimeDirectory, { recursive: true, force: true });
+  } catch {
+    // Best-effort: diretório efêmero em /tmp.
+  }
+}
+
 function resolveSidecarBinaryPath(explicit?: string): string {
   const binaryPath = explicit?.trim();
   if (!binaryPath) {
@@ -119,31 +127,47 @@ function buildSidecarLaunchSpec(input: {
 
 async function waitForSidecarHealth(
   handle: Pick<CliProxySidecarSupervisorHandle, "openAiBaseUrl" | "secrets">,
-  options: { healthTimeoutMs: number; fetchImpl?: typeof fetch },
+  options: { healthTimeoutMs: number; fetchImpl?: typeof fetch; child?: ChildProcess },
 ): Promise<void> {
-  const deadline = Date.now() + options.healthTimeoutMs;
-  let lastError: unknown;
-  while (Date.now() < deadline) {
-    try {
-      await checkCliProxySidecarHealth({
-        openAiBaseUrl: handle.openAiBaseUrl,
-        accessToken: handle.secrets.accessToken,
-        fetchImpl: options.fetchImpl,
-        timeoutMs: Math.min(2_000, options.healthTimeoutMs),
-      });
-      return;
-    } catch (error) {
-      lastError = error;
-      await sleep(DEFAULT_POLL_INTERVAL_MS);
+  let childExitError: ProtocolError | undefined;
+  const onChildExit = (code: number | null, signal: NodeJS.Signals | null) => {
+    childExitError = new ProtocolError(
+      PROTOCOL_ERROR_CODES.INVALID_STATE,
+      `Sidecar CLIProxyAPI encerrou antes do health check (code=${code ?? "null"}, signal=${signal ?? "null"}).`,
+    );
+  };
+  options.child?.once("exit", onChildExit);
+
+  try {
+    const deadline = Date.now() + options.healthTimeoutMs;
+    let lastError: unknown;
+    while (Date.now() < deadline) {
+      if (childExitError) {
+        throw childExitError;
+      }
+      try {
+        await checkCliProxySidecarHealth({
+          openAiBaseUrl: handle.openAiBaseUrl,
+          accessToken: handle.secrets.accessToken,
+          fetchImpl: options.fetchImpl,
+          timeoutMs: Math.min(2_000, options.healthTimeoutMs),
+        });
+        return;
+      } catch (error) {
+        lastError = error;
+        await sleep(DEFAULT_POLL_INTERVAL_MS);
+      }
     }
+    if (lastError instanceof ProtocolError) {
+      throw lastError;
+    }
+    throw new ProtocolError(
+      "PROVIDER_CONNECTION_FAILED",
+      "Timeout aguardando health check do sidecar CLIProxyAPI.",
+    );
+  } finally {
+    options.child?.off("exit", onChildExit);
   }
-  if (lastError instanceof ProtocolError) {
-    throw lastError;
-  }
-  throw new ProtocolError(
-    "PROVIDER_CONNECTION_FAILED",
-    "Timeout aguardando health check do sidecar CLIProxyAPI.",
-  );
 }
 
 /**
@@ -152,14 +176,6 @@ async function waitForSidecarHealth(
 export async function startCliProxySidecarSupervised(
   options: StartCliProxySidecarSupervisorOptions = {},
 ): Promise<CliProxySidecarSupervisorHandle> {
-  const host = options.host ?? DEFAULT_HOST;
-  const port = await allocateLoopbackPort(host);
-  const secrets = generateCliProxySidecarRuntimeSecrets();
-  const runtimeDirectory = options.runtimeDirectory ?? defaultRuntimeDirectory();
-  const configBody = renderCliProxySidecarConfigV8({ host, port, secrets });
-  const configPath = writeCliProxySidecarConfigFile(runtimeDirectory, configBody);
-  const openAiBaseUrl = buildLoopbackOpenAiBaseUrl(port);
-
   if (!options.buildLaunchSpec && !options.binaryPath?.trim()) {
     throw new ProtocolError(
       PROTOCOL_ERROR_CODES.INVALID_STATE,
@@ -167,6 +183,29 @@ export async function startCliProxySidecarSupervised(
       ["binaryPath"],
     );
   }
+
+  const host = options.host ?? DEFAULT_HOST;
+  const port = await allocateLoopbackPort(host);
+  const secrets = generateCliProxySidecarRuntimeSecrets();
+  const ownsRuntimeDirectory = options.runtimeDirectory === undefined;
+  const runtimeDirectory = options.runtimeDirectory ?? defaultRuntimeDirectory();
+
+  const cleanupOwnedRuntime = () => {
+    if (ownsRuntimeDirectory) {
+      removeEphemeralRuntimeDirectory(runtimeDirectory);
+    }
+  };
+
+  let configPath: string;
+  try {
+    const configBody = renderCliProxySidecarConfigV8({ host, port, secrets });
+    configPath = writeCliProxySidecarConfigFile(runtimeDirectory, configBody);
+  } catch (error) {
+    cleanupOwnedRuntime();
+    throw error;
+  }
+
+  const openAiBaseUrl = buildLoopbackOpenAiBaseUrl(port);
 
   const binaryPath = options.binaryPath?.trim()
     ? resolveSidecarBinaryPath(options.binaryPath)
@@ -178,7 +217,7 @@ export async function startCliProxySidecarSupervised(
       spawn(input.command, input.args, {
         cwd: input.cwd,
         env: input.env,
-        stdio: "pipe",
+        stdio: "ignore",
       }));
 
   const launchContext: CliProxySidecarLaunchContext = {
@@ -192,20 +231,32 @@ export async function startCliProxySidecarSupervised(
   const launch = options.buildLaunchSpec
     ? options.buildLaunchSpec(launchContext)
     : buildSidecarLaunchSpec({ binaryPath, configPath, port, secrets });
-  const child = spawnProcess(launch);
-  if (!child.pid) {
-    throw new ProtocolError(
-      PROTOCOL_ERROR_CODES.INVALID_STATE,
-      "Falha ao iniciar processo do sidecar CLIProxyAPI.",
-    );
+
+  let child: ChildProcess;
+  let childPid: number;
+  try {
+    child = spawnProcess(launch);
+    if (!child.pid) {
+      throw new ProtocolError(
+        PROTOCOL_ERROR_CODES.INVALID_STATE,
+        "Falha ao iniciar processo do sidecar CLIProxyAPI.",
+      );
+    }
+    childPid = child.pid;
+  } catch (error) {
+    cleanupOwnedRuntime();
+    throw error;
   }
 
   const healthTimeoutMs = options.healthTimeoutMs ?? DEFAULT_HEALTH_TIMEOUT_MS;
   try {
-    await waitForSidecarHealth({ openAiBaseUrl, secrets }, { healthTimeoutMs, fetchImpl: options.fetchImpl });
+    await waitForSidecarHealth(
+      { openAiBaseUrl, secrets },
+      { healthTimeoutMs, fetchImpl: options.fetchImpl, child },
+    );
   } catch (error) {
     await shutdownCliProxySidecarSupervised({
-      pid: child.pid,
+      pid: childPid,
       host,
       port,
       openAiBaseUrl,
@@ -214,11 +265,12 @@ export async function startCliProxySidecarSupervised(
       runtimeDirectory,
       child,
     }).catch(() => undefined);
+    cleanupOwnedRuntime();
     throw error;
   }
 
   return {
-    pid: child.pid,
+    pid: childPid,
     host,
     port,
     openAiBaseUrl,
