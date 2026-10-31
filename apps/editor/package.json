@@ -7,11 +7,12 @@
   "exports": {
     ".": "./src/index.ts",
     "./agent": "./src/agent/agent-panel.ts",
-    "./agents": "./src/agents/index.ts",
-    "./permissions": "./src/permissions/permission-dialog.ts"
+    "./permissions": "./src/permissions/permission-dialog.ts",
+    "./main": "./src/main/index.ts",
+    "./workbench": "./src/workbench/index.ts"
   },
   "dependencies": {
-    "@openagent/context": "0.1.0",
+    "@openagent/harness-daemon": "0.1.0",
     "@openagent/policy": "0.1.0",
     "@openagent/protocol": "0.1.0"
   }
