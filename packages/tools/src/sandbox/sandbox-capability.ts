@@ -6,6 +6,10 @@ import {
   probeMacosSandbox,
   type MacosSandboxProbe,
 } from "./macos-sandbox-probe.js";
+import {
+  probeWindowsSandbox,
+  type WindowsSandboxProbe,
+} from "./windows-sandbox-probe.js";
 
 /**
  * Nível de isolamento disponível no SO (ADR-006). Degradação explícita antes do consentimento.
@@ -24,6 +28,7 @@ export interface SandboxCapabilitySnapshot {
 export interface DescribeSandboxCapabilityOptions {
   linuxProbe?: LinuxSandboxProbe;
   macosProbe?: MacosSandboxProbe;
+  windowsProbe?: WindowsSandboxProbe;
   /** Somente testes: simula plataforma distinta de process.platform. */
   platform?: NodeJS.Platform;
 }
@@ -79,6 +84,33 @@ export function describeSandboxCapability(
     const degradationNotice = probe.sandboxExecAvailable
       ? "sandbox-exec presente mas Seatbelt não operacional; isolamento limitado a worker thread."
       : "Seatbelt indisponível; sandbox nativa degradada para worker thread.";
+
+    return {
+      level: "degraded",
+      platform,
+      degradationNotice,
+    };
+  }
+
+  if (platform === "win32") {
+    const probe = (
+      options?.windowsProbe ??
+      (() =>
+        probeWindowsSandbox({
+          platform: options?.platform,
+        }))
+    )();
+    if (probe.nativeAvailable && probe.primitive) {
+      return {
+        level: "native",
+        platform,
+        nativePrimitive: probe.primitive,
+      };
+    }
+
+    const degradationNotice = probe.appContainerSupported
+      ? "AppContainer indisponível ou não operacional; Job Object indisponível; isolamento limitado a worker thread."
+      : "AppContainer não suportado nesta versão do Windows; isolamento limitado a worker thread.";
 
     return {
       level: "degraded",

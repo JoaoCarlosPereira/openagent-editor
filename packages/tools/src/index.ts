@@ -22,6 +22,16 @@ export {
 } from "./sandbox/macos-sandbox-probe.js";
 
 export {
+  probeWindowsSandbox,
+  probeAppContainerOperational,
+  probeAppContainerVersionSupport,
+  probeJobObjectAvailability,
+  type WindowsSandboxProbe,
+  type WindowsSandboxProbeResult,
+  type WindowsNativeSandboxPrimitive,
+} from "./sandbox/windows-sandbox-probe.js";
+
+export {
   prepareSandboxToolDispatch,
   sandboxDegradationNoticeForPermission,
   type SandboxToolDispatchInput,
