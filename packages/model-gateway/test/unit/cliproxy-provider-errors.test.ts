@@ -9,6 +9,7 @@ import {
   mapCliProxyChatCompletionHttpFailure,
   mapCliProxyOpenAiHttpFailure,
   probeCliProxyOpenAiCompatibleProvider,
+  redactProviderCredentials,
 } from "../../src/index.js";
 
 test("[API-02] timeout HTTP (504) normaliza para PROVIDER_TIMEOUT", () => {
@@ -58,4 +59,16 @@ test("[API-02] caminho de erro: entrada inválida retorna INVALID_STATE sem efei
       return true;
     },
   );
+});
+
+test("[API-02] redactProviderCredentials cobre chaves sk- com hifen e underscore", () => {
+  for (const secret of [
+    "sk-proj-abcdefghijklmnop1234",
+    "sk-ant-api03-abcDEF_123456789",
+    "sk-echoed-secret-123456789",
+  ]) {
+    const redacted = redactProviderCredentials(`invalid key ${secret} rejected`);
+    assert.ok(!redacted.includes(secret), redacted);
+    assert.match(redacted, /\[REDACTED\]/);
+  }
 });

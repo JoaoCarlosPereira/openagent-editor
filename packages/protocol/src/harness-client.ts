@@ -2,7 +2,11 @@ import type net from "node:net";
 import { randomUUID } from "node:crypto";
 import type { HarnessEvent } from "./harness-event.js";
 import { validateHarnessEvent } from "./harness-event.js";
-import { PROTOCOL_ERROR_CODES, ProtocolError } from "./errors.js";
+import { PROTOCOL_ERROR_CODES, ProtocolError, incompleteStreamError } from "./errors.js";
+import {
+  validateCompletionEventPayload,
+  type CompletionEventPayload,
+} from "./completion-events.js";
 import { OPENAGENT_DAEMON_PROTOCOL_VERSION } from "./protocol-version.js";
 import {
   validateWorkspaceTransportAck,
@@ -21,6 +25,9 @@ import {
   RPC_PROTOCOL_VERSION,
   getRpcMethodSpec,
   type AgentMode,
+  type CompletionCancelResult,
+  type CompletionKind,
+  type CompletionStartResult,
   type PermissionDecision,
   type CheckpointRestoreConflictEntry,
   type RpcMethod,
@@ -66,6 +73,40 @@ export interface QueueItem {
   runId: string;
 }
 
+/** Pedido de completion por stream (TAB-01), vinculado a run e request. */
+export interface StartCompletion {
+  sessionId: string;
+  runId: string;
+  completionId: string;
+  prefix: string;
+  suffix?: string;
+  language?: string;
+  kind?: CompletionKind;
+  requestId?: string;
+  expectedVersion?: number;
+}
+
+export interface CancelCompletion {
+  sessionId: string;
+  runId: string;
+  completionId: string;
+}
+
+/** Evento de completion já validado, com payload canônico entregue pelo daemon. */
+export interface CompletionStreamEvent {
+  event: HarnessEvent;
+  payload: CompletionEventPayload;
+}
+
+/**
+ * Stream de uma requisição `completion.start`: itera os eventos do daemon e `result`
+ * resolve com o resultado terminal de `rpc.stream.end` (ou rejeita em erro/queda).
+ */
+export interface CompletionStream extends AsyncIterable<CompletionStreamEvent> {
+  readonly requestId: string;
+  readonly result: Promise<CompletionStartResult>;
+}
+
 export type RestoreResult =
   | { restored: true }
   | { conflict: true; conflicts: CheckpointRestoreConflictEntry[] };
@@ -81,14 +122,14 @@ export interface HarnessWorkspaceBinding {
 
 export interface HarnessClient {
   readonly binding: HarnessWorkspaceBinding;
-  callRpc<M extends RpcMethod>(method: M, params: RpcParamsMap[M]): Promise<RpcResultMap[M]>;
   createSession(input: CreateSession): Promise<Session>;
   startRun(input: StartRun): AsyncIterable<HarnessEvent>;
   enqueue(runId: string, input: UserInput): Promise<QueueItem>;
-  invokeTool?(runId: string, input: RpcParamsMap[typeof RPC_METHOD.TOOL_INVOKE]): Promise<RpcResultMap[typeof RPC_METHOD.TOOL_INVOKE]>;
   decide(requestId: string, decision: GrantDecision): Promise<void>;
   cancel(runId: string, agentId?: string): Promise<void>;
   restore(checkpointId: string): Promise<RestoreResult>;
+  startCompletion(input: StartCompletion): CompletionStream;
+  cancelCompletion(input: CancelCompletion): Promise<CompletionCancelResult>;
   close(): void;
 }
 
@@ -104,14 +145,19 @@ interface RpcOkFrame<M extends RpcMethod = RpcMethod> {
   result: RpcResultMap[M];
 }
 
-interface RpcStreamEndFrame {
+export interface RpcStreamEndFrame {
   type: "rpc.stream.end";
   requestId: string;
+  result?: unknown;
 }
 
-interface HarnessEventFrame {
+export interface HarnessEventFrame {
   type: "harness.event";
+  /** Requisição RPC à qual o evento pertence (multiplexação de streams). */
+  requestId?: string;
   event: HarnessEvent;
+  /** Payload canônico inline do evento (o payloadRef aponta para o mesmo conteúdo no CAS). */
+  payload?: unknown;
 }
 
 type WireFrame =
@@ -150,10 +196,6 @@ function sessionFromCreateResult(
     loadedRules: result.loadedRules,
     rulesLoaded: result.rulesLoaded,
   };
-}
-
-function throwProtocolErrorFromFrame(frame: ProtocolTransportErrorFrame): never {
-  throw new ProtocolError(frame.code, frame.message, [frame.message]);
 }
 
 function throwProtocolErrorFromRecord(frame: Record<string, unknown>): never {
@@ -246,6 +288,74 @@ async function performTransportHandshake(
   return ackValidation.value;
 }
 
+/** Fila assíncrona de um item por vez com encerramento limpo ou com erro. */
+class StreamChannel<T> {
+  private readonly items: T[] = [];
+  private waiters: Array<() => void> = [];
+  private finished = false;
+  private failure: Error | undefined;
+
+  push(item: T): void {
+    if (this.finished) {
+      return;
+    }
+    this.items.push(item);
+    this.wake();
+  }
+
+  end(): void {
+    this.finished = true;
+    this.wake();
+  }
+
+  fail(error: Error): void {
+    if (this.finished) {
+      return;
+    }
+    this.failure = error;
+    this.finished = true;
+    this.wake();
+  }
+
+  async *drain(): AsyncGenerator<T, void, void> {
+    for (;;) {
+      const item = this.items.shift();
+      if (item !== undefined) {
+        yield item;
+        continue;
+      }
+      if (this.failure) {
+        throw this.failure;
+      }
+      if (this.finished) {
+        return;
+      }
+      await new Promise<void>((resolve) => this.waiters.push(resolve));
+    }
+  }
+
+  private wake(): void {
+    const waiters = this.waiters;
+    this.waiters = [];
+    for (const resolve of waiters) {
+      resolve();
+    }
+  }
+}
+
+type PendingRequest =
+  | {
+      kind: "call";
+      resolve: (frame: RpcOkFrame) => void;
+      reject: (error: Error) => void;
+    }
+  | {
+      kind: "stream";
+      onEvent: (frame: HarnessEventFrame) => void;
+      onEnd: (frame: RpcStreamEndFrame) => void;
+      onError: (error: Error) => void;
+    };
+
 class TransportHarnessClient implements HarnessClient {
   public readonly binding: HarnessWorkspaceBinding;
   private readonly socket: net.Socket;
@@ -253,18 +363,26 @@ class TransportHarnessClient implements HarnessClient {
   private activeRunId: string;
   private expectedVersion = 0;
   private closed = false;
+  /** Falha terminal da conexão; novas chamadas são recusadas em vez de ficarem penduradas. */
+  private connectionFailure: Error | undefined;
+  /** Requisições em voo; um único leitor de frames as despacha por requestId. */
+  private readonly pending = new Map<string, PendingRequest>();
 
   constructor(socket: net.Socket, ack: WorkspaceTransportAck) {
     this.socket = socket;
     this.binding = bindingFromAck(ack);
     this.activeSessionId = ack.sessionIds[0] ?? `ses-${randomUUID()}`;
     this.activeRunId = `run-${randomUUID()}`;
+    void this.pump();
   }
 
   close(): void {
     if (!this.closed) {
       this.closed = true;
       this.socket.destroy();
+      this.failAll(
+        new ProtocolError(PROTOCOL_ERROR_CODES.INVALID_STATE, "Cliente já foi fechado."),
+      );
     }
   }
 
@@ -280,60 +398,131 @@ class TransportHarnessClient implements HarnessClient {
   }
 
   private async *iterateRunStart(input: StartRun): AsyncGenerator<HarnessEvent> {
-    this.activeSessionId = input.sessionId;
-    this.activeRunId = input.runId;
     const requestId = randomUUID();
-    await this.sendRpcEnvelope(
-      RPC_METHOD.RUN_START,
-      { mode: input.mode, input: input.input },
-      {
-        requestId,
-        sessionId: input.sessionId,
-        runId: input.runId,
-        expectedVersion: input.expectedVersion ?? this.expectedVersion,
-      },
-    );
-
-    while (!this.closed) {
-      const frame = await readWireFrame(this.socket);
-      if (frame.type === "protocol.error") {
-        throwProtocolErrorFromFrame(frame);
-      }
-      // Daemon atual: run.start responde com rpc.ok cujo result é o HarnessEvent (CLI-02).
-      if (frame.type === "rpc.ok" && frame.requestId === requestId) {
-        const validation = validateHarnessEvent(frame.result);
-        if (!validation.valid) {
-          throw new ProtocolError(
-            validation.code,
-            validation.errors.join(" "),
-            validation.errors,
-          );
-        }
-        this.activeRunId = input.runId;
-        this.activeSessionId = input.sessionId;
-        yield validation.value;
-        return;
-      }
-      if (frame.type === "harness.event") {
+    const channel = new StreamChannel<HarnessEvent>();
+    this.pending.set(requestId, {
+      kind: "stream",
+      onEvent: (frame) => {
         const validation = validateHarnessEvent(frame.event);
         if (!validation.valid) {
-          throw new ProtocolError(
-            validation.code,
-            validation.errors.join(" "),
-            validation.errors,
+          channel.fail(
+            new ProtocolError(validation.code, validation.errors.join(" "), validation.errors),
           );
+          return;
         }
-        yield validation.value;
-        continue;
-      }
-      if (frame.type === "rpc.stream.end" && frame.requestId === requestId) {
-        return;
-      }
-      throw new ProtocolError(
-        PROTOCOL_ERROR_CODES.INVALID_STATE,
-        `Frame inesperado durante run.start: ${String((frame as { type?: string }).type)}`,
+        channel.push(validation.value);
+      },
+      onEnd: () => channel.end(),
+      onError: (error) => channel.fail(error),
+    });
+    try {
+      this.sendRpcEnvelope(
+        RPC_METHOD.RUN_START,
+        { mode: input.mode, input: input.input },
+        {
+          requestId,
+          sessionId: input.sessionId,
+          runId: input.runId,
+          expectedVersion: input.expectedVersion ?? this.expectedVersion,
+        },
       );
+      yield* channel.drain();
+    } finally {
+      this.pending.delete(requestId);
     }
+  }
+
+  startCompletion(input: StartCompletion): CompletionStream {
+    const requestId = input.requestId ?? randomUUID();
+    const channel = new StreamChannel<CompletionStreamEvent>();
+    let resolveResult!: (value: CompletionStartResult) => void;
+    let rejectResult!: (error: Error) => void;
+    const result = new Promise<CompletionStartResult>((resolve, reject) => {
+      resolveResult = resolve;
+      rejectResult = reject;
+    });
+    // O consumidor pode ignorar `result`; a falha continua visível ao iterar o stream.
+    result.catch(() => undefined);
+
+    const fail = (error: Error): void => {
+      channel.fail(error);
+      rejectResult(error);
+      this.pending.delete(requestId);
+    };
+
+    this.pending.set(requestId, {
+      kind: "stream",
+      onEvent: (frame) => {
+        const eventCheck = validateHarnessEvent(frame.event);
+        if (!eventCheck.valid) {
+          fail(new ProtocolError(eventCheck.code, eventCheck.errors.join(" "), eventCheck.errors));
+          return;
+        }
+        const payloadCheck = validateCompletionEventPayload(frame.payload);
+        if (!payloadCheck.valid) {
+          fail(
+            new ProtocolError(
+              PROTOCOL_ERROR_CODES.INVALID_STATE,
+              payloadCheck.errors.join(" "),
+              payloadCheck.errors,
+            ),
+          );
+          return;
+        }
+        if (payloadCheck.value.completionId !== input.completionId) {
+          fail(
+            new ProtocolError(
+              PROTOCOL_ERROR_CODES.INVALID_STATE,
+              "Evento de completion não pertence ao pedido.",
+              [payloadCheck.value.completionId, input.completionId],
+            ),
+          );
+          return;
+        }
+        channel.push({ event: eventCheck.value, payload: payloadCheck.value });
+      },
+      onEnd: (frame) => {
+        this.pending.delete(requestId);
+        channel.end();
+        resolveResult(frame.result as CompletionStartResult);
+      },
+      onError: fail,
+    });
+
+    try {
+      this.sendRpcEnvelope(
+        RPC_METHOD.COMPLETION_START,
+        {
+          completionId: input.completionId,
+          prefix: input.prefix,
+          ...(input.suffix !== undefined ? { suffix: input.suffix } : {}),
+          ...(input.language !== undefined ? { language: input.language } : {}),
+          ...(input.kind !== undefined ? { kind: input.kind } : {}),
+        },
+        {
+          requestId,
+          sessionId: input.sessionId,
+          runId: input.runId,
+          expectedVersion: input.expectedVersion ?? this.expectedVersion,
+        },
+      );
+    } catch (error) {
+      fail(error instanceof Error ? error : new Error(String(error)));
+    }
+
+    return {
+      requestId,
+      result,
+      [Symbol.asyncIterator]: () => channel.drain(),
+    };
+  }
+
+  async cancelCompletion(input: CancelCompletion): Promise<CompletionCancelResult> {
+    return this.callRpc(
+      RPC_METHOD.COMPLETION_CANCEL,
+      { completionId: input.completionId },
+      { sessionId: input.sessionId, runId: input.runId },
+    );
   }
 
   async enqueue(runId: string, input: UserInput): Promise<QueueItem> {
@@ -357,12 +546,6 @@ class TransportHarnessClient implements HarnessClient {
     );
   }
 
-  async invokeTool(runId: string, input: RpcParamsMap[typeof RPC_METHOD.TOOL_INVOKE]): Promise<RpcResultMap[typeof RPC_METHOD.TOOL_INVOKE]> {
-    const result = await this.callRpc(RPC_METHOD.TOOL_INVOKE, input, { runId });
-    this.activeRunId = runId;
-    return result;
-  }
-
   async cancel(runId: string, agentId?: string): Promise<void> {
     await this.callRpc(RPC_METHOD.RUN_CANCEL, agentId ? { agentId } : {}, {
       runId,
@@ -379,7 +562,7 @@ class TransportHarnessClient implements HarnessClient {
     return { restored: true };
   }
 
-  async callRpc<M extends RpcMethod>(
+  private async callRpc<M extends RpcMethod>(
     method: M,
     params: RpcParamsMap[M],
     context: {
@@ -390,27 +573,128 @@ class TransportHarnessClient implements HarnessClient {
     } = {},
   ): Promise<RpcResultMap[M]> {
     const requestId = context.requestId ?? randomUUID();
-    await this.sendRpcEnvelope(method, params, {
-      requestId,
-      sessionId: context.sessionId ?? this.activeSessionId,
-      runId: context.runId ?? this.activeRunId,
-      expectedVersion: context.expectedVersion ?? this.expectedVersion,
+    const response = new Promise<RpcOkFrame>((resolve, reject) => {
+      this.pending.set(requestId, { kind: "call", resolve, reject });
     });
-
-    const frame = await readWireFrame(this.socket);
-    if (frame.type === "protocol.error") {
-      throwProtocolErrorFromFrame(frame);
+    response.catch(() => undefined);
+    try {
+      this.sendRpcEnvelope(method, params, {
+        requestId,
+        sessionId: context.sessionId ?? this.activeSessionId,
+        runId: context.runId ?? this.activeRunId,
+        expectedVersion: context.expectedVersion ?? this.expectedVersion,
+      });
+    } catch (error) {
+      this.pending.delete(requestId);
+      throw error;
     }
-    if (frame.type !== "rpc.ok" || frame.requestId !== requestId) {
-      throw new ProtocolError(
-        PROTOCOL_ERROR_CODES.INVALID_STATE,
-        "Resposta RPC não corresponde ao requestId enviado.",
-      );
-    }
+    const frame = await response;
     return frame.result as RpcResultMap[M];
   }
 
-  private async sendRpcEnvelope<M extends RpcMethod>(
+  /** Único leitor do socket: roteia cada frame para a requisição dona pelo requestId. */
+  private async pump(): Promise<void> {
+    try {
+      while (!this.closed) {
+        const frame = await readWireFrame(this.socket);
+        this.route(frame);
+      }
+    } catch (error) {
+      if (this.closed) {
+        return;
+      }
+      this.failConnection(
+        error instanceof ProtocolError && error.code !== PROTOCOL_ERROR_CODES.INVALID_STATE
+          ? error
+          : incompleteStreamError(),
+      );
+    }
+  }
+
+  private route(frame: WireFrame): void {
+    switch (frame.type) {
+      case "protocol.error": {
+        const error = new ProtocolError(frame.code, frame.message, [frame.message]);
+        const target = frame.requestId !== undefined ? this.pending.get(frame.requestId) : undefined;
+        if (frame.requestId !== undefined && target) {
+          this.pending.delete(frame.requestId);
+          if (target.kind === "call") {
+            target.reject(error);
+          } else {
+            target.onError(error);
+          }
+          return;
+        }
+        // Sem requestId não há dono confiável: encerra a conexão em vez de culpar outra requisição.
+        if (frame.requestId === undefined) {
+          this.failConnection(error);
+        }
+        return;
+      }
+      case "rpc.ok": {
+        const target = this.pending.get(frame.requestId);
+        if (target?.kind === "call") {
+          this.pending.delete(frame.requestId);
+          target.resolve(frame);
+        } else if (target?.kind === "stream") {
+          // run.start responde com um único rpc.ok (o evento run.started): entrega e encerra.
+          this.pending.delete(frame.requestId);
+          target.onEvent({
+            type: "harness.event",
+            requestId: frame.requestId,
+            event: frame.result as HarnessEvent,
+          });
+          target.onEnd({ type: "rpc.stream.end", requestId: frame.requestId });
+        }
+        return;
+      }
+      case "harness.event": {
+        const target = this.resolveStreamTarget(frame.requestId);
+        target?.onEvent(frame);
+        return;
+      }
+      case "rpc.stream.end": {
+        const target = this.pending.get(frame.requestId);
+        if (target?.kind === "stream") {
+          this.pending.delete(frame.requestId);
+          target.onEnd(frame);
+        }
+        return;
+      }
+    }
+  }
+
+  private resolveStreamTarget(
+    requestId: string | undefined,
+  ): Extract<PendingRequest, { kind: "stream" }> | undefined {
+    if (requestId !== undefined) {
+      const target = this.pending.get(requestId);
+      return target?.kind === "stream" ? target : undefined;
+    }
+    const streams = [...this.pending.values()].filter(
+      (entry): entry is Extract<PendingRequest, { kind: "stream" }> => entry.kind === "stream",
+    );
+    return streams.length === 1 ? streams[0] : undefined;
+  }
+
+  private failConnection(error: Error): void {
+    this.connectionFailure ??= error;
+    this.failAll(error);
+  }
+
+  private failAll(error: Error): void {
+    const entries = [...this.pending.values()];
+    this.pending.clear();
+    for (const entry of entries) {
+      if (entry.kind === "call") {
+        entry.reject(error);
+      } else {
+        entry.onError(error);
+      }
+    }
+  }
+
+  private sendRpcEnvelope<M extends RpcMethod>(
     method: M,
     params: RpcParamsMap[M],
     context: {
@@ -419,12 +703,15 @@ class TransportHarnessClient implements HarnessClient {
       runId: string;
       expectedVersion: number;
     },
-  ): Promise<void> {
+  ): void {
     if (this.closed) {
       throw new ProtocolError(
         PROTOCOL_ERROR_CODES.INVALID_STATE,
         "Cliente já foi fechado.",
       );
+    }
+    if (this.connectionFailure) {
+      throw this.connectionFailure;
     }
 
     const spec = getRpcMethodSpec(method);
@@ -475,5 +762,20 @@ export function buildHarnessRpcOkFrame(
   result: RpcResultMap[RpcMethod],
 ): RpcOkFrame {
   return { type: "rpc.ok", requestId, result };
+}
+
+export function buildHarnessEventFrame(
+  requestId: string,
+  event: HarnessEvent,
+  payload: unknown,
+): HarnessEventFrame {
+  return { type: "harness.event", requestId, event, payload };
+}
+
+export function buildRpcStreamEndFrame(
+  requestId: string,
+  result?: RpcResultMap[RpcMethod],
+): RpcStreamEndFrame {
+  return { type: "rpc.stream.end", requestId, ...(result !== undefined ? { result } : {}) };
 }
 

@@ -13,6 +13,23 @@ export type OpenAiCompatibleErrorBody = {
   };
 };
 
+/** Redige credenciais de provedor encontradas em strings de erro/log. */
+export function redactProviderCredentials(input: string, credential?: string): string {
+  let result = input;
+  if (credential) {
+    result = result.replaceAll(credential, "[REDACTED]");
+  }
+  const patterns: Array<[RegExp, string]> = [
+    [/sk-[A-Za-z0-9_-]{8,}/g, "[REDACTED]"],
+    [/Bearer\s+[^\s,;"'<>]+/gi, "Bearer [REDACTED]"],
+    [/token["']?\s*[:=]\s*["']?[A-Za-z0-9\-._~+/]{8,}/gi, 'token: "[REDACTED]"'],
+  ];
+  for (const [pattern, replacement] of patterns) {
+    result = result.replace(pattern, replacement);
+  }
+  return result;
+}
+
 export function providerFailurePreservationHints(): {
   preservePrompt: true;
   preserveDiff: true;
@@ -23,7 +40,11 @@ export function providerFailurePreservationHints(): {
 /**
  * Extrai a causa legível retornada pelo provedor OpenAI-compatible (CLIProxyAPI).
  */
-export function parseOpenAiCompatibleErrorBody(bodyText: string, fallbackMessage: string): string {
+export function parseOpenAiCompatibleErrorBody(
+  bodyText: string,
+  fallbackMessage: string,
+  credential?: string,
+): string {
   const trimmed = bodyText.trim();
   if (!trimmed) {
     return fallbackMessage;
@@ -32,12 +53,12 @@ export function parseOpenAiCompatibleErrorBody(bodyText: string, fallbackMessage
     const parsed = JSON.parse(trimmed) as OpenAiCompatibleErrorBody;
     const message = parsed.error?.message?.trim();
     if (message) {
-      return message;
+      return redactProviderCredentials(message, credential);
     }
   } catch {
     // texto bruto abaixo
   }
-  return trimmed.slice(0, 500);
+  return redactProviderCredentials(trimmed.slice(0, 500), credential);
 }
 
 /**
@@ -85,8 +106,9 @@ export function mapCliProxyOpenAiHttpFailure(
   status: number,
   bodyText: string,
   fallbackMessage = "Provedor recusou a requisição.",
+  credential?: string,
 ): ProtocolError {
-  const providerCause = parseOpenAiCompatibleErrorBody(bodyText, fallbackMessage);
+  const providerCause = parseOpenAiCompatibleErrorBody(bodyText, fallbackMessage, credential);
   const reason = inferCliProxyProviderFailureReason(status, providerCause);
   return providerFailureError(reason, providerCause);
 }
@@ -97,10 +119,11 @@ export const mapCliProxyChatCompletionHttpFailure = mapCliProxyOpenAiHttpFailure
 export function mapCliProxyInlineStreamErrorObject(
   error: OpenAiCompatibleErrorBody["error"],
 ): ProtocolError {
-  const providerCause =
+  const rawCause =
     error?.message?.trim() ||
     error?.type?.trim() ||
     "Provedor interrompeu o streaming.";
+  const providerCause = redactProviderCredentials(rawCause);
   const codeHint = String(error?.code ?? error?.type ?? "");
   const reason = inferCliProxyProviderFailureReason(400, `${providerCause} ${codeHint}`);
   return providerFailureError(reason, providerCause);

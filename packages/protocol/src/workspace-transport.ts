@@ -27,6 +27,8 @@ export interface ProtocolTransportErrorFrame {
   type: "protocol.error";
   code: ProtocolErrorCode;
   message: string;
+  /** Presente quando o erro responde a uma requisição RPC específica (multiplexação). */
+  requestId?: string;
 }
 
 export type WorkspaceTransportValidationResult =
@@ -114,6 +116,12 @@ export function buildWorkspaceTransportAck(
 export function buildProtocolTransportErrorFrame(
   code: ProtocolErrorCode,
   message: string,
+  requestId?: string,
 ): ProtocolTransportErrorFrame {
-  return { type: "protocol.error", code, message };
+  return {
+    type: "protocol.error",
+    code,
+    message,
+    ...(requestId !== undefined ? { requestId } : {}),
+  };
 }

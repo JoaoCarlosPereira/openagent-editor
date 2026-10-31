@@ -15,6 +15,8 @@ const CAPABILITY_ACTION_LABELS: Record<string, string> = {
   "tool.invoke": "Executar ferramenta",
   "run.write": "Controlar execução",
   "run.queue": "Alterar fila da execução",
+  "completion.stream": "Gerar sugestão de completion",
+  "completion.cancel": "Cancelar sugestão de completion",
   "session.write": "Alterar sessão",
   "session.read": "Ler sessão",
   "permission.grant": "Decidir permissão",

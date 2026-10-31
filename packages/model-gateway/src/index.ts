@@ -61,6 +61,7 @@ export {
   mapCliProxyOpenAiHttpFailure,
   parseOpenAiCompatibleErrorBody,
   providerFailurePreservationHints,
+  redactProviderCredentials,
 } from "./cliproxy-provider-errors.js";
 export {
   assertProviderFailureEditorStateUnchanged,
@@ -90,3 +91,8 @@ export {
   type IncompleteStreamRetryOutcome,
   type IncompleteStreamRunState,
 } from "./cliproxy-incomplete-stream.js";
+export {
+  streamCliProxyChatText,
+  type CliProxyChatMessage,
+  type StreamCliProxyChatTextInput,
+} from "./cliproxy-chat-text-stream.js";

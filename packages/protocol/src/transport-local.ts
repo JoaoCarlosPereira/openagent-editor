@@ -90,52 +90,51 @@ export function writeProtocolFrame(socket: net.Socket, body: Uint8Array): void {
   socket.write(encodeProtocolFrame(body));
 }
 
-interface FrameReader {
+type FrameReader = {
   frames: Buffer[];
   waiters: Array<{ resolve: (frame: Buffer) => void; reject: (error: Error) => void }>;
   error?: Error;
-}
+};
 
-const readers = new WeakMap<net.Socket, FrameReader>();
+const frameReaders = new WeakMap<net.Socket, FrameReader>();
 
 export function readProtocolFrame(socket: net.Socket): Promise<Buffer> {
-  let reader = readers.get(socket);
+  let reader = frameReaders.get(socket);
   if (!reader) {
     reader = { frames: [], waiters: [] };
-    readers.set(socket, reader);
+    frameReaders.set(socket, reader);
     const state = reader;
     const decoder = new ProtocolFrameDecoder();
-    const fail = (error: Error) => {
-      if (state.error) return;
+    const fail = (error: Error): void => {
       state.error = error;
-      for (const waiter of state.waiters.splice(0)) waiter.reject(error);
+      for (const waiter of state.waiters.splice(0)) {
+        waiter.reject(error);
+      }
     };
     socket.on("data", (chunk: Buffer) => {
       try {
         decoder.push(chunk);
         for (const frame of decoder.drain()) {
           const waiter = state.waiters.shift();
-          if (waiter) waiter.resolve(frame);
-          else state.frames.push(frame);
+          if (waiter) {
+            waiter.resolve(frame);
+          } else {
+            state.frames.push(frame);
+          }
         }
       } catch (error) {
         fail(error instanceof Error ? error : new Error(String(error)));
       }
     });
     socket.on("error", fail);
-    socket.on("close", () => {
-      fail(
-        new ProtocolError(
-          PROTOCOL_ERROR_CODES.INVALID_STATE,
-          "Conexão encerrada antes de receber um frame completo.",
-        ),
-      );
-    });
+    socket.on("close", () => fail(new ProtocolError(
+      PROTOCOL_ERROR_CODES.INVALID_STATE,
+      "Conexão encerrada antes de receber um frame completo.",
+    )));
   }
   const frame = reader.frames.shift();
   if (frame !== undefined) return Promise.resolve(frame);
   if (reader.error) return Promise.reject(reader.error);
-  return new Promise((resolve, reject) => {
-    reader.waiters.push({ resolve, reject });
-  });
+  const state = reader;
+  return new Promise((resolve, reject) => state.waiters.push({ resolve, reject }));
 }

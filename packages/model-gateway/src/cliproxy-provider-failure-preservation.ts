@@ -5,7 +5,7 @@ import {
   type ProtocolErrorCode,
 } from "@openagent/protocol";
 
-import { providerFailurePreservationHints } from "./cliproxy-provider-errors.js";
+import { providerFailurePreservationHints, redactProviderCredentials } from "./cliproxy-provider-errors.js";
 
 export type ProviderFailureEditorState = {
   draftPrompt: string;
@@ -55,9 +55,9 @@ export function resolveCliProxyProviderFailurePreservation(
   }
   assertPreservationHints(error);
 
-  const displayCause =
-    (typeof error.hints?.providerCause === "string" && error.hints.providerCause.trim()) ||
-    error.message;
+  const displayCause = redactProviderCredentials(
+    (typeof error.hints?.providerCause === "string" && error.hints.providerCause.trim()) || error.message,
+  );
 
   return {
     code: error.code,

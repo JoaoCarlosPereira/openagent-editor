@@ -13,9 +13,13 @@ import {
   type RpcRequestEnvelope,
 } from "@openagent/protocol";
 import { dispatchCheckpointRpc } from "./checkpoints/checkpoint-rpc-handler.js";
+import {
+  COMPLETION_RPC_METHODS,
+  abortAllCompletions,
+  dispatchCompletionRpc,
+} from "./completion/index.js";
 import { dispatchContextRpc } from "./context/context-rpc-handler.js";
 import { dispatchRunRpc, type DaemonRpcContext } from "./runs/run-rpc-handler.js";
-import { BrowserPermissionRpc } from "./runs/browser-permission-rpc.js";
 import { dispatchSessionRpc } from "./sessions/session-rpc-handler.js";
 
 const SESSION_RPC_METHODS = new Set<string>([
@@ -29,7 +33,6 @@ const SESSION_RPC_METHODS = new Set<string>([
 
 const RUN_RPC_METHODS = new Set<string>([
   RPC_METHOD.RUN_START,
-  RPC_METHOD.RUN_CANCEL,
   RPC_METHOD.RUN_QUEUE_ADD,
   RPC_METHOD.RUN_QUEUE_REMOVE,
 ]);
@@ -41,30 +44,47 @@ const CHECKPOINT_RPC_METHODS = new Set<string>([
 
 const CONTEXT_RPC_METHODS = new Set<string>([RPC_METHOD.CONTEXT_ATTACH]);
 
-function writeProtocolError(socket: net.Socket, code: ProtocolErrorCode, message: string): void {
+function writeProtocolError(
+  socket: net.Socket,
+  code: ProtocolErrorCode,
+  message: string,
+  requestId?: string,
+): void {
   writeProtocolFrame(
     socket,
-    Buffer.from(JSON.stringify(buildProtocolTransportErrorFrame(code, message)), "utf8"),
+    Buffer.from(
+      JSON.stringify(buildProtocolTransportErrorFrame(code, message, requestId)),
+      "utf8",
+    ),
   );
+}
+
+function requestIdOf(parsed: unknown): string | undefined {
+  const value = (parsed as { requestId?: unknown } | null)?.requestId;
+  return typeof value === "string" && value.length > 0 ? value : undefined;
 }
 
 export async function serveRpcOnConnection(
   socket: net.Socket,
   context: DaemonRpcContext,
 ): Promise<void> {
-  const browserPermissions = new BrowserPermissionRpc();
+  const inFlightCompletions = new Set<Promise<void>>();
+  // Conexão caiu: aborta geração em voo para liberar o provedor e fechar o estado terminal.
+  const abortOnClose = (): void => abortAllCompletions(context);
+  socket.once("close", abortOnClose);
   try {
-    await serveRpcLoop(socket, context, browserPermissions);
+    await serveFrames(socket, context, inFlightCompletions);
   } finally {
-    // AUT-01 + ADR-006: workers de navegador pertencem à conexão; encerrá-los quando ela termina.
-    await context.browserSessions.closeAll();
+    abortOnClose();
+    await Promise.allSettled(inFlightCompletions);
+    socket.off("close", abortOnClose);
   }
 }
 
-async function serveRpcLoop(
+async function serveFrames(
   socket: net.Socket,
   context: DaemonRpcContext,
-  browserPermissions: BrowserPermissionRpc,
+  inFlightCompletions: Set<Promise<void>>,
 ): Promise<void> {
   while (!socket.destroyed) {
     let frame: Buffer;
@@ -88,7 +108,7 @@ async function serveRpcLoop(
 
     const validation = validateRpcRequest(parsed);
     if (!validation.valid) {
-      writeProtocolError(socket, validation.code, validation.errors.join(" "));
+      writeProtocolError(socket, validation.code, validation.errors.join(" "), requestIdOf(parsed));
       continue;
     }
 
@@ -98,6 +118,7 @@ async function serveRpcLoop(
         socket,
         PROTOCOL_ERROR_CODES.INVALID_STATE,
         `Método RPC não suportado nesta conexão: ${String(request.method)}`,
+        request.requestId,
       );
       continue;
     }
@@ -106,21 +127,26 @@ async function serveRpcLoop(
     const isRun = RUN_RPC_METHODS.has(request.method);
     const isCheckpoint = CHECKPOINT_RPC_METHODS.has(request.method);
     const isContext = CONTEXT_RPC_METHODS.has(request.method);
-    const isBrowserPermission = request.method === RPC_METHOD.PERMISSION_DECIDE || request.method === RPC_METHOD.TOOL_INVOKE;
-    if (!isSession && !isRun && !isCheckpoint && !isContext && !isBrowserPermission) {
+    if (COMPLETION_RPC_METHODS.has(request.method)) {
+      const operation = dispatchCompletionRpc(socket, context, request).finally(() =>
+        inFlightCompletions.delete(operation),
+      );
+      inFlightCompletions.add(operation);
+      continue;
+    }
+    if (!isSession && !isRun && !isCheckpoint && !isContext) {
       writeProtocolError(
         socket,
         PROTOCOL_ERROR_CODES.INVALID_STATE,
         `Método RPC não suportado nesta conexão: ${String(request.method)}`,
+        request.requestId,
       );
       continue;
     }
 
     try {
-      const result = isBrowserPermission
-        ? await browserPermissions.dispatch(context, request)
-        : isRun
-        ? await dispatchRunRpc(context, request)
+      const result = isRun
+        ? dispatchRunRpc(context, request)
         : isCheckpoint
           ? dispatchCheckpointRpc(context, request)
           : isContext
@@ -139,7 +165,7 @@ async function serveRpcLoop(
           ? error.code
           : PROTOCOL_ERROR_CODES.INVALID_STATE;
       const message = error instanceof Error ? error.message : String(error);
-      writeProtocolError(socket, code, message);
+      writeProtocolError(socket, code, message, request.requestId);
     }
   }
 }
