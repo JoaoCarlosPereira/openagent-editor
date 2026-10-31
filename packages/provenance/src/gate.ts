@@ -65,8 +65,8 @@ async function collectProvenanceFiles(
   let entries;
   try {
     entries = await readdir(dir, { withFileTypes: true });
-  } catch {
-    return [];
+  } catch (error) {
+    throw new Error(`Falha ao percorrer ${dir}: ${(error as Error).message}`, { cause: error });
   }
 
   const results: string[] = [];
@@ -82,7 +82,7 @@ async function collectProvenanceFiles(
     if (entry.isDirectory()) {
       results.push(...(await collectProvenanceFiles(fullPath, baseDir, ignoreRegexes)));
     } else if (entry.isFile()) {
-      if (entry.name.endsWith(".provenance.json")) {
+      if (entry.name === "provenance.json" || entry.name.endsWith(".provenance.json")) {
         results.push(fullPath);
       }
     }
@@ -235,8 +235,18 @@ export async function checkProvenanceGate(
     }
   }
 
+  for (const required of options?.requiredManifests ?? []) {
+    const expected = resolve(rootDir, required);
+    const rel = relative(rootDir, expected).replace(/\\/g, "/");
+    if (rel.startsWith("../") || rel === ".." || !files.includes(expected)) {
+      recordViolation(required, "MISSING_PROVENANCE", "Manifesto obrigatório não foi encontrado na varredura.");
+    }
+  }
+
   const ok = violations.length === 0;
-  const filesPassed = files.length - filesWithViolations.size;
+  const filesPassed = files.filter(
+    (file) => !filesWithViolations.has(relative(rootDir, file).replace(/\\/g, "/")),
+  ).length;
 
   let summary = `Gate de Proveniência: ${files.length} arquivo(s) analisado(s), ${filesPassed} aprovado(s), ${violations.length} violação(ões).`;
   if (violations.length > 0) {

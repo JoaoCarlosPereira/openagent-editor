@@ -67,6 +67,7 @@ export type ValidationResult =
 
 export type ProvenanceViolationCode =
   | "INVALID_SCHEMA"
+  | "MISSING_PROVENANCE"
   | "MISSING_AUTHORIZATION"
   | "AUTHORIZATION_DOCUMENT_NOT_FOUND"
   | "AUTHORIZATION_HASH_MISMATCH"
@@ -82,6 +83,7 @@ export interface ProvenanceViolation {
 
 export interface ProvenanceGateOptions {
   rootDir?: string;
+  requiredManifests?: string[];
   patterns?: string[];
   ignore?: string[];
   verifyDocumentHash?: boolean;
