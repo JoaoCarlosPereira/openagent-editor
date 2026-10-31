@@ -13,13 +13,25 @@ export {
   type PermissionGrantContext,
 } from "./grants.js";
 export {
-  resolvePermissionGrantsPath,
-  WorkspaceGrantStore,
-} from "./grant-store.js";
-export {
   describeCapabilityAction,
   validatePolicyCapability,
 } from "./capability.js";
+export {
+  AGENT_MODE_ASK_BLOCKED_MESSAGE,
+  assertCapabilityAllowedForAgentMode,
+  askAgentModeBlockedError,
+  POLICY_AGENT_MODES,
+  validatePolicyAgentMode,
+} from "./agent-mode.js";
+export {
+  assertCapabilityAllowedForExecutionMode,
+  EXECUTION_MODE_READ_ONLY_BLOCKED_MESSAGE,
+  EXECUTION_MODES,
+  isMutatingPolicyCapability,
+  readOnlyExecutionModeBlockedError,
+  validateExecutionMode,
+  type ExecutionMode,
+} from "./execution-mode.js";
 export {
   buildPermissionPrompt,
   createToolPermissionRequest,
@@ -31,17 +43,119 @@ export {
   type CreateToolPermissionRequestInput,
 } from "./permission-model.js";
 export {
+  parseSubagentDeclaredCapabilities,
+  parseSubagentGrantCheck,
+  parseSubagentRunGrantSeeds,
+  prepareInheritedSubagentToolPermission,
+  seedRunGrantsFromSubagentObjective,
+  stripSubagentObjectiveMarkers,
+  type SubagentGrantCheckSpec,
+  type SubagentRunGrantSeed,
+} from "./subagent-grant-policy.js";
+export {
+  RUN_PERMISSION_DECIDED_EVENT,
+  RUN_PERMISSION_REQUESTED_EVENT,
+  RunToolPermissionFlow,
+  assertRunToolMayExecute,
+  buildPermissionDecidedPayload,
+  buildPermissionRequestedPayload,
+  persistHarnessEventWithPayload,
+  persistPermissionDecidedEvent,
+  persistPermissionRequestedEvent,
+  prepareRunToolPermission,
+  resolveRunToolPermission,
+  validateBeginRunToolPermissionInput,
+  type BeginRunToolPermissionInput,
+  type PermissionDecidedPayload,
+  type PermissionRequestedPayload,
+  type RunPermissionEventWriter,
+  type RunToolPermissionPrepareResult,
+  type ToolExecutionIsolationContext,
+} from "./run-permission.js";
+export {
   formatGrantScopeLabel,
   GRANT_SCOPE_KINDS,
   validateGrantScope,
   validateOfferedScopes,
 } from "./scope.js";
 export { formatPolicyTargetDisplay, validatePolicyTarget } from "./target.js";
+export {
+  formatOutOfScopePathLog,
+  isAbsolutePathInsideRoot,
+  OUT_OF_SCOPE_PATH_LOG_MESSAGE,
+  resolveCanonicalWorkspacePath,
+  validateWorkspacePathInputs,
+  type WorkspacePathResolution,
+} from "./paths.js";
+export {
+  assertValidStandardLogToolAction,
+  formatStandardLogToolAction,
+  redactForStandardLog,
+  STANDARD_LOG_REDACTED,
+  validateStandardLogToolActionInput,
+  type StandardLogToolActionInput,
+} from "./redaction.js";
+export {
+  createLocalStructuredLogger,
+  STRUCTURED_LOG_LEVELS,
+  validateStructuredLogWriteInput,
+  type LocalStructuredLogContext,
+  type LocalStructuredLogger,
+  type StructuredLogLevel,
+  type StructuredLogSink,
+  type StructuredLogWriteInput,
+} from "./logger.js";
+export {
+  DEFAULT_LOCAL_HOOK_HANDLER_TIMEOUT_MS,
+  LocalHookEngine,
+  assertLocalHooksAllowAction,
+  hookActionDeniedError,
+  validateLocalHookAction,
+} from "./hooks/engine.js";
+export type { LocalHookEngineOptions } from "./hooks/engine.js";
+export { formatHookDenialForDisplay } from "./hooks/display.js";
+export {
+  SESSION_RULES_LOADED_EVENT_TYPE,
+  buildSessionRulesLoadedEmission,
+  formatCustomizationRulesForDisplay,
+  mergeCustomizationRulesByPrecedence,
+  validateSessionRulesLoadInput,
+  type CustomizationRuleDisplayEntry,
+  type CustomizationRuleLayer,
+  type LoadedCustomizationRule,
+  type SessionRulesLoadedEmission,
+} from "./hooks/customization-rules.js";
+export {
+  LOCAL_CUSTOMIZATION_INVOKED_EVENT_TYPE,
+  applyLocalCustomizationInvocation,
+  buildLocalCustomizationInvokedEmission,
+  invokeLocalCustomizationWithGrantPolicy,
+  mergeLocalCustomizationAssetsByPrecedence,
+  parseLocalCustomizationInvokeRef,
+  type LoadedLocalCustomizationAsset,
+  type LocalCustomizationAssetKind,
+  type LocalCustomizationAssetLayer,
+  type LocalCustomizationAssetManifest,
+  type LocalCustomizationInvokedEmission,
+  type LocalCustomizationInvocationOutcome,
+  type LocalCustomizationInvokeDisplay,
+  type LocalCustomizationInvokeResult,
+} from "./hooks/local-customization-assets.js";
+export type {
+  HookDenialDisplay,
+  LocalHookAction,
+  LocalHookDecision,
+  LocalHookEvaluationResult,
+  LocalHookHandler,
+  LocalHookHandlerOutcome,
+  RegisteredLocalHook,
+} from "./hooks/types.js";
 export type {
   GrantScopeKind,
   PermissionDecision,
   PermissionExecutionGate,
   PermissionPrompt,
+  SandboxIsolationLevel,
   PolicyCapability,
   PolicyTarget,
   PolicyTargetKind,

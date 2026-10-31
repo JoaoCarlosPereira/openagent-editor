@@ -17,6 +17,8 @@ import {
   tryExtractPlanAcceptBundleFromUserText,
   tryExtractPlanDraftFromUserText,
 } from "../agent/plan-mode-input.js";
+import { tryExtractDebugSessionFromUserText } from "../agent/debug-mode-input.js";
+import { executeDebugRun } from "../agent/debug-run-loop.js";
 import { executePlanAcceptedRun, presentPlanDraftRun } from "../agent/plan-run-loop.js";
 import { RunMessageQueue } from "../queue/run-message-queue.js";
 import {
@@ -24,6 +26,8 @@ import {
   enqueueRunMessage,
   removePendingRunMessage,
 } from "../queue/run-queue-coordinator.js";
+import type { RunGrantRegistryMap } from "../agents/agent-subagent-grants.js";
+import type { SubagentRuntimeRegistry } from "../agents/agent-subagent-runtime.js";
 import { RunStateMachine } from "../state/run-state-machine.js";
 import type { RunLifecycleState } from "../state/run-state.js";
 import type { SessionRpcContext } from "../sessions/session-rpc-handler.js";
@@ -33,6 +37,10 @@ export type DaemonRpcContext = SessionRpcContext & {
   runMachines: Map<string, RunStateMachine>;
   /** Filas em memória por runId (AGT-06), sincronizadas com SQLite. */
   runQueues: Map<string, RunMessageQueue>;
+  /** Subagentes em execução por runId (AGT-07). */
+  subagentRuns?: SubagentRuntimeRegistry;
+  /** Grants do run pai compartilhados com subagentes (AGT-05 / PER-01). */
+  runGrantRegistries?: RunGrantRegistryMap;
 };
 
 export { consumePendingRunQueueAtRunEnd };
@@ -298,6 +306,25 @@ export function handleRunStart(
           machine,
         });
       }
+    }
+
+    if (runMode === "debug") {
+      const debugSession = tryExtractDebugSessionFromUserText(inputResult.value.text);
+      if (!debugSession) {
+        throw new ProtocolError(
+          PROTOCOL_ERROR_CODES.INVALID_STATE,
+          "Modo Debug exige debugSession no input.",
+        );
+      }
+      executeDebugRun({
+        context,
+        db,
+        sessionId: request.sessionId,
+        runId: request.runId,
+        workspaceRoot: context.binding.workspaceRoot,
+        session: debugSession,
+        machine,
+      });
     }
 
     return startedEvent;

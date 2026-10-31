@@ -18,6 +18,7 @@ import {
   type PolicyShellToolContext,
 } from "@openagent/tools";
 
+import { recordParentRunToolGrant } from "../agents/agent-subagent-grants.js";
 import type { DaemonRpcContext } from "../runs/run-rpc-handler.js";
 import { completeRunningRunLifecycle } from "../runs/run-rpc-handler.js";
 import { assertMayDispatchToolForLifecycle } from "../state/terminal-run-tool-guard.js";
@@ -56,15 +57,15 @@ function toolContext(
 
 function grantToolPermission(
   flow: RunToolPermissionFlow,
-  runId: string,
-  sessionId: string,
+  input: Pick<AgentRunLoopInput, "context" | "runId" | "sessionId">,
   requestId: string,
 ): void {
   const decided = flow.decide(requestId, "allow", "once");
   assertRunToolMayExecute(decided.gate);
-  if (decided.context.runId !== runId || decided.context.sessionId !== sessionId) {
+  if (decided.context.runId !== input.runId || decided.context.sessionId !== input.sessionId) {
     throw new Error("Contexto de permissão divergente do run.");
   }
+  recordParentRunToolGrant(input.context, input.runId, input.sessionId, decided.gate, requestId);
 }
 
 function executeWriteBatchCall(
@@ -82,12 +83,7 @@ function executeWriteBatchCall(
       relativePath: operation.relativePath,
     });
     if (prepared.permission.phase === "pending") {
-      grantToolPermission(
-        flow,
-        input.runId,
-        input.sessionId,
-        prepared.permission.request.requestId,
-      );
+      grantToolPermission(flow, input, prepared.permission.request.requestId);
     }
     snapshotWorkspaceFileForWrite(input.workspaceRoot, operation.relativePath);
   }
@@ -141,7 +137,7 @@ function executeShellCall(
     command: call.command,
   });
   if (prepared.permission.phase === "pending") {
-    grantToolPermission(flow, input.runId, input.sessionId, prepared.permission.request.requestId);
+    grantToolPermission(flow, input, prepared.permission.request.requestId);
   }
   const execResult = executePolicyShellExec(input.workspaceRoot, call.command);
   const toolResult = formatAgentShellToolResult(execResult);

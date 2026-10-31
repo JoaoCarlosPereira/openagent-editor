@@ -57,6 +57,7 @@ export function computeGrantExpiresAtMs(
 ): number | null {
   switch (scope) {
     case "once":
+      // once: sem TTL temporal — só consumo/revogação (PER-01).
       return null;
     case "session":
       return context.sessionExpiresAtMs ?? createdAtMs + DEFAULT_SESSION_TTL_MS;
