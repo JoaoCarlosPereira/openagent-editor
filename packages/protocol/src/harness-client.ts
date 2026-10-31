@@ -295,6 +295,21 @@ class TransportHarnessClient implements HarnessClient {
       if (frame.type === "protocol.error") {
         throwProtocolErrorFromFrame(frame);
       }
+      // Daemon atual: run.start responde com rpc.ok cujo result é o HarnessEvent (CLI-02).
+      if (frame.type === "rpc.ok" && frame.requestId === requestId) {
+        const validation = validateHarnessEvent(frame.result);
+        if (!validation.valid) {
+          throw new ProtocolError(
+            validation.code,
+            validation.errors.join(" "),
+            validation.errors,
+          );
+        }
+        this.activeRunId = input.runId;
+        this.activeSessionId = input.sessionId;
+        yield validation.value;
+        return;
+      }
       if (frame.type === "harness.event") {
         const validation = validateHarnessEvent(frame.event);
         if (!validation.valid) {

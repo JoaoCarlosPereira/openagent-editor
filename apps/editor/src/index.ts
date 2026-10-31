@@ -68,3 +68,15 @@ export {
   type FileTreeViewInput,
   type FileTreeViewSnapshot,
 } from "./workbench/workbench-shell.js";
+export {
+  WorkspaceSessionReopenController,
+  WORKSPACE_SESSION_REOPEN_INVALID_MESSAGE,
+  buildWorkspaceSessionReopenView,
+  type ReopenedWorkspaceSession,
+  type SessionReopenAttachment,
+  type SessionReopenTool,
+  type WorkspaceSessionListPort,
+  type WorkspaceSessionReopenInput,
+  type WorkspaceSessionReopenResult,
+  type WorkspaceSessionReopenViewSnapshot,
+} from "./agents/session-reopen.js";
