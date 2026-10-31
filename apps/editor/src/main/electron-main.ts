@@ -2,16 +2,10 @@ import { ProtocolError } from "@openagent/protocol";
 
 import {
   WorkbenchShellController,
-  type WorkbenchShellViewSnapshot,
-  type WorkbenchDebugResult,
-  type WorkbenchGitPanelResult,
   type WorkbenchShellOpenResult,
-  type WorkbenchTerminalResult,
   type WorkbenchTextEditorResult,
 } from "../workbench/workbench-shell.js";
-import type {
-  WorkbenchHealthSnapshot,
-} from "../workbench/health-indicator.js";
+import { ExtensionEditorController } from "../workbench/extension-editor.js";
 import {
   connectOpenAgentEditorMain,
   type OpenAgentEditorMainConnectInput,
@@ -108,6 +102,7 @@ export class ElectronMainController {
   private snapshot: ElectronMainLaunchSnapshot | null = null;
   private daemonConnection: OpenAgentEditorMainConnection | null = null;
   private readonly workbench = new WorkbenchShellController();
+  private extEditor: ExtensionEditorController | null = null;
   private repoRoot: string | undefined;
 
   get current(): ElectronMainLaunchSnapshot | null {
@@ -123,21 +118,8 @@ export class ElectronMainController {
     return this.workbench;
   }
 
-  get health(): WorkbenchHealthSnapshot {
-    return this.workbench.health;
-  }
-
-  setSubsystemHealth(
-    subsystem: unknown,
-    status: unknown,
-    message: unknown,
-  ): WorkbenchShellViewSnapshot {
-    if (this.snapshot === null) {
-      throw new ProtocolError("INVALID_STATE", ELECTRON_MAIN_FOLDER_REQUIRED_MESSAGE, [
-        "launch() não foi chamado",
-      ]);
-    }
-    return this.workbench.setSubsystemHealth(subsystem, status, message);
+  get extensionEditor(): ExtensionEditorController | null {
+    return this.extEditor;
   }
 
   launch(input: ElectronMainLaunchInput): ElectronMainLaunchSnapshot {
@@ -181,11 +163,23 @@ export class ElectronMainController {
         "launch() não foi chamado",
       ]);
     }
-    return this.workbench.openFolder({
+    const res = this.workbench.openFolder({
       platform: this.snapshot.platform,
       folderPath,
       repoRoot: this.repoRoot,
     });
+    this.extEditor = new ExtensionEditorController(res.folderPath);
+    return res;
+  }
+
+  /** Processa requisição de extensão (abrir, editar, decorar documento) sob a pasta aberta. */
+  handleExtensionEditorRequest(request: { operation: string; args: unknown[] }): unknown {
+    if (this.snapshot === null || !this.extEditor) {
+      throw new ProtocolError("INVALID_STATE", ELECTRON_MAIN_FOLDER_REQUIRED_MESSAGE, [
+        "Nenhuma pasta aberta no editor para requisições de extensão.",
+      ]);
+    }
+    return this.extEditor.handleRequest(request);
   }
 
   /**
@@ -219,145 +213,6 @@ export class ElectronMainController {
       ]);
     }
     return this.workbench.saveTextDocument();
-  }
-
-  /**
-   * Abre o terminal integrado pelo processo main (LOC-01 / task_122).
-   * Spawn/CWD no main; o renderer só consome o snapshot.
-   */
-  openTerminal(): WorkbenchTerminalResult {
-    if (this.snapshot === null) {
-      throw new ProtocolError("INVALID_STATE", ELECTRON_MAIN_FOLDER_REQUIRED_MESSAGE, [
-        "launch() não foi chamado",
-      ]);
-    }
-    return this.workbench.openTerminal();
-  }
-
-  /** Executa comando no terminal aberto (main). */
-  runTerminalCommand(command: unknown): WorkbenchTerminalResult {
-    if (this.snapshot === null) {
-      throw new ProtocolError("INVALID_STATE", ELECTRON_MAIN_FOLDER_REQUIRED_MESSAGE, [
-        "launch() não foi chamado",
-      ]);
-    }
-    return this.workbench.runTerminalCommand(command);
-  }
-
-  /** Altera CWD relativo do terminal sob a pasta (main). */
-  setTerminalCwd(relativeDirectory: unknown): WorkbenchTerminalResult {
-    if (this.snapshot === null) {
-      throw new ProtocolError("INVALID_STATE", ELECTRON_MAIN_FOLDER_REQUIRED_MESSAGE, [
-        "launch() não foi chamado",
-      ]);
-    }
-    return this.workbench.setTerminalCwd(relativeDirectory);
-  }
-
-  /**
-   * Abre o painel Git pelo processo main (LOC-01 / task_123).
-   * Status/diff no main; o renderer só consome o snapshot.
-   */
-  openGit(): WorkbenchGitPanelResult {
-    if (this.snapshot === null) {
-      throw new ProtocolError("INVALID_STATE", ELECTRON_MAIN_FOLDER_REQUIRED_MESSAGE, [
-        "launch() não foi chamado",
-      ]);
-    }
-    return this.workbench.openGit();
-  }
-
-  /** Atualiza status Git do painel aberto (main). */
-  refreshGitStatus(): WorkbenchGitPanelResult {
-    if (this.snapshot === null) {
-      throw new ProtocolError("INVALID_STATE", ELECTRON_MAIN_FOLDER_REQUIRED_MESSAGE, [
-        "launch() não foi chamado",
-      ]);
-    }
-    return this.workbench.refreshGitStatus();
-  }
-
-  /** Carrega git diff no painel (main; caminho relativo confinado). */
-  loadGitDiff(relativePath?: unknown): WorkbenchGitPanelResult {
-    if (this.snapshot === null) {
-      throw new ProtocolError("INVALID_STATE", ELECTRON_MAIN_FOLDER_REQUIRED_MESSAGE, [
-        "launch() não foi chamado",
-      ]);
-    }
-    return this.workbench.loadGitDiff(relativePath);
-  }
-
-  /**
-   * Abre uma sessão de depuração DAP pelo processo main (LOC-01 / task_124).
-   * Controle de sessão no main; o renderer consome o snapshot observável.
-   */
-  openDebug(targetPath: unknown): WorkbenchDebugResult {
-    if (this.snapshot === null) {
-      throw new ProtocolError("INVALID_STATE", ELECTRON_MAIN_FOLDER_REQUIRED_MESSAGE, [
-        "launch() não foi chamado",
-      ]);
-    }
-    return this.workbench.openDebug(targetPath);
-  }
-
-  /** Inicia a sessão de depuração DAP aberta (main). */
-  startDebug(): WorkbenchDebugResult {
-    if (this.snapshot === null) {
-      throw new ProtocolError("INVALID_STATE", ELECTRON_MAIN_FOLDER_REQUIRED_MESSAGE, [
-        "launch() não foi chamado",
-      ]);
-    }
-    return this.workbench.startDebug();
-  }
-
-  /** Encerra a sessão de depuração DAP aberta (main). */
-  stopDebug(): WorkbenchDebugResult {
-    if (this.snapshot === null) {
-      throw new ProtocolError("INVALID_STATE", ELECTRON_MAIN_FOLDER_REQUIRED_MESSAGE, [
-        "launch() não foi chamado",
-      ]);
-    }
-    return this.workbench.stopDebug();
-  }
-
-  /** Adiciona um breakpoint na sessão de depuração DAP aberta (main). */
-  setDebugBreakpoint(relativePath: unknown, line: unknown): WorkbenchDebugResult {
-    if (this.snapshot === null) {
-      throw new ProtocolError("INVALID_STATE", ELECTRON_MAIN_FOLDER_REQUIRED_MESSAGE, [
-        "launch() não foi chamado",
-      ]);
-    }
-    return this.workbench.setDebugBreakpoint(relativePath, line);
-  }
-
-  /** Remove um breakpoint na sessão de depuração DAP aberta (main). */
-  removeDebugBreakpoint(breakpointId: unknown): WorkbenchDebugResult {
-    if (this.snapshot === null) {
-      throw new ProtocolError("INVALID_STATE", ELECTRON_MAIN_FOLDER_REQUIRED_MESSAGE, [
-        "launch() não foi chamado",
-      ]);
-    }
-    return this.workbench.removeDebugBreakpoint(breakpointId);
-  }
-
-  /** Continua a execução da sessão de depuração DAP até breakpoint (main). */
-  continueDebug(): WorkbenchDebugResult {
-    if (this.snapshot === null) {
-      throw new ProtocolError("INVALID_STATE", ELECTRON_MAIN_FOLDER_REQUIRED_MESSAGE, [
-        "launch() não foi chamado",
-      ]);
-    }
-    return this.workbench.continueDebug();
-  }
-
-  /** Avança uma linha (step over) na sessão de depuração DAP (main). */
-  stepOverDebug(): WorkbenchDebugResult {
-    if (this.snapshot === null) {
-      throw new ProtocolError("INVALID_STATE", ELECTRON_MAIN_FOLDER_REQUIRED_MESSAGE, [
-        "launch() não foi chamado",
-      ]);
-    }
-    return this.workbench.stepOverDebug();
   }
 
   /** Liga o processo main ao harness-daemon (ADR-003). */

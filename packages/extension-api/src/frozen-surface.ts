@@ -1,3 +1,13 @@
+import {
+  createCommandsNamespace as _createCommandsNamespace,
+  createWindowNamespace as _createWindowNamespace,
+  createWorkspaceNamespace as _createWorkspaceNamespace,
+  createLanguagesNamespace as _createLanguagesNamespace,
+} from "./namespace-impl.js";
+import type { WorkspaceAdapter, WindowAdapter } from "./namespace-impl.js";
+
+export type { WorkspaceAdapter, WindowAdapter } from "./namespace-impl.js";
+
 /**
  * frozen-surface.ts — Superfície congelada da API de extensões do Cursor 3.24.18.
  *
@@ -22,18 +32,22 @@ export const FROZEN_EXTENSION_API_VERSION = "3.24.18" as const;
 
 export type FrozenVersion = typeof FROZEN_EXTENSION_API_VERSION;
 
+export interface Disposable {
+  dispose(): void;
+}
+
+// ─── Re-exports de tipos ────────────────────────────────────────────────────────
+
 // ─── Namespace: commands ─────────────────────────────────────────────────────────
 
 /** Tipo de comando registrado no painel de comandos. */
 export interface CommandEntry {
   command: string;
-  /** Callback executado quando o comando é invocado */
   callback: (...args: unknown[]) => unknown;
 }
 
 export interface CommandRegistration {
   commandId: string;
-  /** Função a ser chamada quando o comando é executado */
   callback: (...args: unknown[]) => unknown;
 }
 
@@ -43,14 +57,8 @@ export interface CommandsNamespace {
     commandId: string,
     callback: (...args: unknown[]) => unknown
   ): CommandRegistration;
-
-  /** Desregistra um comando registrado previamente */
   unregisterCommand(commandId: string): void;
-
-  /** Retorna a lista de comandos registrados */
   getRegisteredCommands(): CommandEntry[];
-
-  /** Executa um comando registrado (simulado, sem efeito colateral) */
   executeCommand<T>(commandId: string, ...args: unknown[]): Promise<T>;
 }
 
@@ -67,22 +75,11 @@ export interface StatusBarItem {
 
 /** Namespace de janela da API de extensões. */
 export interface WindowNamespace {
-  /** Exibe uma mensagem informativa ao usuário (simulada, sem UI real) */
   showInformationMessage(message: string, ...options: unknown[]): Promise<unknown>;
-
-  /** Exibe uma mensagem de aviso ao usuário */
   showWarningMessage(message: string, ...options: unknown[]): Promise<unknown>;
-
-  /** Exibe uma mensagem de erro ao usuário */
   showErrorMessage(message: string, ...options: unknown[]): Promise<unknown>;
-
-  /** Cria/gerencia um item na barra de status */
   createStatusBarItem(id: string, alignment: "right" | "left"): StatusBarItem;
-
-  /** Retorna a lista de items na barra de status */
   getStatusBarItems(): StatusBarItem[];
-
-  /** Retorna o valor atual de um input do usuário (simulado) */
   showInputBox(options?: Record<string, unknown>): Promise<string | undefined>;
 }
 
@@ -91,9 +88,15 @@ export interface WindowNamespace {
 /** Documento aberto no editor */
 export interface TextDocumentData {
   uri: string;
-  version: number;
-  lineCount: number;
+  readonly version: number;
+  readonly lineCount: number;
   text(): string;
+}
+
+export interface TextEdit {
+  start: number;
+  end: number;
+  text: string;
 }
 
 /** Tipo de decoração aplicada a um editor de texto */
@@ -121,26 +124,18 @@ export interface WorkspaceFile {
 
 /** Namespace de workspace da API de extensões. */
 export interface WorkspaceNamespace {
-  /** Abre um documento de texto pelo URI */
+  readonly rootPath?: string;
+  readonly name?: string;
   openTextDocument(uri: string): Promise<TextDocumentData>;
-
-  /** Retorna todos os documentos abertos */
   openTextDocuments(): TextDocumentData[];
-
-  /** Salva um documento aberto */
   saveTextDocument(uri: string): Promise<boolean>;
-
-  /** Obtém arquivos da pasta de trabalho (simulado) */
+  applyTextEdits(uri: string, expectedVersion: number, edits: readonly TextEdit[]): boolean;
   findFiles(
     includePattern: string,
     excludePattern?: string,
     maxResults?: number
   ): Promise<WorkspaceFile[]>;
-
-  /** Obtém configuração de espaço de trabalho por namespace/key */
   getConfigurationSection(section: string): Record<string, unknown> | undefined;
-
-  /** Cria um tipo de decoração aplicada a um editor de texto */
   createTextEditorDecorationType(
     options: Omit<TextEditorDecorationType, "id">
   ): TextEditorDecorationType;
@@ -148,13 +143,87 @@ export interface WorkspaceNamespace {
 
 // ─── Namespace: languages ─────────────────────────────────────────────────────────
 
+export interface Position {
+  line: number;
+  character: number;
+}
+
+export interface Range {
+  start: Position;
+  end: Position;
+}
+
+export interface DocumentFilter {
+  scheme?: string;
+  language?: string;
+  pattern?: string;
+  filepath?: string;
+}
+
+export type DocumentSelector =
+  | string
+  | DocumentFilter
+  | readonly (string | DocumentFilter)[];
+
 /** Item de completude (autocomplete) */
 export interface CompletionItem {
   label: string;
-  kind?: number; // CompletionItemKind
+  kind?: number;
   detail?: string;
   documentation?: string | { kind: "markdown"; value: string };
   preselect?: boolean;
+  insertText?: string;
+  filterText?: string;
+  sortText?: string;
+}
+
+export interface CompletionList {
+  isIncomplete?: boolean;
+  items: CompletionItem[];
+}
+
+export interface CompletionContext {
+  triggerKind?: number;
+  triggerCharacter?: string;
+}
+
+export interface CompletionItemProvider {
+  provideCompletionItems(
+    document: TextDocumentData,
+    position: Position,
+    token?: unknown,
+    context?: CompletionContext
+  ):
+    | Promise<CompletionItem[] | CompletionList | undefined>
+    | CompletionItem[]
+    | CompletionList
+    | undefined;
+  resolveCompletionItem?(
+    item: CompletionItem,
+    token?: unknown
+  ): Promise<CompletionItem> | CompletionItem;
+}
+
+export interface HoverContents {
+  kind: "markdown";
+  value: string;
+}
+
+export interface Hover {
+  contents: HoverContents[] | HoverContents | string[] | string;
+  range?: Range;
+}
+
+export interface HoverProvider {
+  provideHover(
+    document: TextDocumentData,
+    position: Position,
+    token?: unknown
+  ):
+    | Promise<Hover | HoverContents | undefined>
+    | Hover
+    | HoverContents
+    | undefined;
 }
 
 export interface SignatureParameterInfo {
@@ -226,69 +295,49 @@ export interface Diagnostic {
 
 /** Namespace de languages da API de extensões. */
 export interface LanguagesNamespace {
-  /** Registra um provider de completude (autocomplete) */
+  registerCompletionItemProvider(
+    selector: DocumentSelector,
+    provider: CompletionItemProvider,
+    ...triggerCharacters: string[]
+  ): { dispose(): void };
   registerCompletionProvider(
-    selector: { scheme: string; language?: string; filepath?: string },
-    provider: {
-      resolveCompletionItem?: (item: CompletionItem) => Promise<CompletionItem>;
-      provideCompletionItems: (
-        document: TextDocumentData,
-        position: { line: number; character: number }
-      ) => Promise<CompletionItem[]>;
-    },
-    triggerCharacters?: string[]
-  ): unknown;
-
-  /** Registra um provider de assinatura (signature help) */
+    selector: DocumentSelector,
+    provider: CompletionItemProvider,
+    ...triggerCharacters: string[]
+  ): { dispose(): void };
+  registerHoverProvider(
+    selector: DocumentSelector,
+    provider: HoverProvider
+  ): { dispose(): void };
   registerSignatureHelpProvider(
     selector: { scheme: string; language?: string; filepath?: string },
     provider: {
       provideSignatureHelp: (
         document: TextDocumentData,
-        position: { line: number; character: number },
+        position: Position,
         token?: unknown
       ) => Promise<SignatureHelp>;
     }
   ): unknown;
-
-  /** Registra um provider de hover (informação ao passar o mouse) */
-  registerHoverProvider(
-    selector: { scheme: string; language?: string; filepath?: string },
-    provider: {
-      provideHover: (
-        document: TextDocumentData,
-        position: { line: number; character: number }
-      ) => Promise<HoverContents | undefined>;
-    }
-  ): unknown;
-
-  /** Registra um provider de definição (ir para definição) */
   registerDefinitionProvider(
     selector: { scheme: string; language?: string; filepath?: string },
     provider: {
       provideDefinition: (
         document: TextDocumentData,
-        position: { line: number; character: number }
+        position: Position
       ) => Promise<DefinitionLocation[]>;
     }
   ): unknown;
-
-  /** Registra um provider de actions de código (refatorações) */
   registerCodeActionsProvider(
     selector: { scheme: string; language?: string; filepath?: string },
     provider: {
       provideCodeActions: (
         document: TextDocumentData,
-        range: {
-          start: { line: number; character: number };
-          end: { line: number; character: number };
-        },
+        range: Range,
         context: CodeActionContext
       ) => Promise<CodeAction[]>;
     }
   ): unknown;
-
-  /** Registra um provider de diagnósticos (linter, type checker) */
   registerDiagnosticProvider(
     documentSelector: { scheme?: string; language?: string; filepath?: string }[],
     owner: string,
@@ -298,64 +347,46 @@ export interface LanguagesNamespace {
       ) => Promise<Diagnostic[]>;
     }
   ): unknown;
+  getCompletionItems?(
+    document: TextDocumentData,
+    position: Position,
+    context?: CompletionContext
+  ): Promise<CompletionItem[]>;
+  getHover?(
+    document: TextDocumentData,
+    position: Position
+  ): Promise<Hover | HoverContents | undefined>;
 }
 
 // ─── Namespace: env ───────────────────────────────────────────────────────────────
 
-/** Namespace de ambiente da API de extensões. */
 export interface EnvironmentNamespace {
-  /** Retorna o sistema operacional (simulado) */
   os: string;
-
-  /** Retorna o idioma configurado (simulado) */
   language: string;
-
-  /** Retorna a extensão padrão do editor (simulado) */
   getExtension<T>(id: string): T | undefined;
-
-  /** Retorna dados de configuração global do extension host */
   getConfiguration(key: string): Record<string, unknown> | undefined;
-
-  /** Retorna a versão congelada da API de extensões */
   version: FrozenVersion;
-
-  /** Retorna o valor de uma variável de ambiente do editor (simulado) */
   getEnvironmentVariable(key: string): string | undefined;
 }
 
 // ─── Namespace: memento (persistência em memória) ────────────────────────────────
 
-/** Dados persistentes em memória para a extensão. */
 export interface MementoData {
-  /** Retorna um valor pela chave (simulado, sem efeito colateral) */
   get<T>(key: string): T | undefined;
-
-  /** Armazena um valor pela chave em memória (simulado, sem efeito colateral) */
   update(key: string, value: unknown): Promise<void>;
 }
 
 // ─── Namespace: output (canais de saída) ─────────────────────────────────────────
 
-/** Canal de saída (output channel) */
 export interface OutputChannel {
   name: string;
-
-  /** Exibe o conteúdo do canal (simulado) */
   show(preserveScroll?: boolean): void;
-
-  /** Limpa o conteúdo do canal */
   clear(): void;
-
-  /** Escreve uma linha no canal (simulado, sem efeito colateral) */
   appendLine(message: string): void;
-
-  /** Desliga o canal e descarta seu conteúdo */
   dispose(): void;
 }
 
-/** Namespace de output da API de extensões. */
 export interface OutputNamespace {
-  /** Cria um canal de saída com nome dado */
   createOutputChannel(
     name: string,
     preserveScroll?: boolean
@@ -364,13 +395,6 @@ export interface OutputNamespace {
 
 // ─── Superfície congelada completa ───────────────────────────────────────────────
 
-/**
- * Interface completa da superfície congelada da API de extensões Cursor 3.24.18.
- *
- * Esta é a estrutura que deve ser validada pelo validador (validator.ts).
- * Cada namespace é opcional no objeto runtime, mas o validador exige a presença
- * de todos para considerar a superfície válida.
- */
 export interface FrozenExtensionApiSurface {
   version: FrozenVersion;
   commands: CommandsNamespace;
@@ -382,153 +406,73 @@ export interface FrozenExtensionApiSurface {
   output: OutputNamespace;
 }
 
+// ─── Re-exports de factories ────────────────────────────────────────────────────
+
+export {
+  _createCommandsNamespace as createCommandsNamespace,
+  _createWindowNamespace as createWindowNamespace,
+  _createWorkspaceNamespace as createWorkspaceNamespace,
+  _createLanguagesNamespace as createLanguagesNamespace,
+};
+
 /**
- * Cria a superfície congelada padrão — um stub coerente com os contratos.
+ * Cria a superfície congelada padrão com implementações reais dos
+ * namespaces commands, window e workspace (task_159).
  *
  * Nenhum efeito colateral: nenhum dado é escrito em disco ou enviado por rede.
+ * Os namespaces commands, window, workspace são funcionais.
+ * Os namespaces restantes (languages, env, memento, output) permanecem
+ * como stubs — sua implementação funcional cabe a task_160+ e task_161.
  */
-export function createFrozenSurface(): FrozenExtensionApiSurface {
-  // Stub minimal e coerente com a superfície declarada.
-  // As implementações reais (task_159-161) substituem estes stubs por
-  // adaptadores reais contra o editor.
-  const commandsStub: CommandsNamespace = {
-    registerCommand(commandId, callback) {
-      return { commandId, callback };
-    },
-    unregisterCommand() {
-      /* stub */
-    },
-    getRegisteredCommands() {
-      return [];
-    },
-    async executeCommand<T>(commandId: string, ...args: unknown[]): Promise<T> {
-      // Stub: sem efeito colateral. A implementação real (task_159) delega ao command bus.
-      void commandId; // sinaliza uso deliberado do parâmetro
-      void args;
-      return undefined as unknown as T;
-    },
-  };
+export function createFrozenSurface(
+  workspaceRoot?: string,
+  workspaceName?: string,
+  windowAdapter?: WindowAdapter,
+  workspaceAdapter?: WorkspaceAdapter
+): FrozenExtensionApiSurface {
+  const commands = _createCommandsNamespace();
+  const windowNs = _createWindowNamespace(windowAdapter);
+  const workspaceNs = _createWorkspaceNamespace(
+    workspaceRoot,
+    workspaceName,
+    workspaceAdapter
+  );
 
-  const windowStub: WindowNamespace = {
-    async showInformationMessage() {
-      return undefined;
-    },
-    async showWarningMessage() {
-      return undefined;
-    },
-    async showErrorMessage() {
-      return undefined;
-    },
-    createStatusBarItem(id, alignment) {
-      return { id, alignment, text: "" };
-    },
-    getStatusBarItems() {
-      return [];
-    },
-    async showInputBox() {
-      return undefined;
-    },
-  };
-
-  const workspaceStub: WorkspaceNamespace = {
-    async openTextDocument() {
-      return {
-        uri: "",
-        version: 0,
-        lineCount: 0,
-        text() {
-          return "";
-        },
-      };
-    },
-    openTextDocuments() {
-      return [];
-    },
-    async saveTextDocument() {
-      return false;
-    },
-    async findFiles() {
-      return [];
-    },
-    getConfigurationSection() {
-      return undefined;
-    },
-    createTextEditorDecorationType(options) {
-      return { id: "", ...options };
-    },
-  };
-
-  const languagesStub: LanguagesNamespace = {
-    registerCompletionProvider() {
-      return undefined;
-    },
-    registerSignatureHelpProvider() {
-      return undefined;
-    },
-    registerHoverProvider() {
-      return undefined;
-    },
-    registerDefinitionProvider() {
-      return undefined;
-    },
-    registerCodeActionsProvider() {
-      return undefined;
-    },
-    registerDiagnosticProvider() {
-      return undefined;
-    },
-  };
+  const languagesNs = _createLanguagesNamespace();
 
   const envStub: EnvironmentNamespace = {
     os: "unknown",
     language: "en",
-    getExtension() {
-      return undefined;
-    },
-    getConfiguration() {
-      return undefined;
-    },
+    getExtension() { return undefined; },
+    getConfiguration() { return undefined; },
     version: FROZEN_EXTENSION_API_VERSION,
-    getEnvironmentVariable() {
-      return undefined;
-    },
+    getEnvironmentVariable() { return undefined; },
   };
 
   const mementoStub: MementoData = {
-    get() {
-      return undefined;
-    },
-    async update() {
-      /* stub */
-    },
+    get() { return undefined; },
+    async update() { /* stub */ },
   };
 
   const outputStub: OutputNamespace = {
     createOutputChannel(name) {
-      return {
-        name,
-        show() {
-          /* stub */
-        },
-        clear() {
-          /* stub */
-        },
-        appendLine() {
-          /* stub */
-        },
-        dispose() {
-          /* stub */
-        },
+      const channel: OutputChannel = {
+        name: name ?? "",
+        show() { /* stub */ },
+        clear() { /* stub */ },
+        appendLine() { /* stub */ },
+        dispose() { /* stub */ },
       };
+      return channel;
     },
   };
 
   return {
     version: FROZEN_EXTENSION_API_VERSION,
-    commands: commandsStub,
-    window: windowStub,
-    workspace: workspaceStub,
-    languages: languagesStub,
+    commands,
+    window: windowNs,
+    workspace: workspaceNs,
+    languages: languagesNs,
     env: envStub,
     memento: mementoStub,
     output: outputStub,
@@ -537,7 +481,6 @@ export function createFrozenSurface(): FrozenExtensionApiSurface {
 
 // ─── Chaves públicas esperadas (para validação) ──────────────────────────────────
 
-/** Lista das chaves obrigatórias na superfície congelada (top-level namespaces) */
 export const EXPECTED_SURFACE_KEYS: (keyof FrozenExtensionApiSurface)[] = [
   "version",
   "commands",
@@ -549,9 +492,6 @@ export const EXPECTED_SURFACE_KEYS: (keyof FrozenExtensionApiSurface)[] = [
   "output",
 ];
 
-/**
- * Mapa de tipos esperados para cada chave (para verificação estática de tipo).
- */
 export const EXPECTED_SURFACE_TYPES: Record<string, string> = {
   version: "string",
   commands: "object",

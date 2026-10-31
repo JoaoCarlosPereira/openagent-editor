@@ -14,7 +14,11 @@
   <p id="error" role="alert"></p>
   <main>
     <nav aria-label="Arquivos"><ul id="files"></ul></nav>
-    <section aria-label="Editor"><p id="filename">Abra um arquivo para editar</p><textarea id="content" aria-label="Conteúdo do arquivo" disabled spellcheck="false"></textarea></section>
+    <section aria-label="Editor">
+      <p id="filename">Abra um arquivo para editar</p>
+      <textarea id="content" aria-label="Conteúdo do arquivo" disabled spellcheck="false"></textarea>
+      <div id="decorations" aria-label="Decorações do editor" data-testid="editor-decorations"></div>
+    </section>
   </main>
 </body>
 </html>

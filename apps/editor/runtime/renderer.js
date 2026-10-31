@@ -32,6 +32,16 @@ function render(state, preserveContent = false) {
   content.disabled = !doc;
   save.disabled = !doc;
   if (!preserveContent) content.value = doc?.content ?? "";
+  const decorationsEl = document.querySelector("#decorations");
+  if (decorationsEl) {
+    if (state.extensionDecorations) {
+      decorationsEl.innerHTML = state.extensionDecorations;
+      decorationsEl.hidden = false;
+    } else {
+      decorationsEl.replaceChildren();
+      decorationsEl.hidden = true;
+    }
+  }
 }
 
 function perform(action, preserveContent = false, isEdit = false) {

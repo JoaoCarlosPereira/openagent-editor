@@ -22,6 +22,7 @@ export function createEditorBridge(options: BridgeOptions) {
     document: controller.shell.openDocument,
     folder: controller.shell.snapshot.accessible.folderPath,
     documentVersion,
+    extensionDecorations: controller.extensionEditor?.snapshot?.html ?? null,
   });
   let closed = false;
   let pending = Promise.resolve();
@@ -70,6 +71,11 @@ export function createEditorBridge(options: BridgeOptions) {
             break;
           }
           case "save": controller.saveTextDocument(); break;
+          case "extension-request": {
+            controller.handleExtensionEditorRequest(value as { operation: string; args: unknown[] });
+            documentVersion++;
+            break;
+          }
           default: throw new Error("Operação de editor inválida.");
         }
         return state();
