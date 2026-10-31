@@ -1,0 +1,1438 @@
+{
+  "_preparacao": "Preparação do aceite manual (UAT) 53/53, gerada por scripts/uat-checklist.mjs. Não constitui aceite executado.",
+  "_fontes": [
+    "packages/parity/src/catalog.ts",
+    "packages/parity/src/scenarios.ts"
+  ],
+  "generatedOn": "2026-10-30",
+  "total": 53,
+  "requirements": [
+    {
+      "id": "LOC-01",
+      "category": "LOC",
+      "summary": "Editor instalável multiplataforma",
+      "criteria": "Instalar em Linux, Windows ou macOS; abrir pasta; oferecer edição, terminal, Git, depuração e extensão compatível com a API do editor, com nome e ícone OpenAgent.",
+      "scenarioId": "loc-01-open-folder",
+      "scenarioPath": "packages/parity/scenarios/loc-01-open-folder.ts",
+      "steps": [
+        "abrir-pasta",
+        "editar-arquivo",
+        "abrir-terminal",
+        "abrir-git",
+        "abrir-debug",
+        "instalar-extensao-compativel"
+      ],
+      "expectedEffects": {
+        "abrir-pasta": [
+          "workspace-opened",
+          "package-identity"
+        ],
+        "editar-arquivo": [
+          "file-edited"
+        ],
+        "abrir-terminal": [
+          "terminal-panel"
+        ],
+        "abrir-git": [
+          "git-panel"
+        ],
+        "abrir-debug": [
+          "debug-session"
+        ],
+        "instalar-extensao-compativel": [
+          "extension-installed"
+        ]
+      }
+    },
+    {
+      "id": "UI-01",
+      "category": "UI",
+      "summary": "Painel e controles acessíveis",
+      "criteria": "Quanto a janela principal abrir, mostrar painel do agente, seletor de modo, seletor de modelo, contexto, histórico e revisão de alterações, todos alcançáveis por teclado.",
+      "scenarioId": "ui-01-agent-panel",
+      "scenarioPath": "packages/parity/scenarios/ui-01-agent-panel.ts",
+      "steps": [
+        "abrir-painel-do-agente",
+        "selecionar-modo",
+        "selecionar-modelo",
+        "anexar-contexto",
+        "abrir-historico",
+        "revisar-alteracoes",
+        "navegar-por-teclado"
+      ],
+      "expectedEffects": {
+        "abrir-painel-do-agente": [
+          "agent-panel"
+        ],
+        "selecionar-modo": [
+          "mode-selector"
+        ],
+        "selecionar-modelo": [
+          "model-selector"
+        ],
+        "anexar-contexto": [
+          "context-attachment"
+        ],
+        "abrir-historico": [
+          "history"
+        ],
+        "revisar-alteracoes": [
+          "change-review"
+        ],
+        "navegar-por-teclado": [
+          "keyboard-accessible"
+        ]
+      }
+    },
+    {
+      "id": "UI-02",
+      "category": "UI",
+      "summary": "Tema/largura preservam conversa",
+      "criteria": "Quando alternar tema claro e escuro ou a largura do painel, manter controles legíveis e preservar mensagens da conversa.",
+      "scenarioId": "ui-02-theme-panel",
+      "scenarioPath": "packages/parity/scenarios/ui-02-theme-panel.ts",
+      "steps": [
+        "alternar-tema-claro",
+        "alternar-tema-escuro",
+        "ajustar-largura-do-painel",
+        "verificar-controles-legiveis",
+        "verificar-mensagens-preservadas"
+      ],
+      "expectedEffects": {
+        "alternar-tema-claro": [
+          "theme-change"
+        ],
+        "alternar-tema-escuro": [
+          "theme-change"
+        ],
+        "ajustar-largura-do-painel": [
+          "panel-width-change"
+        ],
+        "verificar-controles-legiveis": [
+          "controls-readable"
+        ],
+        "verificar-mensagens-preservadas": [
+          "conversation-preserved"
+        ]
+      }
+    },
+    {
+      "id": "UI-03",
+      "category": "UI",
+      "summary": "Onboarding e teste do provedor",
+      "criteria": "Ao abrir o editor pela primeira vez, conduzir configuração do provedor, executar teste de conexão e permitir abrir projeto sem conta da Anysphere.",
+      "scenarioId": "ui-03-onboarding",
+      "scenarioPath": "packages/parity/scenarios/ui-03-onboarding.ts",
+      "steps": [
+        "abrir-editor-primeira-vez",
+        "conduzir-configuracao-do-provedor",
+        "executar-teste-de-conexao",
+        "abrir-projeto-sem-conta"
+      ],
+      "expectedEffects": {
+        "abrir-editor-primeira-vez": [
+          "onboarding-screen"
+        ],
+        "conduzir-configuracao-do-provedor": [
+          "provider-profile-saved"
+        ],
+        "executar-teste-de-conexao": [
+          "connection-test"
+        ],
+        "abrir-projeto-sem-conta": [
+          "project-opened"
+        ]
+      }
+    },
+    {
+      "id": "UI-04",
+      "category": "UI",
+      "summary": "Janela de agentes e retorno",
+      "criteria": "Quando abrir a janela de agentes, listar execuções locais em paralelo e oferecer comando de voltar ao editor no mesmo workspace.",
+      "scenarioId": "ui-04-agents-window",
+      "scenarioPath": "packages/parity/scenarios/ui-04-agents-window.ts",
+      "steps": [
+        "abrir-janela-de-agentes",
+        "listar-execucoes-locais-em-paralelo",
+        "voltar-ao-editor"
+      ],
+      "expectedEffects": {
+        "abrir-janela-de-agentes": [
+          "agents-window"
+        ],
+        "listar-execucoes-locais-em-paralelo": [
+          "parallel-local-runs"
+        ],
+        "voltar-ao-editor": [
+          "back-to-editor"
+        ]
+      }
+    },
+    {
+      "id": "AGT-01",
+      "category": "AGT",
+      "summary": "Ask sem mutação",
+      "criteria": "Quanto escolher Ask, responder com leitura e busca, sem gravar arquivo nem executar comando.",
+      "scenarioId": "agt-01-ask-no-mutation",
+      "scenarioPath": "packages/parity/scenarios/agt-01-ask-no-mutation.ts",
+      "steps": [
+        "escolher-modo-ask",
+        "perguntar-sobre-a-funcao",
+        "responder-usando-leitura-e-busca",
+        "verificar-workspace-sem-mutacao"
+      ],
+      "expectedEffects": {
+        "escolher-modo-ask": [
+          "mode-selected"
+        ],
+        "perguntar-sobre-a-funcao": [
+          "question-sent"
+        ],
+        "responder-usando-leitura-e-busca": [
+          "tool-usage"
+        ],
+        "verificar-workspace-sem-mutacao": [
+          "workspace-mutation"
+        ]
+      }
+    },
+    {
+      "id": "AGT-02",
+      "category": "AGT",
+      "summary": "Plan visível e executável",
+      "criteria": "Quando aceitar plano no modo Plan, iniciar execução com plano e progresso visíveis.",
+      "scenarioId": "agt-02-plan-execution",
+      "scenarioPath": "packages/parity/scenarios/agt-02-plan-execution.ts",
+      "steps": [
+        "propor-plano-no-modo-plan",
+        "aceitar-o-plano",
+        "iniciar-execucao-com-o-plano",
+        "mostrar-progresso-das-etapas"
+      ],
+      "expectedEffects": {
+        "propor-plano-no-modo-plan": [
+          "plan-proposal"
+        ],
+        "aceitar-o-plano": [
+          "plan-accepted"
+        ],
+        "iniciar-execucao-com-o-plano": [
+          "execution-started"
+        ],
+        "mostrar-progresso-das-etapas": [
+          "execution-progress"
+        ]
+      }
+    },
+    {
+      "id": "AGT-03",
+      "category": "AGT",
+      "summary": "Agent edita/testa e mostra diff",
+      "criteria": "Ao executar tarefa no modo Agent, editar mais de um arquivo, rodar teste autorizado e mostrar diff agrupado e resultado de cada ferramenta.",
+      "scenarioId": "agt-03-agent-multi-file-diff",
+      "scenarioPath": "packages/parity/scenarios/agt-03-agent-multi-file-diff.ts",
+      "steps": [
+        "executar-tarefa-no-modo-agent",
+        "editar-multiplos-arquivos",
+        "rodar-teste-autorizado",
+        "mostrar-diff-agrupado-e-resultados"
+      ],
+      "expectedEffects": {
+        "executar-tarefa-no-modo-agent": [
+          "agent-run"
+        ],
+        "editar-multiplos-arquivos": [
+          "multi-file-edit"
+        ],
+        "rodar-teste-autorizado": [
+          "test-run"
+        ],
+        "mostrar-diff-agrupado-e-resultados": [
+          "grouped-diff",
+          "tool-results"
+        ]
+      }
+    },
+    {
+      "id": "AGT-04",
+      "category": "AGT",
+      "summary": "Debug com hipótese/evidência",
+      "criteria": "Quando escolher Debug, registrar hipótese, evidência de execução e resultado da verificação antes de marcar tarefa como concluída.",
+      "scenarioId": "agt-04-debug-hypothesis-evidence",
+      "scenarioPath": "packages/parity/scenarios/agt-04-debug-hypothesis-evidence.ts",
+      "steps": [
+        "registrar-hipotese",
+        "executar-e-coletar-evidencia",
+        "verificar-a-hipotese",
+        "marcar-tarefa-como-concluida"
+      ],
+      "expectedEffects": {
+        "registrar-hipotese": [
+          "debug-hypothesis"
+        ],
+        "executar-e-coletar-evidencia": [
+          "execution-evidence"
+        ],
+        "verificar-a-hipotese": [
+          "verification-result"
+        ],
+        "marcar-tarefa-como-concluida": [
+          "task-completion"
+        ]
+      }
+    },
+    {
+      "id": "AGT-05",
+      "category": "AGT",
+      "summary": "Subagentes com estado próprio",
+      "criteria": "Quando dividir tarefa, mostrar cada subagente local com nome, estado e resultado próprios.",
+      "scenarioId": "agt-05-subagents-named",
+      "scenarioPath": "packages/parity/scenarios/agt-05-subagents-named.ts",
+      "steps": [
+        "dividir-a-tarefa-em-subagentes",
+        "executar-cada-subagente",
+        "mostrar-resultado-proprio-de-cada-um"
+      ],
+      "expectedEffects": {
+        "dividir-a-tarefa-em-subagentes": [
+          "subagent-list"
+        ],
+        "executar-cada-subagente": [
+          "subagent-entries"
+        ],
+        "mostrar-resultado-proprio-de-cada-um": [
+          "subagent-results"
+        ]
+      }
+    },
+    {
+      "id": "AGT-06",
+      "category": "AGT",
+      "summary": "Fila editável durante execução",
+      "criteria": "Quando mensagem chegar durante execução, colocá-la na fila e permitir remover item que ainda não começou.",
+      "scenarioId": "agt-06-message-queue",
+      "scenarioPath": "packages/parity/scenarios/agt-06-message-queue.ts",
+      "steps": [
+        "enviar-mensagem-durante-execucao",
+        "listar-a-fila",
+        "remover-item-que-nao-comecou",
+        "recusar-remocao-de-item-ja-iniciado"
+      ],
+      "expectedEffects": {
+        "enviar-mensagem-durante-execucao": [
+          "message-queued"
+        ],
+        "listar-a-fila": [
+          "queue-items"
+        ],
+        "remover-item-que-nao-comecou": [
+          "queue-item-removed"
+        ],
+        "recusar-remocao-de-item-ja-iniciado": [
+          "queue-item-removal-denied"
+        ]
+      }
+    },
+    {
+      "id": "AGT-07",
+      "category": "AGT",
+      "summary": "Cancelamento isolado de subagente",
+      "criteria": "Quando cancelar um subagente, interromper só esse subagente e conservar estado dos demais.",
+      "scenarioId": "agt-07-subagent-cancel",
+      "scenarioPath": "packages/parity/scenarios/agt-07-subagent-cancel.ts",
+      "steps": [
+        "cancelar-um-subagente",
+        "conservar-o-estado-dos-demais"
+      ],
+      "expectedEffects": {
+        "cancelar-um-subagente": [
+          "subagent-cancelled"
+        ],
+        "conservar-o-estado-dos-demais": [
+          "remaining-subagents-intact"
+        ]
+      }
+    },
+    {
+      "id": "PRJ-01",
+      "category": "PRJ",
+      "summary": "Coordenador local",
+      "criteria": "Quando criar projeto com objetivo, abrir coordenador local que divide em tarefas de agentes na mesma máquina e mostrar cada resultado para aceitar ou rejeitar.",
+      "scenarioId": "prj-01-local-coordinator",
+      "scenarioPath": "packages/parity/scenarios/prj-01-local-coordinator.ts",
+      "steps": [
+        "criar-projeto-com-objetivo",
+        "dividir-o-objetivo-em-tarefas-de-agentes",
+        "mostrar-cada-resultado-de-tarefa",
+        "aceitar-ou-rejeitar-resultado"
+      ],
+      "expectedEffects": {
+        "criar-projeto-com-objetivo": [
+          "project-created"
+        ],
+        "dividir-o-objetivo-em-tarefas-de-agentes": [
+          "coordinator-plan"
+        ],
+        "mostrar-cada-resultado-de-tarefa": [
+          "task-results"
+        ],
+        "aceitar-ou-rejeitar-resultado": [
+          "result-decision"
+        ]
+      }
+    },
+    {
+      "id": "PER-01",
+      "category": "PER",
+      "summary": "Aceite explícito de ferramenta",
+      "criteria": "Quando ferramenta precisar permissão, mostrar ação, alvo e escopo; executar só depois de aceite explícito.",
+      "scenarioId": "per-01-permission-accept",
+      "scenarioPath": "packages/parity/scenarios/per-01-permission-accept.ts",
+      "steps": [
+        "mostrar-acao-alvo-e-escopo",
+        "aceitar-explicitamente",
+        "executar-ferramenta"
+      ],
+      "expectedEffects": {
+        "mostrar-acao-alvo-e-escopo": [
+          "permission-request"
+        ],
+        "aceitar-explicitamente": [
+          "explicit-accept"
+        ],
+        "executar-ferramenta": [
+          "tool-executed"
+        ]
+      }
+    },
+    {
+      "id": "PER-02",
+      "category": "PER",
+      "summary": "Cancelar em até 2 segundos",
+      "criteria": "Quando cancelar execução, marcar Cancelada em até 2 segundos, não iniciar nova ferramenta e conservar alteração aplicada.",
+      "scenarioId": "per-02-cancel-execution",
+      "scenarioPath": "packages/parity/scenarios/per-02-cancel-execution.ts",
+      "steps": [
+        "cancelar-durante-execucao",
+        "conservar-alteracao-aplicada",
+        "recusar-ferramenta-nova"
+      ],
+      "expectedEffects": {
+        "cancelar-durante-execucao": [
+          "cancel-requested",
+          "cancelled-state"
+        ],
+        "conservar-alteracao-aplicada": [
+          "applied-change-preserved"
+        ],
+        "recusar-ferramenta-nova": [
+          "new-tool-denied"
+        ]
+      }
+    },
+    {
+      "id": "PER-03",
+      "category": "PER",
+      "summary": "Somente leitura bloqueia mutação",
+      "criteria": "Enquanto modo for Somente leitura, bloquear gravação de arquivo e comando que altere workspace; exibir 'Bloqueado pelo modo de execução.'",
+      "scenarioId": "per-03-readonly-block",
+      "scenarioPath": "packages/parity/scenarios/per-03-readonly-block.ts",
+      "steps": [
+        "ativar-somente-leitura",
+        "gravar-arquivo",
+        "executar-comando-mutavel"
+      ],
+      "expectedEffects": {
+        "ativar-somente-leitura": [
+          "readonly-mode-active"
+        ],
+        "gravar-arquivo": [
+          "file-write-blocked"
+        ],
+        "executar-comando-mutavel": [
+          "mutating-command-blocked"
+        ]
+      }
+    },
+    {
+      "id": "STA-01",
+      "category": "STA",
+      "summary": "Estado terminal recusa ferramenta",
+      "criteria": "Quando execução estiver Concluída ou Cancelada, recusar nova ferramenta; aceitar só depois de mensagem nova.",
+      "scenarioId": "sta-01-terminal-state",
+      "scenarioPath": "packages/parity/scenarios/sta-01-terminal-state.ts",
+      "steps": [
+        "execucao-terminal",
+        "solicitar-ferramenta-na-execucao-terminal",
+        "enviar-mensagem-nova"
+      ],
+      "expectedEffects": {
+        "execucao-terminal": [
+          "run-terminal-state"
+        ],
+        "solicitar-ferramenta-na-execucao-terminal": [
+          "new-tool-denied"
+        ],
+        "enviar-mensagem-nova": [
+          "new-message-accepts-tool"
+        ]
+      }
+    },
+    {
+      "id": "VAL-01",
+      "category": "VAL",
+      "summary": "Mensagem vazia recusada",
+      "criteria": "Quando enviar mensagem sem texto e sem anexo, recusar envio e exibir 'Escreva uma mensagem ou anexe um contexto.'",
+      "scenarioId": "val-01-empty-message",
+      "scenarioPath": "packages/parity/scenarios/val-01-empty-message.ts",
+      "steps": [
+        "enviar-mensagem-vazia",
+        "anexar-contexto-e-enviar"
+      ],
+      "expectedEffects": {
+        "enviar-mensagem-vazia": [
+          "empty-message-refused"
+        ],
+        "anexar-contexto-e-enviar": [
+          "message-sent"
+        ]
+      }
+    },
+    {
+      "id": "CTX-01",
+      "category": "CTX",
+      "summary": "Fontes, tokens e teto visíveis",
+      "criteria": "Ao anexar seleção, arquivo, pasta ou símbolo, listar cada fonte; mostrar contagem de tokens e teto antes do envio.",
+      "scenarioId": "ctx-01-attach-context-summary",
+      "scenarioPath": "packages/parity/scenarios/ctx-01-attach-context-summary.ts",
+      "steps": [
+        "anexar-seleção",
+        "anexar-arquivo",
+        "anexar-pasta",
+        "anexar-símbolo",
+        "mostrar-resumo-antes-do-envio"
+      ],
+      "expectedEffects": {
+        "anexar-seleção": [
+          "selection-attached"
+        ],
+        "anexar-arquivo": [
+          "file-attached"
+        ],
+        "anexar-pasta": [
+          "folder-attached"
+        ],
+        "anexar-símbolo": [
+          "symbol-attached"
+        ],
+        "mostrar-resumo-antes-do-envio": [
+          "context-summary-before-send"
+        ]
+      }
+    },
+    {
+      "id": "CTX-02",
+      "category": "CTX",
+      "summary": "Índice incremental",
+      "criteria": "Ao salvar arquivo indexado, busca local deve passar a encontrar texto novo sem reconstrução do índice inteiro.",
+      "scenarioId": "ctx-02-incremental-index",
+      "scenarioPath": "packages/parity/scenarios/ctx-02-incremental-index.ts",
+      "steps": [
+        "salvar-arquivo-indexado",
+        "atualizar-indice-incremental",
+        "buscar-texto-novo"
+      ],
+      "expectedEffects": {
+        "salvar-arquivo-indexado": [
+          "file-saved"
+        ],
+        "atualizar-indice-incremental": [
+          "index-updated-incrementally"
+        ],
+        "buscar-texto-novo": [
+          "search-finds-new-text"
+        ]
+      }
+    },
+    {
+      "id": "CTX-03",
+      "category": "CTX",
+      "summary": "Exclusões em índice/contexto/busca",
+      "criteria": "Enquanto caminho estiver em regra de exclusão, omiti-lo da indexação, contexto automático e busca do agente.",
+      "scenarioId": "ctx-03-excluded-path-omitted",
+      "scenarioPath": "packages/parity/scenarios/ctx-03-excluded-path-omitted.ts",
+      "steps": [
+        "aplicar-regra-de-exclusão",
+        "omitir-da-indexação",
+        "omitir-do-contexto-automático",
+        "omitir-da-busca-do-agente"
+      ],
+      "expectedEffects": {
+        "aplicar-regra-de-exclusão": [
+          "exclusion-rule-active"
+        ],
+        "omitir-da-indexação": [
+          "path-omitted-from-index"
+        ],
+        "omitir-do-contexto-automático": [
+          "path-omitted-from-auto-context"
+        ],
+        "omitir-da-busca-do-agente": [
+          "path-omitted-from-agent-search"
+        ]
+      }
+    },
+    {
+      "id": "CTX-04",
+      "category": "CTX",
+      "summary": "Limpeza com escopo e tamanho",
+      "criteria": "Quando pedir limpeza do índice, mostrar escopo e tamanho; apagar dados locais daquele workspace.",
+      "scenarioId": "ctx-04-index-cleanup",
+      "scenarioPath": "packages/parity/scenarios/ctx-04-index-cleanup.ts",
+      "steps": [
+        "pedir-limpeza-do-índice",
+        "mostrar-escopo-e-tamanho",
+        "apagar-dados-do-workspace"
+      ],
+      "expectedEffects": {
+        "pedir-limpeza-do-índice": [
+          "cleanup-requested"
+        ],
+        "mostrar-escopo-e-tamanho": [
+          "cleanup-scope-and-size-shown"
+        ],
+        "apagar-dados-do-workspace": [
+          "workspace-local-data-cleared"
+        ]
+      }
+    },
+    {
+      "id": "PRV-01",
+      "category": "PRV",
+      "summary": "Envio externo só explícito",
+      "criteria": "Enviar contexto a API externa só após ação explícita de envio; não enviar caminho excluído.",
+      "scenarioId": "prv-01-explicit-external-send",
+      "scenarioPath": "packages/parity/scenarios/prv-01-explicit-external-send.ts",
+      "steps": [
+        "montar-contexto-local",
+        "registrar-ação-explícita-de-envio",
+        "enviar-a-api-externa",
+        "verificar-caminho-excluído-não-enviado"
+      ],
+      "expectedEffects": {
+        "montar-contexto-local": [
+          "context-assembled-locally"
+        ],
+        "registrar-ação-explícita-de-envio": [
+          "explicit-send-action"
+        ],
+        "enviar-a-api-externa": [
+          "context-sent-to-external-api"
+        ],
+        "verificar-caminho-excluído-não-enviado": [
+          "excluded-path-never-sent"
+        ]
+      }
+    },
+    {
+      "id": "PRV-02",
+      "category": "PRV",
+      "summary": "Log sem segredo/conteúdo bruto",
+      "criteria": "Registrar ação de ferramenta, omitir credencial, conteúdo de arquivo excluído e corpo bruto do modelo no log padrão.",
+      "scenarioId": "prv-02-redacted-tool-log",
+      "scenarioPath": "packages/parity/scenarios/prv-02-redacted-tool-log.ts",
+      "steps": [
+        "executar-ferramenta",
+        "escrever-log-padrão",
+        "auditar-omissões-do-log"
+      ],
+      "expectedEffects": {
+        "executar-ferramenta": [
+          "tool-action-logged"
+        ],
+        "escrever-log-padrão": [
+          "log-written"
+        ],
+        "auditar-omissões-do-log": [
+          "credential-omitted",
+          "excluded-file-content-omitted",
+          "raw-model-body-omitted"
+        ]
+      }
+    },
+    {
+      "id": "TAB-01",
+      "category": "TAB",
+      "summary": "Sugestão com aceitar/recusar",
+      "criteria": "Ao digitar com Tab ativo, oferecer continuação de linha ou bloco com aceitar, recusar e cancelar.",
+      "scenarioId": "tab-01-suggestion-controls",
+      "scenarioPath": "packages/parity/scenarios/tab-01-suggestion-controls.ts",
+      "steps": [
+        "digitar-com-tab-ativo",
+        "oferecer-continuacao-de-linha",
+        "oferecer-continuacao-de-bloco",
+        "oferecer-aceitar-recusar-cancelar",
+        "cancelar-durante-geracao"
+      ],
+      "expectedEffects": {
+        "digitar-com-tab-ativo": [
+          "suggestion-offered"
+        ],
+        "oferecer-continuacao-de-linha": [
+          "continuation-suggested"
+        ],
+        "oferecer-continuacao-de-bloco": [
+          "continuation-suggested"
+        ],
+        "oferecer-aceitar-recusar-cancelar": [
+          "suggestion-controls"
+        ],
+        "cancelar-durante-geracao": [
+          "suggestion-cancelled"
+        ]
+      }
+    },
+    {
+      "id": "TAB-02",
+      "category": "TAB",
+      "summary": "Próximo ponto e salto",
+      "criteria": "Ao aceitar sugestão com continuação, indicar próximo ponto e permitir salto por teclado.",
+      "scenarioId": "tab-02-next-point-jump",
+      "scenarioPath": "packages/parity/scenarios/tab-02-next-point-jump.ts",
+      "steps": [
+        "aceitar-sugestao-com-continuacao",
+        "indicar-proximo-ponto",
+        "saltar-por-teclado"
+      ],
+      "expectedEffects": {
+        "aceitar-sugestao-com-continuacao": [
+          "suggestion-accepted"
+        ],
+        "indicar-proximo-ponto": [
+          "next-point-indicated"
+        ],
+        "saltar-por-teclado": [
+          "keyboard-jump"
+        ]
+      }
+    },
+    {
+      "id": "TAB-03",
+      "category": "TAB",
+      "summary": "Edição em outro arquivo revisada",
+      "criteria": "Quando sugestão alterar outro arquivo, mostrar caminho e aplicar só depois de revisão.",
+      "scenarioId": "tab-03-cross-file-review",
+      "scenarioPath": "packages/parity/scenarios/tab-03-cross-file-review.ts",
+      "steps": [
+        "gerar-sugestao-que-altera-outro-arquivo",
+        "mostrar-caminho-do-arquivo-afetado",
+        "revisar-diff-do-outro-arquivo",
+        "aplicar-somente-apos-revisao"
+      ],
+      "expectedEffects": {
+        "gerar-sugestao-que-altera-outro-arquivo": [
+          "cross-file-change"
+        ],
+        "mostrar-caminho-do-arquivo-afetado": [
+          "affected-path-shown"
+        ],
+        "revisar-diff-do-outro-arquivo": [
+          "review-required"
+        ],
+        "aplicar-somente-apos-revisao": [
+          "applied-after-review"
+        ]
+      }
+    },
+    {
+      "id": "INL-01",
+      "category": "INL",
+      "summary": "Inline Edit com diff/refino",
+      "criteria": "Quando pedir Inline Edit na seleção, mostrar diff no editor com aceitar, rejeitar e refinar.",
+      "scenarioId": "inl-01-inline-edit-diff",
+      "scenarioPath": "packages/parity/scenarios/inl-01-inline-edit-diff.ts",
+      "steps": [
+        "pedir-inline-edit-na-selecao",
+        "mostrar-diff-no-editor",
+        "oferecer-aceitar-rejeitar-refinar"
+      ],
+      "expectedEffects": {
+        "pedir-inline-edit-na-selecao": [
+          "inline-edit-requested"
+        ],
+        "mostrar-diff-no-editor": [
+          "diff-shown-in-editor"
+        ],
+        "oferecer-aceitar-rejeitar-refinar": [
+          "inline-edit-controls"
+        ]
+      }
+    },
+    {
+      "id": "INL-02",
+      "category": "INL",
+      "summary": "Arquivo inteiro restaurável",
+      "criteria": "Ao pedir edição de arquivo inteiro, permitir rejeitar e restaurar conteúdo anterior ao pedido.",
+      "scenarioId": "inl-02-whole-file-restore",
+      "scenarioPath": "packages/parity/scenarios/inl-02-whole-file-restore.ts",
+      "steps": [
+        "pedir-edicao-do-arquivo-inteiro",
+        "mostrar-previa-do-arquivo-inteiro",
+        "rejeitar-edicao",
+        "restaurar-conteudo-anterior"
+      ],
+      "expectedEffects": {
+        "pedir-edicao-do-arquivo-inteiro": [
+          "whole-file-edit-requested"
+        ],
+        "mostrar-previa-do-arquivo-inteiro": [
+          "whole-file-preview-shown"
+        ],
+        "rejeitar-edicao": [
+          "edit-rejected"
+        ],
+        "restaurar-conteudo-anterior": [
+          "previous-content-restored"
+        ]
+      }
+    },
+    {
+      "id": "AUT-01",
+      "category": "AUT",
+      "summary": "Browser autorizado com captura/console",
+      "criteria": "Quando autorizar navegador, abrir URL, executar interação autorizada, mostrar captura e texto de console.",
+      "scenarioId": "aut-01-authorized-browser",
+      "scenarioPath": "packages/parity/scenarios/aut-01-authorized-browser.ts",
+      "steps": [
+        "autorizar-navegador",
+        "abrir-url-indicada",
+        "executar-interacao-autorizada",
+        "mostrar-captura",
+        "mostrar-texto-de-console"
+      ],
+      "expectedEffects": {
+        "autorizar-navegador": [
+          "browser-permission-granted"
+        ],
+        "abrir-url-indicada": [
+          "url-opened"
+        ],
+        "executar-interacao-autorizada": [
+          "authorized-interaction-executed"
+        ],
+        "mostrar-captura": [
+          "screenshot-shown"
+        ],
+        "mostrar-texto-de-console": [
+          "console-shown"
+        ]
+      }
+    },
+    {
+      "id": "AUT-02",
+      "category": "AUT",
+      "summary": "Computer use uma ação por vez",
+      "criteria": "Ao autorizar uso do computador, executar ação por vez, nomeada na permissão, mostrar resultado.",
+      "scenarioId": "aut-02-computer-action-at-a-time",
+      "scenarioPath": "packages/parity/scenarios/aut-02-computer-action-at-a-time.ts",
+      "steps": [
+        "autorizar-uso-do-computador",
+        "executar-uma-acao-por-vez",
+        "mostrar-resultado-da-acao",
+        "negar-acao-nomeada-fora-da-permissao"
+      ],
+      "expectedEffects": {
+        "autorizar-uso-do-computador": [
+          "computer-permission-granted"
+        ],
+        "executar-uma-acao-por-vez": [
+          "single-action-executed"
+        ],
+        "mostrar-resultado-da-acao": [
+          "action-result-shown"
+        ],
+        "negar-acao-nomeada-fora-da-permissao": [
+          "unauthorized-action-denied"
+        ]
+      }
+    },
+    {
+      "id": "DES-01",
+      "category": "DES",
+      "summary": "Elemento e código anexados",
+      "criteria": "Quando selecionar elemento no navegador em modo desenho, anexar identificação do elemento e trecho de código à mensagem seguinte.",
+      "scenarioId": "des-01-element-code-attach",
+      "scenarioPath": "packages/parity/scenarios/des-01-element-code-attach.ts",
+      "steps": [
+        "ativar-modo-de-desenho-no-navegador",
+        "selecionar-elemento-no-navegador",
+        "anexar-identificacao-e-trecho-a-proxima-mensagem"
+      ],
+      "expectedEffects": {
+        "ativar-modo-de-desenho-no-navegador": [
+          "drawing-mode-active"
+        ],
+        "selecionar-elemento-no-navegador": [
+          "element-selected"
+        ],
+        "anexar-identificacao-e-trecho-a-proxima-mensagem": [
+          "element-context-attached"
+        ]
+      }
+    },
+    {
+      "id": "CAN-01",
+      "category": "CAN",
+      "summary": "Canvas persistente no painel",
+      "criteria": "Quando agente abrir canvas, exibir conteúdo no painel e mantê-lo visível após fim da resposta.",
+      "scenarioId": "can-01-canvas-persistent-panel",
+      "scenarioPath": "packages/parity/scenarios/can-01-canvas-persistent-panel.ts",
+      "steps": [
+        "agente-abrir-canvas",
+        "exibir-conteudo-no-painel",
+        "finalizar-resposta",
+        "verificar-canvas-ainda-visivel"
+      ],
+      "expectedEffects": {
+        "agente-abrir-canvas": [
+          "canvas-opened"
+        ],
+        "exibir-conteudo-no-painel": [
+          "canvas-displayed"
+        ],
+        "finalizar-resposta": [
+          "response-finished"
+        ],
+        "verificar-canvas-ainda-visivel": [
+          "canvas-still-visible"
+        ]
+      }
+    },
+    {
+      "id": "CUS-01",
+      "category": "CUS",
+      "summary": "Regras de usuário/projeto",
+      "criteria": "Ao iniciar sessão, carregar regras de usuário e de projeto aplicáveis, mostrar origem de cada uma.",
+      "scenarioId": "cus-01-user-project-rules",
+      "scenarioPath": "packages/parity/scenarios/cus-01-user-project-rules.ts",
+      "steps": [
+        "iniciar-sessao",
+        "carregar-regras-do-usuario",
+        "carregar-regras-do-projeto",
+        "mostrar-origem-de-cada-regra"
+      ],
+      "expectedEffects": {
+        "iniciar-sessao": [
+          "session-started"
+        ],
+        "carregar-regras-do-usuario": [
+          "rule-loaded"
+        ],
+        "carregar-regras-do-projeto": [
+          "rule-loaded"
+        ],
+        "mostrar-origem-de-cada-regra": [
+          "rules-with-origin-shown"
+        ]
+      }
+    },
+    {
+      "id": "CUS-02",
+      "category": "CUS",
+      "summary": "Comando/skill/plugin com origem",
+      "criteria": "Ao invocar comando, skill ou plugin local, aplicar instrução declarada e mostrar origem.",
+      "scenarioId": "cus-02-command-skill-plugin-origin",
+      "scenarioPath": "packages/parity/scenarios/cus-02-command-skill-plugin-origin.ts",
+      "steps": [
+        "invocar-comando-local",
+        "aplicar-instrucao-declarada",
+        "mostrar-origem"
+      ],
+      "expectedEffects": {
+        "invocar-comando-local": [
+          "command-invoked"
+        ],
+        "aplicar-instrucao-declarada": [
+          "instruction-applied"
+        ],
+        "mostrar-origem": [
+          "origin-shown"
+        ]
+      }
+    },
+    {
+      "id": "CUS-03",
+      "category": "CUS",
+      "summary": "Hook pode negar ação",
+      "criteria": "Quando hook local negar ação, impedir ação e mostrar justificativa do hook.",
+      "scenarioId": "cus-03-hook-denies-action",
+      "scenarioPath": "packages/parity/scenarios/cus-03-hook-denies-action.ts",
+      "steps": [
+        "hook-negar-acao",
+        "impedir-acao",
+        "mostrar-justificativa"
+      ],
+      "expectedEffects": {
+        "hook-negar-acao": [
+          "hook-denied"
+        ],
+        "impedir-acao": [
+          "action-blocked"
+        ],
+        "mostrar-justificativa": [
+          "hook-justification-shown"
+        ]
+      }
+    },
+    {
+      "id": "MCP-01",
+      "category": "MCP",
+      "summary": "MCP stdio/HTTP com permissão",
+      "criteria": "Ao configurar servidor MCP por stdio/HTTP, listar ferramentas, executar escolhida só com permissão, mostrar resultado ou erro.",
+      "scenarioId": "mcp-01-mcp-tools-permission",
+      "scenarioPath": "packages/parity/scenarios/mcp-01-mcp-tools-permission.ts",
+      "steps": [
+        "configurar-servidor-mcp",
+        "listar-ferramentas",
+        "pedir-permissao-da-ferramenta",
+        "executar-ferramenta-escolhida",
+        "mostrar-resultado-ou-erro"
+      ],
+      "expectedEffects": {
+        "configurar-servidor-mcp": [
+          "mcp-server-configured"
+        ],
+        "listar-ferramentas": [
+          "mcp-tools-listed"
+        ],
+        "pedir-permissao-da-ferramenta": [
+          "permission-requested"
+        ],
+        "executar-ferramenta-escolhida": [
+          "tool-executed"
+        ],
+        "mostrar-resultado-ou-erro": [
+          "tool-result-shown"
+        ]
+      }
+    },
+    {
+      "id": "CLI-01",
+      "category": "CLI",
+      "summary": "CLI reutiliza configuração",
+      "criteria": "Quando iniciar CLI num workspace, reutilizar provedor, modo, regras, MCP e sessões daquele workspace.",
+      "scenarioId": "cli-01-reuse-workspace-config",
+      "scenarioPath": "packages/parity/scenarios/cli-01-reuse-workspace-config.ts",
+      "steps": [
+        "iniciar-cli-no-workspace",
+        "reutilizar-provedor",
+        "reutilizar-modo",
+        "reutilizar-regras",
+        "reutilizar-mcp",
+        "reutilizar-sessoes"
+      ],
+      "expectedEffects": {
+        "iniciar-cli-no-workspace": [
+          "cli-started"
+        ],
+        "reutilizar-provedor": [
+          "provider-reused"
+        ],
+        "reutilizar-modo": [
+          "mode-reused"
+        ],
+        "reutilizar-regras": [
+          "rules-reused"
+        ],
+        "reutilizar-mcp": [
+          "mcp-reused"
+        ],
+        "reutilizar-sessoes": [
+          "sessions-reused"
+        ]
+      }
+    },
+    {
+      "id": "CLI-02",
+      "category": "CLI",
+      "summary": "Sessão headless abre no editor",
+      "criteria": "Quando execução headless da CLI terminar, mostrar essa sessão ao abrir mesmo workspace no editor.",
+      "scenarioId": "cli-02-headless-session-in-editor",
+      "scenarioPath": "packages/parity/scenarios/cli-02-headless-session-in-editor.ts",
+      "steps": [
+        "concluir-execucao-headless",
+        "abrir-editor-no-mesmo-workspace",
+        "mostrar-sessao-no-editor"
+      ],
+      "expectedEffects": {
+        "concluir-execucao-headless": [
+          "headless-run-finished"
+        ],
+        "abrir-editor-no-mesmo-workspace": [
+          "editor-opened"
+        ],
+        "mostrar-sessao-no-editor": [
+          "session-visible-in-editor"
+        ]
+      }
+    },
+    {
+      "id": "SES-01",
+      "category": "SES",
+      "summary": "Retomar sessão completa",
+      "criteria": "Ao reiniciar editor, reabrir sessões do workspace com modo, mensagens, ferramentas e anexos existentes.",
+      "scenarioId": "ses-01-reopen-sessions-on-restart",
+      "scenarioPath": "packages/parity/scenarios/ses-01-reopen-sessions-on-restart.ts",
+      "steps": [
+        "reiniciar-editor",
+        "reabrir-sessoes-do-workspace",
+        "mostrar-modo-mensagens-ferramentas-anexos"
+      ],
+      "expectedEffects": {
+        "reiniciar-editor": [
+          "editor-restarted"
+        ],
+        "reabrir-sessoes-do-workspace": [
+          "session-reopened"
+        ],
+        "mostrar-modo-mensagens-ferramentas-anexos": [
+          "session-content-restored"
+        ]
+      }
+    },
+    {
+      "id": "SES-02",
+      "category": "SES",
+      "summary": "Exportar sessão em texto",
+      "criteria": "Ao exportar sessão, gravar arquivo de texto com mensagens daquela sessão.",
+      "scenarioId": "ses-02-export-session-text",
+      "scenarioPath": "packages/parity/scenarios/ses-02-export-session-text.ts",
+      "steps": [
+        "exportar-sessao",
+        "gravar-arquivo-de-texto",
+        "confirmar-escrita"
+      ],
+      "expectedEffects": {
+        "exportar-sessao": [
+          "session-export-requested"
+        ],
+        "gravar-arquivo-de-texto": [
+          "export-file-written"
+        ],
+        "confirmar-escrita": [
+          "export-confirmed"
+        ]
+      }
+    },
+    {
+      "id": "SES-03",
+      "category": "SES",
+      "summary": "Checkpoint sem sobrescrita",
+      "criteria": "Ao restaurar checkpoint, reverter só arquivos marcados daquela execução; mostrar conflito e não gravar por cima.",
+      "scenarioId": "ses-03-checkpoint-restore-conflict",
+      "scenarioPath": "packages/parity/scenarios/ses-03-checkpoint-restore-conflict.ts",
+      "steps": [
+        "selecionar-checkpoint",
+        "reverter-arquivos-marcados",
+        "reportar-conflito"
+      ],
+      "expectedEffects": {
+        "selecionar-checkpoint": [
+          "checkpoint-selected"
+        ],
+        "reverter-arquivos-marcados": [
+          "marked-files-reverted"
+        ],
+        "reportar-conflito": [
+          "restore-conflict-shown"
+        ]
+      }
+    },
+    {
+      "id": "SES-04",
+      "category": "SES",
+      "summary": "Isolamento por worktree",
+      "criteria": "Quando criar trabalho isolado, usar worktree local e manter arquivos do workspace original intactos até aplicação escolhida.",
+      "scenarioId": "ses-04-worktree-isolation",
+      "scenarioPath": "packages/parity/scenarios/ses-04-worktree-isolation.ts",
+      "steps": [
+        "criar-trabalho-isolado",
+        "criar-worktree-local",
+        "preservar-workspace-original"
+      ],
+      "expectedEffects": {
+        "criar-trabalho-isolado": [
+          "isolated-work-requested"
+        ],
+        "criar-worktree-local": [
+          "worktree-created"
+        ],
+        "preservar-workspace-original": [
+          "original-preserved"
+        ]
+      }
+    },
+    {
+      "id": "SES-05",
+      "category": "SES",
+      "summary": "Buscar conversa local",
+      "criteria": "Ao buscar texto na conversa, listar mensagens da sessão local que contêm texto.",
+      "scenarioId": "ses-05-conversation-search",
+      "scenarioPath": "packages/parity/scenarios/ses-05-conversation-search.ts",
+      "steps": [
+        "buscar-texto-na-conversa",
+        "listar-mensagens-encontradas"
+      ],
+      "expectedEffects": {
+        "buscar-texto-na-conversa": [
+          "conversation-search-performed"
+        ],
+        "listar-mensagens-encontradas": [
+          "conversation-matches-listed"
+        ]
+      }
+    },
+    {
+      "id": "SES-06",
+      "category": "SES",
+      "summary": "Conversa lateral preserva principal",
+      "criteria": "Ao abrir conversa lateral, conservar mensagens da conversa principal.",
+      "scenarioId": "ses-06-side-conversation-preserves-main",
+      "scenarioPath": "packages/parity/scenarios/ses-06-side-conversation-preserves-main.ts",
+      "steps": [
+        "abrir-conversa-lateral",
+        "preservar-conversa-principal",
+        "voltar-ao-principal"
+      ],
+      "expectedEffects": {
+        "abrir-conversa-lateral": [
+          "side-conversation-opened"
+        ],
+        "preservar-conversa-principal": [
+          "main-conversation-preserved"
+        ],
+        "voltar-ao-principal": [
+          "returned-to-main"
+        ]
+      }
+    },
+    {
+      "id": "SES-07",
+      "category": "SES",
+      "summary": "Apagar mensagens locais",
+      "criteria": "Ao apagar sessão, remover mensagens locais daquela sessão.",
+      "scenarioId": "ses-07-session-delete",
+      "scenarioPath": "packages/parity/scenarios/ses-07-session-delete.ts",
+      "steps": [
+        "apagar-sessao",
+        "remover-mensagens-locais",
+        "conservar-outras-sessoes"
+      ],
+      "expectedEffects": {
+        "apagar-sessao": [
+          "session-delete-confirmed"
+        ],
+        "remover-mensagens-locais": [
+          "local-messages-removed"
+        ],
+        "conservar-outras-sessoes": [
+          "other-sessions-unaffected"
+        ]
+      }
+    },
+    {
+      "id": "API-01",
+      "category": "API",
+      "summary": "Teste/capabilities/cofre",
+      "criteria": "Ao informar endpoint, modelo e credencial, testar conexão, mostrar capacidades detectadas, guardar credencial no cofre do sistema.",
+      "scenarioId": "api-01-provider-test-vault",
+      "scenarioPath": "packages/parity/scenarios/api-01-provider-test-vault.ts",
+      "steps": [
+        "informar-credenciais",
+        "testar-conexao",
+        "mostrar-capacidades",
+        "guardar-credencial-cofre"
+      ],
+      "expectedEffects": {
+        "informar-credenciais": [
+          "provider-credentials-informed"
+        ],
+        "testar-conexao": [
+          "connection-tested"
+        ],
+        "mostrar-capacidades": [
+          "capabilities-detected"
+        ],
+        "guardar-credencial-cofre": [
+          "credential-stored-system-vault"
+        ]
+      }
+    },
+    {
+      "id": "API-02",
+      "category": "API",
+      "summary": "Falha preserva prompt e diff",
+      "criteria": "Se provedor expira/recusa taxa/ausenta capacidade, exibir causa, conservar texto digitado, não apagar diff já produzido.",
+      "scenarioId": "api-02-provider-failure-preserves-diff",
+      "scenarioPath": "packages/parity/scenarios/api-02-provider-failure-preserves-diff.ts",
+      "steps": [
+        "gerar-diff-previo",
+        "enviar-com-falha",
+        "exibir-causa",
+        "conservar-prompt-e-diff"
+      ],
+      "expectedEffects": {
+        "gerar-diff-previo": [
+          "previous-diff-produced"
+        ],
+        "enviar-com-falha": [
+          "provider-failure-received"
+        ],
+        "exibir-causa": [
+          "failure-cause-displayed"
+        ],
+        "conservar-prompt-e-diff": [
+          "typed-text-preserved",
+          "previous-diff-preserved"
+        ]
+      }
+    },
+    {
+      "id": "API-03",
+      "category": "API",
+      "summary": "Teto padrão 200000 tokens",
+      "criteria": "Ao enviar mensagem, exibir teto de contexto em tokens; usar 200000 quando não gravado outro valor.",
+      "scenarioId": "api-03-context-ceiling-default",
+      "scenarioPath": "packages/parity/scenarios/api-03-context-ceiling-default.ts",
+      "steps": [
+        "enviar-sem-teto-gravado",
+        "exibir-teto-padrao",
+        "enviar-com-teto-gravado",
+        "exibir-teto-gravado"
+      ],
+      "expectedEffects": {
+        "enviar-sem-teto-gravado": [
+          "message-submitted-without-ceiling"
+        ],
+        "exibir-teto-padrao": [
+          "context-ceiling-displayed"
+        ],
+        "enviar-com-teto-gravado": [
+          "message-submitted-with-saved-ceiling"
+        ],
+        "exibir-teto-gravado": [
+          "saved-context-ceiling-displayed"
+        ]
+      }
+    },
+    {
+      "id": "ERR-01",
+      "category": "ERR",
+      "summary": "Conflito mostra duas versões",
+      "criteria": "Quando arquivo mudar entre geração e aplicação, impedir aplicação direta, mostrar duas versões.",
+      "scenarioId": "err-01-file-changed-conflict-versions",
+      "scenarioPath": "packages/parity/scenarios/err-01-file-changed-conflict-versions.ts",
+      "steps": [
+        "gerar-patch",
+        "mudar-arquivo-fora",
+        "bloquear-aplicacao-direta",
+        "mostrar-duas-versoes"
+      ],
+      "expectedEffects": {
+        "gerar-patch": [
+          "patch-generated"
+        ],
+        "mudar-arquivo-fora": [
+          "file-changed-externally"
+        ],
+        "bloquear-aplicacao-direta": [
+          "direct-apply-blocked"
+        ],
+        "mostrar-duas-versoes": [
+          "both-versions-shown"
+        ]
+      }
+    },
+    {
+      "id": "ERR-02",
+      "category": "ERR",
+      "summary": "Caminho fora do escopo negado",
+      "criteria": "Se ferramenta pedir caminho fora do workspace aprovado, negar operação, registrar 'Caminho fora do escopo.'",
+      "scenarioId": "err-02-path-out-of-scope",
+      "scenarioPath": "packages/parity/scenarios/err-02-path-out-of-scope.ts",
+      "steps": [
+        "solicitar-operacao-fora",
+        "negar-operacao",
+        "registrar-mensagem"
+      ],
+      "expectedEffects": {
+        "solicitar-operacao-fora": [
+          "out-of-scope-requested"
+        ],
+        "negar-operacao": [
+          "operation-denied"
+        ],
+        "registrar-mensagem": [
+          "message-recorded"
+        ]
+      }
+    },
+    {
+      "id": "ERR-03",
+      "category": "ERR",
+      "summary": "Streaming incompleto e retry",
+      "criteria": "Se conexão cair durante streaming, marcar resposta como Incompleta, permitir tentar de novo sem alterar gravação existente.",
+      "scenarioId": "err-03-incomplete-stream-retry",
+      "scenarioPath": "packages/parity/scenarios/err-03-incomplete-stream-retry.ts",
+      "steps": [
+        "streamar-parcial",
+        "queda-do-streaming",
+        "marcar-incompleta",
+        "tentar-de-novo"
+      ],
+      "expectedEffects": {
+        "streamar-parcial": [
+          "stream-partial-received"
+        ],
+        "queda-do-streaming": [
+          "stream-connection-dropped"
+        ],
+        "marcar-incompleta": [
+          "response-marked-incomplete"
+        ],
+        "tentar-de-novo": [
+          "partial-record-preserved",
+          "retry-issued"
+        ]
+      }
+    },
+    {
+      "id": "ERR-04",
+      "category": "ERR",
+      "summary": "Remover trecho recém-excluído",
+      "criteria": "Se índice tiver trecho de arquivo que passou a excluído, remover antes da próxima busca.",
+      "scenarioId": "err-04-index-removes-recently-excluded",
+      "scenarioPath": "packages/parity/scenarios/err-04-index-removes-recently-excluded.ts",
+      "steps": [
+        "indexar-trechos",
+        "marcar-caminho-excluido",
+        "remover-trecho-antes-da-busca",
+        "confirmar-busca-limpa"
+      ],
+      "expectedEffects": {
+        "indexar-trechos": [
+          "chunks-indexed"
+        ],
+        "marcar-caminho-excluido": [
+          "path-recently-excluded"
+        ],
+        "remover-trecho-antes-da-busca": [
+          "stale-chunk-removed"
+        ],
+        "confirmar-busca-limpa": [
+          "next-search-omits-excluded"
+        ]
+      }
+    }
+  ]
+}
