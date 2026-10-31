@@ -22,16 +22,6 @@ export {
 } from "./sandbox/macos-sandbox-probe.js";
 
 export {
-  probeWindowsSandbox,
-  probeAppContainerOperational,
-  probeAppContainerVersionSupport,
-  probeJobObjectAvailability,
-  type WindowsSandboxProbe,
-  type WindowsSandboxProbeResult,
-  type WindowsNativeSandboxPrimitive,
-} from "./sandbox/windows-sandbox-probe.js";
-
-export {
   prepareSandboxToolDispatch,
   sandboxDegradationNoticeForPermission,
   type SandboxToolDispatchInput,
@@ -196,7 +186,6 @@ export type {
 
 export {
   discoverMcpStdioTools,
-  type DiscoverMcpStdioToolsOptions,
   type DiscoveredMcpStdioTool,
   type McpStdioToolDiscoveryResult,
 } from "./mcp/discover-mcp-stdio-tools.js";
@@ -208,7 +197,6 @@ export {
 
 export {
   discoverMcpHttpTools,
-  type DiscoverMcpHttpToolsOptions,
   type DiscoveredMcpHttpTool,
   type McpHttpToolDiscoveryResult,
 } from "./mcp/discover-mcp-http-tools.js";
@@ -219,27 +207,24 @@ export {
 } from "./mcp/mcp-http-config.js";
 
 export {
-  assertMcpAuthSecretRef,
-  mcpAuthMaterialToHttpHeaders,
-  resolveMcpHttpHeaders,
-  resolveMcpStdioEnv,
-  type McpAuthMaterial,
-  type McpAuthSecretResolver,
-} from "./mcp/mcp-auth-material.js";
+  executeMcpTool,
+  type ExecuteMcpHttpToolInput,
+  type ExecuteMcpStdioToolInput,
+  type ExecuteMcpToolInput,
+} from "./mcp/execute-mcp-tool.js";
 
 export {
-  assertLocalHooksAllowMcpToolInvoke,
-  type McpToolHookGateInput,
-} from "./mcp/local-hook-gate.js";
+  mapCallToolResultToInvocation,
+  primaryTextFromMcpToolInvocation,
+  type McpToolContentBlock,
+  type McpToolInvocationResult,
+} from "./mcp/mcp-tool-invocation-result.js";
 
 export {
-  createNodeCustomizationRuleFileReader,
-  loadCustomizationRulesFromPaths,
-  type CustomizationRuleFileReader,
-  type LoadCustomizationRulesFromPathsInput,
-} from "./mcp/load-customization-rules.js";
-
-export {
-  loadLocalCustomizationAssetsFromPaths,
-  type LoadLocalCustomizationAssetsInput,
-} from "./mcp/load-local-customization-assets.js";
+  executePolicyMcpToolInvoke,
+  formatAgentMcpToolResult,
+  preparePolicyMcpToolInvoke,
+  type AgentMcpToolInvocationResult,
+  type PolicyMcpToolContext,
+  type PreparePolicyMcpToolInvokeInput,
+} from "./mcp/policy-mcp-tools.js";
