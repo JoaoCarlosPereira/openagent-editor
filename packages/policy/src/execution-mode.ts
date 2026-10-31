@@ -13,6 +13,8 @@ export const EXECUTION_MODES: readonly ExecutionMode[] = ["standard", "read_only
 const READ_ONLY_BLOCKED_CAPABILITIES: ReadonlySet<PolicyCapability> = new Set([
   "file.write",
   "shell.exec",
+  // AUT-02: uso do computador é mutável — bloqueado em Somente leitura (PER-03).
+  "computer.use",
 ]);
 
 function isNonEmptyString(value: unknown): value is string {

@@ -12,11 +12,10 @@ import {
   type ProtocolErrorCode,
   type RpcRequestEnvelope,
 } from "@openagent/protocol";
-import { dispatchAgentRpc } from "./agents/agent-rpc-handler.js";
 import { dispatchCheckpointRpc } from "./checkpoints/checkpoint-rpc-handler.js";
 import { dispatchContextRpc } from "./context/context-rpc-handler.js";
-import { dispatchProjectRpc } from "./projects/project-rpc-handler.js";
 import { dispatchRunRpc, type DaemonRpcContext } from "./runs/run-rpc-handler.js";
+import { BrowserPermissionRpc } from "./runs/browser-permission-rpc.js";
 import { dispatchSessionRpc } from "./sessions/session-rpc-handler.js";
 
 const SESSION_RPC_METHODS = new Set<string>([
@@ -30,6 +29,7 @@ const SESSION_RPC_METHODS = new Set<string>([
 
 const RUN_RPC_METHODS = new Set<string>([
   RPC_METHOD.RUN_START,
+  RPC_METHOD.RUN_CANCEL,
   RPC_METHOD.RUN_QUEUE_ADD,
   RPC_METHOD.RUN_QUEUE_REMOVE,
 ]);
@@ -39,22 +39,7 @@ const CHECKPOINT_RPC_METHODS = new Set<string>([
   RPC_METHOD.CHECKPOINT_RESTORE,
 ]);
 
-const CONTEXT_RPC_METHODS = new Set<string>([
-  RPC_METHOD.CONTEXT_ATTACH, RPC_METHOD.CONTEXT_INDEX, RPC_METHOD.CONTEXT_SEARCH,
-  RPC_METHOD.CONTEXT_CLEAR, RPC_METHOD.CONTEXT_CLEAR_PREVIEW,
-  RPC_METHOD.CONTEXT_EXCLUSIONS_GET, RPC_METHOD.CONTEXT_EXCLUSIONS_SET,
-]);
-
-const AGENT_RPC_METHODS = new Set<string>([
-  RPC_METHOD.AGENT_SPAWN,
-  RPC_METHOD.AGENT_CANCEL,
-]);
-
-const PROJECT_RPC_METHODS = new Set<string>([
-  RPC_METHOD.PROJECT_CREATE,
-  RPC_METHOD.PROJECT_ACCEPT,
-  RPC_METHOD.PROJECT_REJECT,
-]);
+const CONTEXT_RPC_METHODS = new Set<string>([RPC_METHOD.CONTEXT_ATTACH]);
 
 function writeProtocolError(socket: net.Socket, code: ProtocolErrorCode, message: string): void {
   writeProtocolFrame(
@@ -66,6 +51,20 @@ function writeProtocolError(socket: net.Socket, code: ProtocolErrorCode, message
 export async function serveRpcOnConnection(
   socket: net.Socket,
   context: DaemonRpcContext,
+): Promise<void> {
+  const browserPermissions = new BrowserPermissionRpc();
+  try {
+    await serveRpcLoop(socket, context, browserPermissions);
+  } finally {
+    // AUT-01 + ADR-006: workers de navegador pertencem à conexão; encerrá-los quando ela termina.
+    await context.browserSessions.closeAll();
+  }
+}
+
+async function serveRpcLoop(
+  socket: net.Socket,
+  context: DaemonRpcContext,
+  browserPermissions: BrowserPermissionRpc,
 ): Promise<void> {
   while (!socket.destroyed) {
     let frame: Buffer;
@@ -107,9 +106,8 @@ export async function serveRpcOnConnection(
     const isRun = RUN_RPC_METHODS.has(request.method);
     const isCheckpoint = CHECKPOINT_RPC_METHODS.has(request.method);
     const isContext = CONTEXT_RPC_METHODS.has(request.method);
-    const isAgent = AGENT_RPC_METHODS.has(request.method);
-    const isProject = PROJECT_RPC_METHODS.has(request.method);
-    if (!isSession && !isRun && !isCheckpoint && !isContext && !isAgent && !isProject) {
+    const isBrowserPermission = request.method === RPC_METHOD.PERMISSION_DECIDE || request.method === RPC_METHOD.TOOL_INVOKE;
+    if (!isSession && !isRun && !isCheckpoint && !isContext && !isBrowserPermission) {
       writeProtocolError(
         socket,
         PROTOCOL_ERROR_CODES.INVALID_STATE,
@@ -119,17 +117,15 @@ export async function serveRpcOnConnection(
     }
 
     try {
-      const result = isRun
-        ? dispatchRunRpc(context, request)
+      const result = isBrowserPermission
+        ? await browserPermissions.dispatch(context, request)
+        : isRun
+        ? await dispatchRunRpc(context, request)
         : isCheckpoint
           ? dispatchCheckpointRpc(context, request)
           : isContext
             ? dispatchContextRpc(context, request)
-            : isAgent
-              ? dispatchAgentRpc(context, request)
-              : isProject
-                ? dispatchProjectRpc(context, request)
-                : dispatchSessionRpc(context, request);
+            : dispatchSessionRpc(context, request);
       writeProtocolFrame(
         socket,
         Buffer.from(

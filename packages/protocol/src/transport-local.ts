@@ -90,48 +90,52 @@ export function writeProtocolFrame(socket: net.Socket, body: Uint8Array): void {
   socket.write(encodeProtocolFrame(body));
 }
 
-export function readProtocolFrame(socket: net.Socket): Promise<Buffer> {
-  const decoder = new ProtocolFrameDecoder();
+interface FrameReader {
+  frames: Buffer[];
+  waiters: Array<{ resolve: (frame: Buffer) => void; reject: (error: Error) => void }>;
+  error?: Error;
+}
 
-  return new Promise((resolve, reject) => {
-    const onData = (chunk: Buffer) => {
+const readers = new WeakMap<net.Socket, FrameReader>();
+
+export function readProtocolFrame(socket: net.Socket): Promise<Buffer> {
+  let reader = readers.get(socket);
+  if (!reader) {
+    reader = { frames: [], waiters: [] };
+    readers.set(socket, reader);
+    const state = reader;
+    const decoder = new ProtocolFrameDecoder();
+    const fail = (error: Error) => {
+      if (state.error) return;
+      state.error = error;
+      for (const waiter of state.waiters.splice(0)) waiter.reject(error);
+    };
+    socket.on("data", (chunk: Buffer) => {
       try {
         decoder.push(chunk);
-        const frames = decoder.drain();
-        const firstFrame = frames[0];
-        if (firstFrame !== undefined) {
-          cleanup();
-          resolve(firstFrame);
+        for (const frame of decoder.drain()) {
+          const waiter = state.waiters.shift();
+          if (waiter) waiter.resolve(frame);
+          else state.frames.push(frame);
         }
       } catch (error) {
-        cleanup();
-        reject(error);
+        fail(error instanceof Error ? error : new Error(String(error)));
       }
-    };
-
-    const onError = (error: Error) => {
-      cleanup();
-      reject(error);
-    };
-
-    const onEnd = () => {
-      cleanup();
-      reject(
+    });
+    socket.on("error", fail);
+    socket.on("close", () => {
+      fail(
         new ProtocolError(
           PROTOCOL_ERROR_CODES.INVALID_STATE,
           "Conexão encerrada antes de receber um frame completo.",
         ),
       );
-    };
-
-    const cleanup = () => {
-      socket.off("data", onData);
-      socket.off("error", onError);
-      socket.off("end", onEnd);
-    };
-
-    socket.on("data", onData);
-    socket.on("error", onError);
-    socket.on("end", onEnd);
+    });
+  }
+  const frame = reader.frames.shift();
+  if (frame !== undefined) return Promise.resolve(frame);
+  if (reader.error) return Promise.reject(reader.error);
+  return new Promise((resolve, reject) => {
+    reader.waiters.push({ resolve, reject });
   });
 }

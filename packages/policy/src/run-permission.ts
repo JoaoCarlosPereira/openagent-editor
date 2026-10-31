@@ -254,10 +254,13 @@ export class RunToolPermissionFlow {
       request: ToolPermissionRequest;
     }
   >();
+  private readonly authorized = new Map<string, ToolPermissionRequest>();
+  private readonly denied = new Set<string>();
 
   requestPermission(input: BeginRunToolPermissionInput): RunToolPermissionPrepareResult {
     const prepared = prepareRunToolPermission(input);
     if (prepared.phase === "granted") {
+      this.authorized.set(prepared.request.requestId, prepared.request);
       return prepared;
     }
     const context = validateRunContext(input.runId, input.sessionId);
@@ -285,6 +288,11 @@ export class RunToolPermissionFlow {
     }
     const gate = resolveRunToolPermission(pending.gate, decision, selectedScope);
     this.pending.delete(requestId);
+    if (mayExecuteAfterPermissionGate(gate)) {
+      this.authorized.set(requestId, pending.request);
+    } else {
+      this.denied.add(requestId);
+    }
     return {
       gate,
       canExecute: mayExecuteAfterPermissionGate(gate),
@@ -294,6 +302,22 @@ export class RunToolPermissionFlow {
 
   getPending(requestId: string): ToolPermissionRequest | undefined {
     return this.pending.get(requestId)?.request;
+  }
+
+  getAuthorizedRequest(requestId: string): ToolPermissionRequest | undefined {
+    return this.authorized.get(requestId);
+  }
+
+  consumeAuthorizedRequest(requestId: string): ToolPermissionRequest | undefined {
+    const request = this.authorized.get(requestId);
+    if (request) {
+      this.authorized.delete(requestId);
+    }
+    return request;
+  }
+
+  wasDenied(requestId: string): boolean {
+    return this.denied.has(requestId);
   }
 }
 

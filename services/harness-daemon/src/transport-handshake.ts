@@ -12,8 +12,12 @@ import {
 import type { WorkspaceTransportHello } from "@openagent/protocol";
 import type { WorkspaceBindingState } from "./workspace-state.js";
 import { readPeerCredentialFromSocket } from "./peer-credential.js";
+import { RunMessageQueue } from "./queue/run-message-queue.js";
+import { RunStateMachine } from "./state/run-state-machine.js";
 import { serveRpcOnConnection } from "./rpc-connection.js";
-import type { SessionRpcContext } from "./sessions/session-rpc-handler.js";
+import { createWorkspaceCustomizationRules } from "./customization/session-rules-loader.js";
+import { BrowserSessionRegistry } from "./runs/browser-session-registry.js";
+import type { DaemonRpcContext } from "./runs/run-rpc-handler.js";
 
 export async function performServerTransportHandshake(
   socket: net.Socket,
@@ -89,6 +93,13 @@ export async function performServerTransportHandshake(
     ),
   );
 
-  const rpcContext: SessionRpcContext = { dataRoot: options.dataRoot, binding };
+  const rpcContext: DaemonRpcContext = {
+    dataRoot: options.dataRoot,
+    binding,
+    customizationRules: createWorkspaceCustomizationRules(),
+    runMachines: new Map<string, RunStateMachine>(),
+    runQueues: new Map<string, RunMessageQueue>(),
+    browserSessions: new BrowserSessionRegistry(),
+  };
   await serveRpcOnConnection(socket, rpcContext);
 }

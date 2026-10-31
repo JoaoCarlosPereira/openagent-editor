@@ -118,6 +118,77 @@ async function callDaemonRpc<M extends RpcMethod>(
 }
 
 test.describe("run.start emitindo HarnessEvent persistido", { concurrency: 1 }, () => {
+  test("permissão de browser por RPC fica vinculada à run e é persistida", async () => {
+    const dataRoot = await mkdtemp(path.join(os.tmpdir(), "openagent-browser-permission-"));
+    const runtime = await startHarnessDaemon({ dataRoot, runtimeDirectory: path.join(dataRoot, "runtime") });
+    const socket = await connectLocalTransport(runtime.address);
+    try {
+      await performClientHandshake(socket, WORKSPACE_HELLO);
+      const created = await callDaemonRpc(socket, RPC_METHOD.SESSION_CREATE, { mode: "agent" }, {
+        workspaceId: WORKSPACE_HELLO.workspaceId, sessionId: "placeholder", runId: "placeholder",
+      });
+      const context = { workspaceId: WORKSPACE_HELLO.workspaceId, sessionId: created.sessionId, runId: `run-${randomUUID()}` };
+      await callDaemonRpc(socket, RPC_METHOD.RUN_START, { input: { text: "Iniciar" } }, context);
+      const pending = await callDaemonRpc(socket, RPC_METHOD.TOOL_INVOKE, {
+        tool: "browser.open", target: "https://example.com/", arguments: {},
+      }, context);
+      assert.ok("pending" in pending);
+      await assert.rejects(callDaemonRpc(socket, RPC_METHOD.PERMISSION_DECIDE, {
+        permissionRequestId: pending.permissionRequestId, decision: "allow",
+      }, { ...context, sessionId: "outra" }), { code: "INVALID_STATE" });
+      assert.deepEqual(await callDaemonRpc(socket, RPC_METHOD.PERMISSION_DECIDE, {
+        permissionRequestId: pending.permissionRequestId, decision: "deny",
+      }, context), { persisted: true });
+      await assert.rejects(callDaemonRpc(socket, RPC_METHOD.PERMISSION_DECIDE, {
+        permissionRequestId: pending.permissionRequestId, decision: "allow",
+      }, context), { code: "INVALID_STATE" });
+      await callDaemonRpc(socket, RPC_METHOD.RUN_CANCEL, {}, context);
+      await assert.rejects(callDaemonRpc(socket, RPC_METHOD.TOOL_INVOKE, {
+        tool: "browser.open", target: "https://example.com/", arguments: {},
+      }, context), { code: "INVALID_STATE" });
+      const db = openWorkspaceDatabase({ dataRoot, workspaceId: WORKSPACE_HELLO.workspaceId });
+      try {
+        assert.deepEqual(db.listHarnessEvents(context.runId).map((event) => event.type),
+          ["run.started", "permission.requested", "permission.decided"]);
+      } finally { db.close(); }
+    } finally {
+      socket.destroy();
+      await runtime.stop();
+      await rm(dataRoot, { recursive: true, force: true });
+    }
+  });
+
+  test("run.cancel por RPC persiste estado e rejeita outra sessão e repetição", async () => {
+    const dataRoot = await mkdtemp(path.join(os.tmpdir(), "openagent-run-cancel-"));
+    const runtime = await startHarnessDaemon({ dataRoot, runtimeDirectory: path.join(dataRoot, "runtime") });
+    const socket = await connectLocalTransport(runtime.address);
+    const runId = `run-${randomUUID()}`;
+    try {
+      await performClientHandshake(socket, WORKSPACE_HELLO);
+      const created = await callDaemonRpc(socket, RPC_METHOD.SESSION_CREATE, { mode: "agent" }, {
+        workspaceId: WORKSPACE_HELLO.workspaceId, sessionId: "placeholder", runId: "placeholder",
+      });
+      const context = { workspaceId: WORKSPACE_HELLO.workspaceId, sessionId: created.sessionId, runId };
+      await callDaemonRpc(socket, RPC_METHOD.RUN_START, { input: { text: "Iniciar" } }, context);
+      await assert.rejects(callDaemonRpc(socket, RPC_METHOD.RUN_CANCEL, {}, { ...context, sessionId: "outra" }),
+        { code: "INVALID_STATE" });
+      assert.deepEqual(await callDaemonRpc(socket, RPC_METHOD.RUN_CANCEL, {}, context), { cancelled: true });
+      await assert.rejects(callDaemonRpc(socket, RPC_METHOD.RUN_CANCEL, {}, context), { code: "INVALID_STATE" });
+      const db = openWorkspaceDatabase({ dataRoot, workspaceId: WORKSPACE_HELLO.workspaceId });
+      try {
+        const sqlite = new (await import("node:sqlite")).DatabaseSync(db.databasePath);
+        try {
+          assert.equal((sqlite.prepare("SELECT state FROM run WHERE id = ?").get(runId) as { state: string }).state,
+            "cancelled");
+        } finally { sqlite.close(); }
+      } finally { db.close(); }
+    } finally {
+      socket.destroy();
+      await runtime.stop();
+      await rm(dataRoot, { recursive: true, force: true });
+    }
+  });
+
   test("[SES-01] run.start persiste run.started e sobrevive a reinício do storage", async () => {
     const dataRoot = await mkdtemp(path.join(os.tmpdir(), "openagent-run-start-44-"));
     const runtimeDirectory = path.join(dataRoot, "runtime");

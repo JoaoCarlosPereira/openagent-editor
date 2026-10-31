@@ -26,6 +26,7 @@ import { openWorkspaceDatabase } from "@openagent/storage";
 import { RunStateMachine } from "../../src/state/run-state-machine.js";
 import { RunMessageQueue } from "../../src/queue/run-message-queue.js";
 import { completeRunningRunLifecycle } from "../../src/runs/run-rpc-handler.js";
+import { BrowserSessionRegistry } from "../../src/runs/browser-session-registry.js";
 import { createWorkspaceCustomizationRules, startHarnessDaemon } from "../../src/index.js";
 
 const WORKSPACE: WorkspaceTransportHello = {
@@ -195,6 +196,7 @@ test.describe("run.queue.add/remove persistido", { concurrency: 1 }, () => {
         customizationRules: createWorkspaceCustomizationRules(),
         runMachines: new Map<string, RunStateMachine>(),
         runQueues: new Map<string, RunMessageQueue>(),
+        browserSessions: new BrowserSessionRegistry(),
       };
       const consumed = completeRunningRunLifecycle(context, runId);
       assert.equal(consumed.length, 2);

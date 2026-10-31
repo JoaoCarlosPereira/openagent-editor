@@ -9,6 +9,7 @@ import {
   type RpcRequestEnvelope,
   type RpcResultMap,
 } from "@openagent/protocol";
+import { persistHarnessEventWithPayload } from "@openagent/policy";
 import { openWorkspaceDatabase, type WorkspaceDatabase } from "@openagent/storage";
 import { runAgentModeIfRequested } from "../agent/agent-mode-run.js";
 import { executeAskRunLoop } from "../agent/ask-run-loop.js";
@@ -17,8 +18,6 @@ import {
   tryExtractPlanAcceptBundleFromUserText,
   tryExtractPlanDraftFromUserText,
 } from "../agent/plan-mode-input.js";
-import { tryExtractDebugSessionFromUserText } from "../agent/debug-mode-input.js";
-import { executeDebugRun } from "../agent/debug-run-loop.js";
 import { executePlanAcceptedRun, presentPlanDraftRun } from "../agent/plan-run-loop.js";
 import { RunMessageQueue } from "../queue/run-message-queue.js";
 import {
@@ -26,27 +25,23 @@ import {
   enqueueRunMessage,
   removePendingRunMessage,
 } from "../queue/run-queue-coordinator.js";
-import type { RunGrantRegistryMap } from "../agents/agent-subagent-grants.js";
-import type { SubagentRuntimeRegistry } from "../agents/agent-subagent-runtime.js";
 import { RunStateMachine } from "../state/run-state-machine.js";
 import type { RunLifecycleState } from "../state/run-state.js";
 import type { SessionRpcContext } from "../sessions/session-rpc-handler.js";
+import { BrowserSessionRegistry } from "./browser-session-registry.js";
 
 export type DaemonRpcContext = SessionRpcContext & {
   /** Máquinas de estado por runId na conexão (STA-01). */
   runMachines: Map<string, RunStateMachine>;
   /** Filas em memória por runId (AGT-06), sincronizadas com SQLite. */
   runQueues: Map<string, RunMessageQueue>;
-  /** Subagentes em execução por runId (AGT-07). */
-  subagentRuns?: SubagentRuntimeRegistry;
-  /** Grants do run pai compartilhados com subagentes (AGT-05 / PER-01). */
-  runGrantRegistries?: RunGrantRegistryMap;
+  /** Sessões de navegador autorizado ativas por runId na conexão (AUT-01). */
+  browserSessions: BrowserSessionRegistry;
 };
 
 export { consumePendingRunQueueAtRunEnd };
 
 const RUN_STARTED_EVENT_TYPE = "run.started";
-const RUN_CANCELLED_EVENT_TYPE = "run.cancelled";
 
 function mapProtocolError(error: unknown): ProtocolError {
   if (error instanceof ProtocolError) {
@@ -121,53 +116,10 @@ function persistRunCompleted(db: WorkspaceDatabase, runId: string, endedAtIso: s
   });
 }
 
-function persistRunCancelled(db: WorkspaceDatabase, runId: string, endedAtIso: string): void {
-  withSqlite(db, (sqlite) => {
-    sqlite
-      .prepare(`UPDATE run SET state = ?, ended_at = ? WHERE id = ?`)
-      .run("cancelled", endedAtIso, runId);
-  });
-}
-
 /**
  * Encerra uma execução em andamento: consome itens pending da fila e persiste estado completed.
  * Usado pelo loop do agente ao fim de uma iteração (AGT-06).
  */
-/**
- * Cancela execução em andamento: persiste `cancelled`, atualiza máquina (STA-01/PER-02)
- * e não consome itens pending da fila (sem novo dispatch).
- */
-export function cancelRunningRunLifecycle(
-  context: DaemonRpcContext,
-  runId: string,
-): { cancelled: true } {
-  const db = openWorkspaceDatabase({
-    dataRoot: context.dataRoot,
-    workspaceId: context.binding.workspaceId,
-  });
-  try {
-    const machine = machineForRun(context, db, runId);
-    machine.cancel();
-    const endedAtIso = new Date().toISOString();
-    persistRunCancelled(db, runId, endedAtIso);
-    const payloadBody = JSON.stringify({
-      type: RUN_CANCELLED_EVENT_TYPE,
-      runId,
-      endedAt: endedAtIso,
-    });
-    const cas = db.putCasBlob(Buffer.from(payloadBody, "utf8"));
-    db.appendHarnessEvent({
-      runId,
-      type: RUN_CANCELLED_EVENT_TYPE,
-      payloadRef: cas.contentRef,
-      timestamp: Date.now(),
-    });
-    return { cancelled: true };
-  } finally {
-    db.close();
-  }
-}
-
 export function completeRunningRunLifecycle(
   context: DaemonRpcContext,
   runId: string,
@@ -308,25 +260,6 @@ export function handleRunStart(
       }
     }
 
-    if (runMode === "debug") {
-      const debugSession = tryExtractDebugSessionFromUserText(inputResult.value.text);
-      if (!debugSession) {
-        throw new ProtocolError(
-          PROTOCOL_ERROR_CODES.INVALID_STATE,
-          "Modo Debug exige debugSession no input.",
-        );
-      }
-      executeDebugRun({
-        context,
-        db,
-        sessionId: request.sessionId,
-        runId: request.runId,
-        workspaceRoot: context.binding.workspaceRoot,
-        session: debugSession,
-        machine,
-      });
-    }
-
     return startedEvent;
   } finally {
     db.close();
@@ -343,45 +276,39 @@ function assertRunWorkspace(context: DaemonRpcContext, request: RpcRequestEnvelo
   }
 }
 
-function handleRunCancel(
+async function handleRunCancel(
   context: DaemonRpcContext,
   request: RpcRequestEnvelope<typeof RPC_METHOD.RUN_CANCEL>,
-): RpcResultMap[typeof RPC_METHOD.RUN_CANCEL] {
+): Promise<RpcResultMap[typeof RPC_METHOD.RUN_CANCEL]> {
   assertRunWorkspace(context, request);
-  const params = (request.payload ?? {}) as RpcParamsMap[typeof RPC_METHOD.RUN_CANCEL];
-  if (params.agentId) {
-    throw new ProtocolError(
-      PROTOCOL_ERROR_CODES.INVALID_STATE,
-      "Cancelamento de subagente ainda não implementado; omita agentId para cancelar a execução.",
-      [params.agentId],
-    );
+  if (request.payload?.agentId) {
+    throw new ProtocolError(PROTOCOL_ERROR_CODES.INVALID_STATE, "Cancelamento de subagente não é suportado.");
   }
-
   const db = openWorkspaceDatabase({
     dataRoot: context.dataRoot,
     workspaceId: context.binding.workspaceId,
   });
   try {
-    const lifecycle = loadRunLifecycleState(db, request.runId);
-    if (lifecycle === null) {
-      throw new ProtocolError(
-        PROTOCOL_ERROR_CODES.INVALID_STATE,
-        "runId inexistente para run.cancel.",
-        [request.runId],
-      );
+    const updated = withSqlite(db, (sqlite) => sqlite.prepare(
+      "UPDATE run SET state = 'cancelled', ended_at = ? WHERE id = ? AND session_id = ? AND state = 'running'",
+    ).run(new Date().toISOString(), request.runId, request.sessionId).changes);
+    if (updated !== 1) {
+      throw new ProtocolError(PROTOCOL_ERROR_CODES.INVALID_STATE, "Execução inexistente, terminal ou de outra sessão.");
     }
-    if (lifecycle !== "running") {
-      throw new ProtocolError(
-        PROTOCOL_ERROR_CODES.INVALID_STATE,
-        "run.cancel exige execução em andamento.",
-        [request.runId, lifecycle],
-      );
+    context.runMachines.set(request.runId, new RunStateMachine("cancelled"));
+    // AUT-01 + ADR-006: cancelamento da run encerra o worker do navegador e impede novos dispatches.
+    const browserClosed = await context.browserSessions.closeForRun(request.runId);
+    if (browserClosed) {
+      persistHarnessEventWithPayload(db, request.runId, "browser.cancelled", {
+        type: "browser.cancelled",
+        runId: request.runId,
+        sessionId: request.sessionId,
+      });
     }
+    return { cancelled: true };
   } finally {
     db.close();
   }
-
-  return cancelRunningRunLifecycle(context, request.runId);
 }
 
 function handleRunQueueAdd(
@@ -402,10 +329,10 @@ function handleRunQueueRemove(
   return removePendingRunMessage(context, request.runId, params.queueItemId);
 }
 
-export function handleRunRpc(
+export async function handleRunRpc(
   context: DaemonRpcContext,
   request: RpcRequestEnvelope,
-): RpcResultMap[RpcMethod] {
+): Promise<RpcResultMap[RpcMethod]> {
   switch (request.method) {
     case RPC_METHOD.RUN_START:
       return handleRunStart(context, request as RpcRequestEnvelope<typeof RPC_METHOD.RUN_START>);
@@ -429,12 +356,12 @@ export function handleRunRpc(
   }
 }
 
-export function dispatchRunRpc(
+export async function dispatchRunRpc(
   context: DaemonRpcContext,
   request: RpcRequestEnvelope,
-): RpcResultMap[RpcMethod] {
+): Promise<RpcResultMap[RpcMethod]> {
   try {
-    return handleRunRpc(context, request);
+    return await handleRunRpc(context, request);
   } catch (error) {
     throw mapProtocolError(error);
   }

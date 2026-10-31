@@ -8,6 +8,7 @@
     ".": "./src/index.ts",
     "./agent": "./src/agent/agent-panel.ts",
     "./agents": "./src/agents/index.ts",
+    "./browser": "./src/browser/index.ts",
     "./onboarding": "./src/onboarding/index.ts",
     "./permissions": "./src/permissions/permission-dialog.ts",
     "./settings": "./src/settings/index.ts"

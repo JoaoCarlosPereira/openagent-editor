@@ -314,7 +314,9 @@ export interface RpcResultMap {
   [RPC_METHOD.RUN_QUEUE_ADD]: { queueItemId: string; ordinal: number };
   [RPC_METHOD.RUN_QUEUE_REMOVE]: { removed: true };
   [RPC_METHOD.PERMISSION_DECIDE]: { persisted: boolean };
-  [RPC_METHOD.TOOL_INVOKE]: { resultRef: string };
+  [RPC_METHOD.TOOL_INVOKE]:
+    | { resultRef: string }
+    | { pending: true; permissionRequestId: string; prompt: { action: string; target: string; scopeLabel: string; sandboxIsolationLevel?: string; degradationNotice?: string } };
   [RPC_METHOD.CHECKPOINT_CREATE]: { checkpointId: string };
   [RPC_METHOD.CHECKPOINT_RESTORE]: CheckpointRestoreRpcResult;
   [RPC_METHOD.AGENT_SPAWN]: { agentId: string };
