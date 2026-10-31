@@ -33,6 +33,9 @@ export const RPC_METHOD = {
   CONTEXT_INDEX: "context.index",
   CONTEXT_SEARCH: "context.search",
   CONTEXT_CLEAR: "context.clear",
+  CONTEXT_EXCLUSIONS_GET: "context.exclusions.get",
+  CONTEXT_EXCLUSIONS_SET: "context.exclusions.set",
+  CONTEXT_CLEAR_PREVIEW: "context.clear.preview",
   EXTENSION_INSTALL: "extension.install",
   EXTENSION_ENABLE: "extension.enable",
   EXTENSION_DISABLE: "extension.disable",
@@ -223,6 +226,7 @@ export interface ContextSearchParams {
 
 export interface ContextClearParams {
   scope?: "session" | "workspace";
+  previewToken?: string;
 }
 
 /** Tamanho do índice lexical antes da limpeza (CTX-04). */
@@ -237,6 +241,13 @@ export interface ContextClearResult {
   cleared: true;
   scope: "workspace";
   size: ContextClearIndexSize;
+  sizeAfter?: ContextClearIndexSize;
+}
+
+export interface ContextClearPreview {
+  scope: "workspace";
+  size: ContextClearIndexSize;
+  previewToken: string;
 }
 
 export interface ExtensionInstallParams {
@@ -276,6 +287,9 @@ export interface RpcParamsMap {
   [RPC_METHOD.CONTEXT_INDEX]: ContextIndexParams;
   [RPC_METHOD.CONTEXT_SEARCH]: ContextSearchParams;
   [RPC_METHOD.CONTEXT_CLEAR]: ContextClearParams;
+  [RPC_METHOD.CONTEXT_EXCLUSIONS_GET]: Record<string, never>;
+  [RPC_METHOD.CONTEXT_EXCLUSIONS_SET]: { patterns: string[] };
+  [RPC_METHOD.CONTEXT_CLEAR_PREVIEW]: Record<string, never>;
   [RPC_METHOD.EXTENSION_INSTALL]: ExtensionInstallParams;
   [RPC_METHOD.EXTENSION_ENABLE]: ExtensionEnableParams;
   [RPC_METHOD.EXTENSION_DISABLE]: ExtensionDisableParams;
@@ -312,6 +326,9 @@ export interface RpcResultMap {
   [RPC_METHOD.CONTEXT_INDEX]: { indexed: number };
   [RPC_METHOD.CONTEXT_SEARCH]: { hits: Array<{ ref: string; score: number }> };
   [RPC_METHOD.CONTEXT_CLEAR]: ContextClearResult;
+  [RPC_METHOD.CONTEXT_EXCLUSIONS_GET]: { patterns: string[] };
+  [RPC_METHOD.CONTEXT_EXCLUSIONS_SET]: { patterns: string[] };
+  [RPC_METHOD.CONTEXT_CLEAR_PREVIEW]: ContextClearPreview;
   [RPC_METHOD.EXTENSION_INSTALL]: { extensionId: string };
   [RPC_METHOD.EXTENSION_ENABLE]: { enabled: true };
   [RPC_METHOD.EXTENSION_DISABLE]: { disabled: true };
@@ -444,6 +461,21 @@ export const RPC_METHOD_SPECS: Record<RpcMethod, RpcMethodSpec> = {
   [RPC_METHOD.CONTEXT_CLEAR]: {
     method: RPC_METHOD.CONTEXT_CLEAR,
     capability: "context.write",
+    workspaceBindings: ["sessions"],
+  },
+  [RPC_METHOD.CONTEXT_EXCLUSIONS_GET]: {
+    method: RPC_METHOD.CONTEXT_EXCLUSIONS_GET,
+    capability: "context.read",
+    workspaceBindings: ["rules"],
+  },
+  [RPC_METHOD.CONTEXT_EXCLUSIONS_SET]: {
+    method: RPC_METHOD.CONTEXT_EXCLUSIONS_SET,
+    capability: "context.write",
+    workspaceBindings: ["rules"],
+  },
+  [RPC_METHOD.CONTEXT_CLEAR_PREVIEW]: {
+    method: RPC_METHOD.CONTEXT_CLEAR_PREVIEW,
+    capability: "context.read",
     workspaceBindings: ["sessions"],
   },
   [RPC_METHOD.EXTENSION_INSTALL]: {

@@ -87,6 +87,7 @@ export {
 export { removeContextFileIndex } from "./indexer/remove-context-file-index.js";
 export {
   clearContextChunkVectors,
+  ensureContextChunkVectorSchema,
   EMBEDDING_VECTOR_REF_PREFIX,
   formatEmbeddingVectorRef,
   loadRedistributableLocalEmbeddingModel,

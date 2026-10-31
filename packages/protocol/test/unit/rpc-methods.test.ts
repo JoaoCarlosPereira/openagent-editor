@@ -53,7 +53,7 @@ test("[CLI-01] Catálogo RPC cobre session, run, queue, permission, tool, checkp
     );
   }
 
-  assert.equal(ALL_RPC_METHODS.length, 27);
+  assert.equal(ALL_RPC_METHODS.length, 30);
 });
 
 test("[CLI-01] session.list ancora workspaceId e expõe bindings de provedor, modo, regras, MCP e sessões", () => {

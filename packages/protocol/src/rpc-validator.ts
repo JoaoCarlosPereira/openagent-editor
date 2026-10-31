@@ -231,6 +231,17 @@ function validateParamsForMethod(method: RpcMethod, params: unknown): string[] {
       ) {
         errors.push("Campo 'scope' deve ser 'session' ou 'workspace' quando presente.");
       }
+      if (params["previewToken"] !== undefined && !isNonEmptyString(params["previewToken"])) {
+        errors.push("Campo 'previewToken' deve ser string não-vazia quando presente.");
+      }
+      break;
+    case RPC_METHOD.CONTEXT_EXCLUSIONS_GET:
+    case RPC_METHOD.CONTEXT_CLEAR_PREVIEW:
+      break;
+    case RPC_METHOD.CONTEXT_EXCLUSIONS_SET:
+      if (!Array.isArray(params["patterns"]) || !params["patterns"].every(isNonEmptyString)) {
+        errors.push("Campo 'patterns' deve ser array de padrões não-vazios.");
+      }
       break;
     case RPC_METHOD.EXTENSION_INSTALL:
       if (!isNonEmptyString(params["packageRef"])) {

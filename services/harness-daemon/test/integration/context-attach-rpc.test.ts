@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import type net from "node:net";
@@ -133,6 +133,7 @@ function seedWorkspace(dataRoot: string, contextLimit: number): void {
 
 test("[CTX-01] context.attach via daemon retorna fontes, tokens e teto", async (t) => {
   const dataRoot = await mkdtemp(path.join(os.tmpdir(), "ctx-attach-86-"));
+  await mkdir(WORKSPACE.workspaceRoot, { recursive: true });
   t.after(async () => {
     await rm(dataRoot, { recursive: true, force: true });
   });
@@ -155,13 +156,13 @@ test("[CTX-01] context.attach via daemon retorna fontes, tokens e teto", async (
       {
         id: "file-1",
         kind: "file",
-        path: "/proj/a.ts",
+        path: `${WORKSPACE.workspaceRoot}/a.ts`,
         previewText: "const x = 1;",
       },
       {
         id: "folder-1",
         kind: "folder",
-        path: "/proj/lib",
+        path: `${WORKSPACE.workspaceRoot}/lib`,
       },
     ],
     messageText: "explique",
@@ -211,6 +212,7 @@ test("[CTX-01] context.attach rejeita anexo inválido com INVALID_STATE", async 
 
 test("[CTX-01] context.attach sem workspace persistido usa teto API-03", async (t) => {
   const dataRoot = await mkdtemp(path.join(os.tmpdir(), "ctx-attach-86-default-"));
+  await mkdir(WORKSPACE.workspaceRoot, { recursive: true });
   t.after(async () => {
     await rm(dataRoot, { recursive: true, force: true });
   });
@@ -231,7 +233,7 @@ test("[CTX-01] context.attach sem workspace persistido usa teto API-03", async (
       {
         id: "sel",
         kind: "selection",
-        path: "/proj/b.ts",
+        path: `${WORKSPACE.workspaceRoot}/b.ts`,
         previewText: "snippet",
       },
     ],
